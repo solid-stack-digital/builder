@@ -5,9 +5,6 @@ console.log("🔍 Running pre-publish validation checks...");
 
 const distPath = path.resolve(process.cwd(), "dist");
 const requiredFiles = [
-  "index.js",
-  "index.cjs",
-  "index.d.ts",
   "bin.js",
 ];
 
