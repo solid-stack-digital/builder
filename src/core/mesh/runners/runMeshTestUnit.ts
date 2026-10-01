@@ -1,0 +1,51 @@
+import path from "node:path";
+import pc from "picocolors";
+import { runTestUnit } from "../../runners/runTestUnit.js";
+import { checkMesh } from "../checkers/checkMesh.js";
+import { getMeshJson } from "../getMeshJson.js";
+import type { MeshRunOptions } from "../MeshRunOptions.js";
+
+export function runMeshTestUnit(options: MeshRunOptions = {}): number {
+  const meshDir = path.resolve(options.projectDir || process.cwd());
+
+  console.log(pc.bold(pc.blue(`\n========================================`)));
+  console.log(pc.bold(pc.blue(`🧪 [MESH] STAGE: ISOLATED UNIT TESTS`)));
+  console.log(pc.bold(pc.blue(`========================================\n`)));
+
+  checkMesh(meshDir, { requireTester: false });
+  const mesh = getMeshJson(meshDir);
+
+  for (const [serviceName, serviceConfig] of Object.entries(mesh.services)) {
+    const serviceDir = path.resolve(meshDir, serviceConfig.path);
+    console.log(
+      pc.cyan(`\n-> Running isolated unit tests for service: [${serviceName}]...`)
+    );
+
+    if (options.dryRun) {
+      console.log(pc.green(`[DRY-RUN] Unit tests for ${serviceName} simulated.`));
+      continue;
+    }
+
+    const unitStatus = runTestUnit({
+      projectDir: serviceDir,
+      debug: Boolean(options.debug),
+      detach: Boolean(options.detach),
+    });
+
+    if (unitStatus !== 0) {
+      console.error(
+        pc.red(`\n❌ Unit tests failed for service [${serviceName}] with exit code ${unitStatus}.\n`)
+      );
+      return unitStatus;
+    }
+
+    console.log(
+      pc.bold(pc.green(`\n✅ Isolated unit tests passed for service: [${serviceName}]\n`))
+    );
+  }
+
+  console.log(
+    pc.bold(pc.green(`🎉 All mesh service unit tests completed successfully!\n`))
+  );
+  return 0;
+}

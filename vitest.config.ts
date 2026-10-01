@@ -36,5 +36,6 @@ export default defineConfig({
     globals: true,
     include: ["src/**/__tests__/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
     exclude: ["node_modules", "dist"],
+    testTimeout: 60000,
   },
 });

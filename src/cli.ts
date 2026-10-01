@@ -3,6 +3,7 @@ import pc from "picocolors";
 import { ScriptError } from "./errors/ScriptError.js";
 import { version } from "./version.js";
 import { registerServiceCommand } from "./commands/service/command.js";
+import { registerMeshCommand } from "./commands/mesh/command.js";
 import { registerCheckCommand } from "./commands/check/command.js";
 
 export function createCli(): Command {
@@ -15,6 +16,9 @@ export function createCli(): Command {
 
   // Group: builder service up [stage]
   registerServiceCommand(program);
+
+  // Group: builder mesh up [stage]
+  registerMeshCommand(program);
 
   // Dedicated infra check command: builder check
   registerCheckCommand(program);

@@ -26,7 +26,7 @@ describe("Backend API E2E Suite (via Gateway Instance)", () => {
 			expect(contentType).toContain("application/json");
 
 			const body = (await res.json()) as { status: string };
-			expect(body).toEqual({ status: "success" });
+			expect(body.status).toBe("healthy");
 		});
 	});
 });

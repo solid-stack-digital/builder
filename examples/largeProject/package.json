@@ -3,7 +3,8 @@
   "name": "root-orchestrator",
   "private": true,
   "scripts": {
-    "dev": "make dev"
+    "dev": "make dev",
+    "builder": "builder"
   },
   "license": "UNLICENSED",
   "devEngines": {
@@ -14,6 +15,7 @@
     }
   },
   "devDependencies": {
+    "@solid-stack/builder": "link:../..",
     "@types/node": "^20.0.0",
     "tsx": "^4.7.0",
     "typescript": "^5.0.0"
