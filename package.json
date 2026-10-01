@@ -1,6 +1,6 @@
 {
   "name": "@solid-stack/builder",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "CLI build tool and orchestrator for Solid Stack services.",
   "type": "module",
   "bin": {
@@ -13,7 +13,7 @@
     "templates"
   ],
   "scripts": {
-   "build": "tsc --project tsconfig.build.json --outDir dist && tsc-alias -p tsconfig.build.json",
+    "build": "tsc --project tsconfig.build.json --outDir dist && tsc-alias -p tsconfig.build.json",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
