@@ -2,30 +2,18 @@
   "name": "@solid-stack/builder",
   "version": "1.0.0",
   "description": "CLI build tool and orchestrator for Solid Stack services.",
-  "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "type": "module", 
   "bin": {
     "builder": "./dist/bin.js",
     "solid-builder": "./dist/bin.js"
   },
-  "packageManager": "pnpm@11.18.0",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "default": "./dist/index.js"
-    },
-    "./package.json": "./package.json"
-  },
+  "packageManager": "pnpm@11.18.0", 
   "files": [
     "dist",
     "templates"
   ],
   "scripts": {
-    "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly --outDir dist",
+    "build": "tsup && tsc --project tsconfig.build.json --outDir dist",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
