@@ -1,0 +1,12 @@
+services:
+  mock-auth-api:
+    image: wiremock/wiremock:3.9.1
+    ports:
+      - "3002:8080"
+    volumes:
+      - .docker/mocks/auth-api-wiremock:/home/wiremock    
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-f", "http://localhost:8080/__admin/mappings"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

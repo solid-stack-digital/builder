@@ -1,0 +1,24 @@
+
+{
+  "name": "root-orchestrator",
+  "private": true,
+  "scripts": {
+    "dev": "make dev"
+  },
+  "license": "UNLICENSED",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.18.0",
+      "onFail": "download"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": { 
+    "dotenv": "^17.4.2"  
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@solid-stack/test-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "pnpm check:lint",
+    "test": "pnpm lint && vitest run --includeTaskLocation",
+    "test:watch": "vitest",
+    "check:lint:fix": "biome check --write src/",
+    "test:ui": "vitest --ui",
+    "check:types": "tsc --noEmit",
+    "check:lint": "biome check src/",
+    "check:all": "pnpm check:types && pnpm check:lint",
+    "check": "pnpm check:all && vitest run"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@types/node": "^22.13.4",
+    "@vitest/ui": "^4.1.10",
+    "dotenv": "^17.4.2",
+    "tsx": "^4.23.1",
+    "typescript": "^5.7.3",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.10"
+  }
+}

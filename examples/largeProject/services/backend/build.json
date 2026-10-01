@@ -1,0 +1,27 @@
+{
+  "name": "example-backend",
+  "dependencies": {
+    "filesystem": {
+      "path": ".docker/mocks/docker-compose.filesystem.yml",
+      "service": "mock-filesystem"
+    }, 
+    "auth-api": {
+      "path": ".docker/mocks/docker-compose.auth-api.yml",
+      "service": "mock-auth-api"
+    }
+  },
+  "overrides": {
+    "dev": {
+      "path": ".docker/overrides/docker-compose.dev.override.yml"
+    },
+    "test": {
+      "path": ".docker/overrides/docker-compose.test.override.yml"
+    },
+    "prod": {
+      "path": ".docker/overrides/docker-compose.prod.override.yml"
+    },
+    "e2e": {
+      "path": ".docker/overrides/docker-compose.e2e.override.yml"
+    }
+  }
+}

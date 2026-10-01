@@ -1,0 +1,19 @@
+{
+  "services": { 
+    "auth-api": {
+      "path": "./services/auth-api", 
+      "provideDependency": {},
+      "envOverrides": {}
+    },
+    "backend": {
+      "path": "./services/backend",
+      "port": 3000,
+      "provideDependency": {
+        "auth-api": "auth-api"
+      },
+      "envOverrides": {
+        "AUTH_API_URL": "http://auth-api:3000"
+      }
+    } 
+  }
+}
