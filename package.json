@@ -1,6 +1,6 @@
 {
   "name": "@solid-stack/builder",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "CLI build tool and orchestrator for Solid Stack services.",
   "type": "module",
   "bin": {
