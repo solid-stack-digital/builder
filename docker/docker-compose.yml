@@ -1,0 +1,45 @@
+name: package-template
+
+services:
+  dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: dev
+    volumes:
+      - ..:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - CI=true
+
+  test:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: test
+    environment:
+      - NODE_ENV=test
+      - CI=true
+
+  build:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: builder
+    volumes:
+      - ..:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=production
+      - CI=true
+    command: ["pnpm", "build"]
+
+  prod:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: prod
+    environment:
+      - NODE_ENV=production
+      - CI=true

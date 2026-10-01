@@ -1,0 +1,72 @@
+{
+  "name": "@solid-stack/ts-jspackage-template",
+  "version": "0.1.1",
+  "description": "A modern TypeScript package starter template with pnpm, tsup, and vitest.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "packageManager": "pnpm@11.18.0",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly --outDir dist",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "prepublishOnly": "pnpm build && pnpm test && tsx scripts/prepublish-check.ts"
+  },
+  "keywords": [
+    "typescript",
+    "template",
+    "pnpm",
+    "tsup",
+    "vitest",
+    "esm",
+    "cjs"
+  ],
+  "author": "Solid Stack Digital",
+  "license": "UNLICENSED",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.18.0",
+      "onFail": "download"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/solid-stack-digital/ts-jspackage-template.git"
+  },
+  "homepage": "https://github.com/solid-stack-digital/ts-jspackage-template#readme",
+  "peerDependencies": {
+    "@solid-stack/di": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@solid-stack/di": "^1.0.4",
+    "@types/node": "^26.1.2",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
