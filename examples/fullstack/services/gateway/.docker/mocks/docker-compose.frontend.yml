@@ -1,0 +1,17 @@
+services:
+  mock-frontend:
+    image: node:22-alpine
+    command: >
+      node -e "
+        const http = require('http');
+        const server = http.createServer((req, res) => {
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.end('<!DOCTYPE html><html><body><div id=\"root\"><div id=\"frontend-source\">Frontend: mock-frontend</div></div></body></html>');
+        });
+        server.listen(3001, '0.0.0.0', () => console.log('Mock frontend running on 3001'));
+      "
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(3001, '127.0.0.1').on('connect', () => process.exit(0)).on('error', () => process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 5

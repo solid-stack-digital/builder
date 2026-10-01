@@ -1,4 +1,5 @@
 {
+  "name": "fullstack",
   "services": {
     "filesystem": {
       "path": "./services/filesystem"
@@ -6,7 +7,6 @@
     "mailer": {
       "path": "./services/mailer"
     },
-
     "backend": {
       "path": "./services/backend",
       "provideDependency": {
@@ -14,8 +14,8 @@
         "mailer": "mailer"
       },
       "envOverrides": {
-        "FILESYSTEM_URL": "http://auth-api:3000",
-        "MAILER_URL": "http://auth-api:3000"
+        "FILESYSTEM_URL": "http://filesystem:3003",
+        "MAILER_URL": "http://mailer:3004"
       }
     },
     "frontend": {

@@ -1,0 +1,5 @@
+packages:
+  - "services/*"
+  - "e2e"
+allowBuilds:
+  esbuild: true

@@ -1,0 +1,21 @@
+services:
+  mock-mailer:
+    image: node:22-alpine
+    command: >
+      node -e "
+        const http = require('http');
+        const server = http.createServer((req, res) => {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          if (req.url === '/health' || req.url === '/api/info') {
+            res.end(JSON.stringify({ status: 'healthy', service: 'mailer', source: 'mock-mailer' }));
+          } else {
+            res.end(JSON.stringify({ source: 'mock-mailer', status: 'sent', id: 'mock-mail-999' }));
+          }
+        });
+        server.listen(3004, '0.0.0.0', () => console.log('Mock mailer running on 3004'));
+      "
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(3004, '127.0.0.1').on('connect', () => process.exit(0)).on('error', () => process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 5

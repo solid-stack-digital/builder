@@ -1,0 +1,31 @@
+{
+  "name": "fullstack-backend",
+  "dependencies": {
+    "filesystem": {
+      "path": ".docker/mocks/docker-compose.filesystem.yml",
+      "service": "mock-filesystem"
+    },
+    "mailer": {
+      "path": ".docker/mocks/docker-compose.mailer.yml",
+      "service": "mock-mailer"
+    },
+    "firebase": {
+      "path": ".docker/mocks/docker-compose.firebase.yml",
+      "service": "firebase-emulator"
+    }
+  },
+  "overrides": {
+    "dev": {
+      "path": ".docker/overrides/docker-compose.dev.override.yml"
+    },
+    "test": {
+      "path": ".docker/overrides/docker-compose.test.override.yml"
+    },
+    "prod": {
+      "path": ".docker/overrides/docker-compose.prod.override.yml"
+    },
+    "e2e": {
+      "path": ".docker/overrides/docker-compose.e2e.override.yml"
+    }
+  }
+}

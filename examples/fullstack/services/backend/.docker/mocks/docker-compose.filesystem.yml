@@ -1,0 +1,23 @@
+services:
+  mock-filesystem:
+    image: node:22-alpine
+    command: >
+      node -e "
+        const http = require('http');
+        const server = http.createServer((req, res) => {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          if (req.url === '/health' || req.url === '/api/info') {
+            res.end(JSON.stringify({ status: 'healthy', service: 'filesystem', source: 'mock-filesystem' }));
+          } else if (req.method === 'POST') {
+            res.end(JSON.stringify({ source: 'mock-filesystem', status: 'saved', fileId: 'mock-file-123' }));
+          } else {
+            res.end(JSON.stringify({ source: 'mock-filesystem', fileId: 'mock-file-123', filename: 'mock.txt', content: 'mock content' }));
+          }
+        });
+        server.listen(3003, '0.0.0.0', () => console.log('Mock filesystem running on 3003'));
+      "
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(3003, '127.0.0.1').on('connect', () => process.exit(0)).on('error', () => process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 5

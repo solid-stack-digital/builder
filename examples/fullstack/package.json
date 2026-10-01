@@ -1,0 +1,13 @@
+{
+  "name": "fullstack-example",
+  "private": true,
+  "scripts": {
+    "builder": "builder"
+  },
+  "devDependencies": {
+    "@solid-stack/builder": "link:../..",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.0.0"
+  }
+}

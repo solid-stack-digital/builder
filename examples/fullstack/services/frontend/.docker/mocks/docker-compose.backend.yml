@@ -1,0 +1,27 @@
+services:
+  mock-backend:
+    image: node:22-alpine
+    command: >
+      node -e "
+        const http = require('http');
+        const server = http.createServer((req, res) => {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          if (req.url === '/health' || req.url === '/api/health') {
+            res.end(JSON.stringify({ status: 'healthy', service: 'backend', source: 'mock-backend' }));
+          } else {
+            res.end(JSON.stringify({
+              service: 'backend',
+              source: 'mock-backend',
+              database: { status: 'connected', type: 'mock' },
+              filesystem: { source: 'mock-filesystem' },
+              mailer: { source: 'mock-mailer' }
+            }));
+          }
+        });
+        server.listen(3002, '0.0.0.0', () => console.log('Mock backend running on 3002'));
+      "
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(3002, '127.0.0.1').on('connect', () => process.exit(0)).on('error', () => process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 5

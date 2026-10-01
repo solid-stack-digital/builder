@@ -1,0 +1,19 @@
+{
+  "name": "fullstack-gateway",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "nginx -g 'daemon off;'",
+    "build": "node -e 'process.exit(0)'",
+    "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.e2e.config.mts",
+    "builder": "builder"
+  },
+  "devDependencies": {
+    "@solid-stack/builder": "link:../../../..",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.10"
+  }
+}

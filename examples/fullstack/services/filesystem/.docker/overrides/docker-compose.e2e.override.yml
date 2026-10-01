@@ -1,0 +1,4 @@
+services:
+  tester:
+    environment:
+      - CI=true
