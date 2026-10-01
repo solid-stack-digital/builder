@@ -33,3 +33,8 @@ patch:
 	pnpm version patch
 	make build
 	make publish
+
+
+
+lookci: 
+	@find src -type f -exec tail -n +1 {} + 
