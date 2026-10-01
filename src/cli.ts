@@ -1,9 +1,9 @@
 import { Command } from "commander";
 import pc from "picocolors";
-import { checkInfra } from "./commands/checkInfra.js";
 import { ScriptError } from "./errors/ScriptError.js";
 import { version } from "./version.js";
 import { registerServiceCommand } from "./commands/service/command.js";
+import { registerCheckCommand } from "./commands/check/command.js";
 
 export function createCli(): Command {
   const program = new Command();
@@ -17,17 +17,7 @@ export function createCli(): Command {
   registerServiceCommand(program);
 
   // Dedicated infra check command: builder check
-  program
-    .command("check")
-    .description("Run infrastructure and contract checks (hadolint, conftest)")
-    .option(
-      "-C, --project-dir <dir>",
-      "Service project directory (defaults to cwd)",
-    )
-    .action((options: Record<string, any> = {}) => {
-      const projectDir = options.projectDir || process.cwd();
-      checkInfra(projectDir);
-    });
+  registerCheckCommand(program);
 
   return program;
 }

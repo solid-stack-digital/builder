@@ -2,12 +2,12 @@ import pc from "picocolors";
 import { ScriptError } from "../../../../errors/ScriptError.js";
 import type { ServiceUpOptions } from "../../../../types/index.js";
 import { checkDependencies } from "../../../../utils/checkDependencies.js";
-import { checkInfra } from "../../../checkInfra.js";
 import { runDev } from "@/core/runners/runDev.js";
 import { runProd } from "@/core/runners/runProd.js";
 import { runTestE2e } from "@/core/runners/runTestE2e.js";
 import { runTestUnit } from "@/core/runners/runTestUnit.js";
 import { runTest } from "@/core/runners/runTest.js";
+import { checkInfra } from "@/core/checkers/checkInfra.js";
 
 export async function handleServiceUp(
   rawStage?: string,
@@ -15,11 +15,6 @@ export async function handleServiceUp(
 ): Promise<number> {
   const projectDir = options.projectDir || process.cwd();
   const stage = (rawStage || "dev").toLowerCase();
-
-  // Validate dependencies (e.g. docker installed)
-  checkDependencies();
-
-  checkInfra(projectDir);
 
   const runOptions = {
     projectDir,
