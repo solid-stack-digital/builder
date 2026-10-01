@@ -1,0 +1,46 @@
+{
+  "services": {
+    "filesystem": {
+      "path": "./services/filesystem"
+    },
+    "mailer": {
+      "path": "./services/mailer"
+    },
+
+    "backend": {
+      "path": "./services/backend",
+      "provideDependency": {
+        "filesystem": "filesystem",
+        "mailer": "mailer"
+      },
+      "envOverrides": {
+        "FILESYSTEM_URL": "http://auth-api:3000",
+        "MAILER_URL": "http://auth-api:3000"
+      }
+    },
+    "frontend": {
+      "path": "./services/frontend",
+      "provideDependency": {
+        "backend": "backend"
+      },
+      "envOverrides": {
+        "BACKEND_URL": "http://backend:3002"
+      }
+    },
+    "gateway": {
+      "path": "./services/gateway",
+      "port": 3000,
+      "provideDependency": {
+        "frontend": "frontend",
+        "backend": "backend"
+      },
+      "envOverrides": {
+        "FRONTEND_URL": "http://frontend:3001",
+        "BACKEND_URL": "http://backend:3002"
+      }
+    }
+  },
+  "tester": {
+    "path": "./e2e"
+  }
+}
