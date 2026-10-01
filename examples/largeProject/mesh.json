@@ -15,5 +15,8 @@
         "AUTH_API_URL": "http://auth-api:3000"
       }
     } 
+  },
+  "tester": {
+    "path": "./e2e"
   }
 }
