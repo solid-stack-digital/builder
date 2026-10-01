@@ -4,6 +4,7 @@ import { checkInfra } from "./commands/checkInfra.js";
 import { handleServiceUp } from "./commands/serviceUp.js";
 import { ScriptError } from "./errors/ScriptError.js";
 import { version } from "./version.js";
+import { registerServiceCommand } from "./commands/service/command.js";
 
 export function createCli(): Command {
   const program = new Command();
@@ -18,13 +19,22 @@ export function createCli(): Command {
       .option("--skip-check", "Skip infrastructure and contract checks")
       .option("--debug", "Output the merged Docker Compose YAML configuration")
       .option("-d, --detach", "Run containers in the background")
-      .option("--dry-run", "Preview generated compose configuration without starting containers")
-      .option("-C, --project-dir <dir>", "Service project directory (defaults to cwd)")
+      .option(
+        "--dry-run",
+        "Preview generated compose configuration without starting containers",
+      )
+      .option(
+        "-C, --project-dir <dir>",
+        "Service project directory (defaults to cwd)",
+      )
       .option("--unit", "Run only unit tests (when stage is test)")
       .option("--e2e", "Run only e2e tests (when stage is test)");
   };
 
-  const handleUpAction = async (stage: string = "dev", options: Record<string, any> = {}) => {
+  const handleUpAction = async (
+    stage: string = "dev",
+    options: Record<string, any> = {},
+  ) => {
     const exitCode = await handleServiceUp(stage, {
       projectDir: options.projectDir,
       skipCheck: options.skipCheck,
@@ -40,46 +50,16 @@ export function createCli(): Command {
   };
 
   // Group: builder service up [stage]
-  const service = program
-    .command("service")
-    .description("Manage and run services");
-
-  registerUpOptions(
-    service
-      .command("up [stage]")
-      .description("Start or test a service environment (dev, prod, test, test-unit, test-e2e)")
-  )
-    .addHelpText(
-      "after",
-      `\nExamples:
-  $ builder service up dev
-  $ builder service up prod
-  $ builder service up test
-  $ builder service up test-unit
-  $ builder service up test-e2e`
-    )
-    .action(handleUpAction);
-
-  // Direct shorthand: builder up [stage]
-  registerUpOptions(
-    program
-      .command("up [stage]")
-      .description("Shorthand for 'builder service up [stage]'")
-  )
-    .addHelpText(
-      "after",
-      `\nExamples:
-  $ builder up dev
-  $ builder up prod
-  $ builder up test`
-    )
-    .action(handleUpAction);
+  registerServiceCommand(program);
 
   // Dedicated infra check command: builder check
   program
     .command("check")
     .description("Run infrastructure and contract checks (hadolint, conftest)")
-    .option("-C, --project-dir <dir>", "Service project directory (defaults to cwd)")
+    .option(
+      "-C, --project-dir <dir>",
+      "Service project directory (defaults to cwd)",
+    )
     .action((options: Record<string, any> = {}) => {
       const projectDir = options.projectDir || process.cwd();
       checkInfra(projectDir);
@@ -93,7 +73,10 @@ export async function runCli(argv: string[] = process.argv): Promise<void> {
   try {
     await cli.parseAsync(argv);
   } catch (err: any) {
-    if (err?.code === "commander.helpDisplayed" || err?.code === "commander.version") {
+    if (
+      err?.code === "commander.helpDisplayed" ||
+      err?.code === "commander.version"
+    ) {
       return;
     }
     if (err instanceof ScriptError) {
