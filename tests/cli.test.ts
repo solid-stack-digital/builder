@@ -1,7 +1,7 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createCli } from "../src/cli.js";
-import { handleServiceUp } from "../src/commands/serviceUp.js";
+import { handleServiceUp } from "../src/commands/service/commands/up/serviceUp.js";
 
 const BACKEND_DIR = path.resolve(
   __dirname,

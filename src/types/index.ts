@@ -19,11 +19,7 @@ export type BuildJson = {
 };
 
 export interface ServiceUpOptions {
-  projectDir?: string;
-  skipCheck?: boolean;
+  projectDir?: string; 
   debug?: boolean;
-  detach?: boolean;
-  dryRun?: boolean;
-  unit?: boolean;
-  e2e?: boolean;
+  detach?: boolean; 
 }
