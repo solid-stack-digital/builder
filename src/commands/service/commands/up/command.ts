@@ -1,4 +1,4 @@
-import { handleServiceUp } from "./serviceUp.js";
+import { handleServiceUp } from "./handler.js";
 import type { Command } from "commander";
 
 export const registerUpCommand = (cmd: Command) => {
