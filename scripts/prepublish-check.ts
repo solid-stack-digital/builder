@@ -8,6 +8,7 @@ const requiredFiles = [
   "index.js",
   "index.cjs",
   "index.d.ts",
+  "bin.js",
 ];
 
 if (!fs.existsSync(distPath)) {

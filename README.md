@@ -1,112 +1,161 @@
-# TypeScript Package Template (`@solid-stack/ts-jspackage-template`)
+# @solid-stack/builder
 
-A modern, production-ready starter template for building and publishing high-quality TypeScript / JavaScript libraries for the **Solid Stack** ecosystem using **pnpm**, **tsup**, **vitest**, and **@solid-stack/di**.
+The official build system, test runner, and Docker orchestrator CLI for Solid Stack services.
 
----
+## Installation
 
-## ✨ Features
+### Global Installation (CLI tool)
 
-- ⚡ **Dual Output (ESM + CommonJS)**: Bundled via [tsup](https://tsup.egoist.dev/) with tree-shaking and sourcemaps.
-- 🔒 **Type Declarations**: Independent, reliable declaration emit (`.d.ts` and `.d.ts.map`) via `tsc --project tsconfig.build.json`.
-- 💉 **Dependency Injection Ready**: Native support for `@solid-stack/di` decorators (`@MakeInjectable`), `ValueToken`, `MultiToken`, and `Container`.
-- 🧪 **Unit Testing**: Powered by [Vitest](https://vitest.dev/) with built-in Stage 3 decorator transform support.
-- 📦 **pnpm First**: Optimized for deterministic dependency management.
-- 🛡️ **Pre-publish Validation**: Automated pre-publish checks verifying build output completeness.
-- 🐳 **Docker & Make Support**: Containerized dev, test, and build environments.
-- 🤖 **GitHub Actions CI/CD**: Ready-to-use workflows for multi-version Node.js matrix testing and automated npm publishing.
+Install globally using `pnpm` (or `npm`):
 
----
+```bash
+pnpm add -g @solid-stack/builder
+```
 
-## 📁 Project Structure
+Once installed globally, the CLI tool is available directly as `builder`:
 
-```text
-.
-├── .github/
-│   └── workflows/
-│       ├── ci.yml               # Automated CI matrix testing (Node 18, 20, 22)
-│       └── publish.yml          # Automated npm publish workflow
-├── docker/
-│   ├── Dockerfile               # Multi-stage Docker build
-│   └── docker-compose.yml       # Docker Compose setup
-├── examples/
-│   └── basic.ts                 # Executable usage example (DI + pure utils)
-├── scripts/
-│   ├── build.ts                 # Build runner (tsup + tsc)
-│   └── prepublish-check.ts      # Pre-publish validation script
-├── src/
-│   ├── core/                    # Domain logic & @MakeInjectable services
-│   │   ├── GreeterService.ts
-│   │   └── index.ts
-│   ├── types/                   # Type definitions & DI ValueTokens
-│   │   ├── tokens.ts
-│   │   └── index.ts
-│   ├── utils/                   # Pure utility functions
-│   │   ├── formatGreeting.ts
-│   │   └── index.ts
-│   └── index.ts                 # Strict public API gateway
-├── tests/
-│   ├── GreeterService.test.ts   # Container resolution & service unit test
-│   ├── formatGreeting.test.ts   # Pure utility test
-│   └── public-api.test.ts       # Public export barrier test
-├── Makefile                     # Shortcut Makefile for Docker/dev workflows
-├── package.json                 # Package manifest & configuration
-├── tsconfig.json                # TypeScript compiler configuration
-├── tsconfig.build.json          # Declaration-only build configuration
-├── tsup.config.ts               # tsup bundler configuration
-└── vitest.config.ts             # Vitest test runner configuration
+```bash
+builder --version
+builder --help
+```
+
+### Local / Project Installation
+
+When developing within a project or monorepo, add `@solid-stack/builder` to your dependencies (or link to local source during development via `"@solid-stack/builder": "link:../../builder"`), and run commands via `pnpm`:
+
+```bash
+# Add script in package.json: "builder": "builder"
+pnpm builder service up dev
+# or via pnpm exec
+pnpm exec builder service up dev
 ```
 
 ---
 
-## 🚀 Getting Started
+## 🚀 CLI Commands
 
-### 1. Install Dependencies
+### 1. Development Mode (`builder service up dev`)
+
+Spins up the isolated development environment with hot-reloading:
+
 ```bash
-pnpm install
+builder service up dev
 ```
 
-### 2. Configure for Your Package
-Update the following in `package.json`:
-- `name`: Your package name (e.g., `@solid-stack/my-package`)
-- `description`: A brief summary of your library
-- `repository`: Your GitHub repository URL
-- `homepage`: Your project homepage / README link
+- Performs Dockerfile linting (`hadolint`) and OPA policy contract validation (`conftest`)
+- Merges `docker-compose.base.yml`, `docker-compose.dev.yml`, `.env.dev`, and any overrides defined in `build.json`
+- Mounts source code with hot-reloading enabled
 
-### 3. Develop & Test
+### 2. Production Mode (`builder service up prod`)
+
+Spins up the production runtime with integrated local mocks:
+
 ```bash
-# Run unit tests
-pnpm test
-
-# Run tests in watch mode
-pnpm test:watch
-
-# Run tsup build in watch mode
-pnpm dev
+builder service up prod
 ```
 
-### 4. Build & Validate
-```bash
-# Typecheck, test, and bundle package
-pnpm check
+- Validates infrastructure and contract compliance
+- Merges production compose definitions with mock dependencies (e.g., wiremock, databases)
+- Sets up inter-service health checks (`service_healthy` conditions)
 
-# Run full pre-publish verification
-pnpm prepublishOnly
+### 3. Test Suites (`builder service up test`)
+
+Runs the full end-to-end test pipeline:
+
+```bash
+builder service up test
+```
+
+- Stage 1: Runs isolated unit tests (`pnpm test` in test container)
+- Stage 2: If unit tests pass, boots dependencies, app, and tester containers for integration/E2E assertions (`pnpm test:e2e`)
+- Automatically cleans up and tears down containers upon completion
+
+#### Targeting specific test stages
+
+```bash
+# Run only unit tests
+builder service up test --unit
+# Or shorthand:
+builder service up test-unit
+
+# Run only E2E integration tests
+builder service up test --e2e
+# Or shorthand:
+builder service up test-e2e
 ```
 
 ---
 
-## 🐳 Docker / Make Commands
+## 🛠️ Options
 
-```bash
-make dev     # Start dev watcher container
-make test    # Run test suite in container
-make build   # Build package in container
-make prod    # Verify production container
-make clean   # Clean up containers and volumes
+| Flag | Description |
+|---|---|
+| `--dry-run` | Preview the merged Docker Compose YAML configuration without starting containers |
+| `--debug` | Print the final merged Docker Compose YAML before launching |
+| `--skip-check` | Skip hadolint and conftest infrastructure validation |
+| `-d, --detach` | Run Docker Compose in detached mode (background) |
+| `-C, --project-dir <path>` | Specify target service directory (defaults to current working directory) |
+| `--unit` | For `test`, run only unit test stage |
+| `--e2e` | For `test`, run only e2e test stage |
+
+---
+
+## ⚙️ Configuration (`build.json`)
+
+Each service configures its dependencies and overrides via `build.json` in its project root:
+
+```json
+{
+  "name": "backend",
+  "dependencies": {
+    "filesystem": {
+      "path": ".docker/mocks/docker-compose.filesystem.yml",
+      "service": "mock-filesystem"
+    }
+  },
+  "overrides": {
+    "dev": {
+      "path": ".docker/overrides/docker-compose.dev.override.yml"
+    },
+    "test": {
+      "path": ".docker/overrides/docker-compose.test.override.yml"
+    },
+    "prod": {
+      "path": ".docker/overrides/docker-compose.prod.override.yml"
+    },
+    "e2e": {
+      "path": ".docker/overrides/docker-compose.e2e.override.yml"
+    }
+  }
+}
+```
+
+---
+
+## 💻 Programmatic Usage
+
+You can also import `@solid-stack/builder` inside Node.js or TypeScript code:
+
+```typescript
+import {
+  compileEnvironment,
+  getBuildJson,
+  checkInfra,
+  handleServiceUp,
+} from "@solid-stack/builder";
+
+// Compile Docker Compose YAML for a specific environment
+const devYaml = compileEnvironment("dev", "/path/to/service");
+
+// Boot an environment programmatically
+await handleServiceUp("dev", {
+  projectDir: "/path/to/service",
+  skipCheck: false,
+});
 ```
 
 ---
 
 ## 📄 License
 
-UNLICENSED © [Solid Stack Digital](https://github.com/solid-stack-digital)
+UNLICENSED © Solid Stack Digital

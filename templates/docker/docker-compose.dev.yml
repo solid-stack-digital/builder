@@ -1,0 +1,11 @@
+services:
+  app: 
+    build:
+      target: dev
+    env_file:
+      - .env.dev 
+    volumes:
+      - .:/app
+    environment:
+      - INFRA_MODE=isolated
+      - EXEC_MODE=dev

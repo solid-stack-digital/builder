@@ -1,11 +1,15 @@
 {
-  "name": "@solid-stack/ts-jspackage-template",
-  "version": "0.1.1",
-  "description": "A modern TypeScript package starter template with pnpm, tsup, and vitest.",
+  "name": "@solid-stack/builder",
+  "version": "1.0.0",
+  "description": "CLI build tool and orchestrator for Solid Stack services.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "builder": "./dist/bin.js",
+    "solid-builder": "./dist/bin.js"
+  },
   "packageManager": "pnpm@11.18.0",
   "exports": {
     ".": {
@@ -17,7 +21,8 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "templates"
   ],
   "scripts": {
     "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly --outDir dist",
@@ -30,11 +35,13 @@
     "prepublishOnly": "pnpm build && pnpm test && tsx scripts/prepublish-check.ts"
   },
   "keywords": [
+    "solid-stack",
+    "builder",
+    "cli",
+    "docker",
+    "orchestrator",
+    "compose",
     "typescript",
-    "template",
-    "pnpm",
-    "tsup",
-    "vitest",
     "esm",
     "cjs"
   ],
@@ -53,17 +60,15 @@
       "onFail": "download"
     }
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/solid-stack-digital/ts-jspackage-template.git"
-  },
-  "homepage": "https://github.com/solid-stack-digital/ts-jspackage-template#readme",
-  "peerDependencies": {
-    "@solid-stack/di": ">=1.0.0"
+  "dependencies": {
+    "cac": "^7.0.0",
+    "picocolors": "^1.1.1",
+    "yaml": "^2.7.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@solid-stack/di": "^1.0.4",
     "@types/node": "^26.1.2",
+    "@types/yaml": "^1.9.7",
     "tsup": "^8.5.1",
     "tsx": "^4.23.1",
     "typescript": "^7.0.2",

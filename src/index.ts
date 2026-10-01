@@ -1,18 +1,18 @@
-/**
- * @solid-stack/ts-jspackage-template
- *
- * A modern TypeScript package starter template powered by @solid-stack/di.
- */
-
-// 1. Core Services & Implementations
-export { GreeterService } from "./core/index.js";
-
-// 2. Public Types & DI Tokens
-export {
-  GreeterConfigToken,
-  type GreeterConfig,
-  type GreetResult,
+export { createCli, runCli } from "./cli.js";
+export { checkInfra } from "./commands/checkInfra.js";
+export { handleServiceUp } from "./commands/serviceUp.js";
+export { compileEnvironment } from "./core/compileEnvironment.js";
+export { getDockerComposeTemplate, getTemplatesDir } from "./core/templates.js";
+export { NotFoundError } from "./errors/NotFoundError.js";
+export { ScriptError } from "./errors/ScriptError.js";
+export type {
+  BuildDependency,
+  BuildJson,
+  BuildOverride,
+  Environment,
+  ServiceUpOptions,
 } from "./types/index.js";
-
-// 3. Helper Utilities
-export { formatGreeting } from "./utils/index.js";
+export { checkDependencies } from "./utils/checkDependencies.js";
+export { extractBuildDeps } from "./utils/extractBuildDeps.js";
+export { extractOverrides } from "./utils/extractOverrides.js";
+export { getBuildJson } from "./utils/getBuildJson.js";

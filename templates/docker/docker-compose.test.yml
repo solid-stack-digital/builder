@@ -1,0 +1,10 @@
+services: 
+  app: 
+    build: 
+      target: test
+    env_file:
+      - .env.test 
+    environment:
+      - INFRA_MODE=isolated
+      - EXEC_MODE=test
+ 

@@ -1,0 +1,9 @@
+services: 
+  tester:
+    build: 
+      context: .
+      target: test-e2e
+    env_file:
+      - .env.e2e
+    environment: 
+      - API_URL=http://app:${PORT:-3000}
