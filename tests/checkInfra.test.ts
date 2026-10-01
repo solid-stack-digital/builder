@@ -1,11 +1,11 @@
 import path from "node:path";
-import { describe, expect, it } from "vitest";
-import { checkInfra } from "../src/commands/checkInfra.js";
+import { describe, expect, it } from "vitest"; 
 import { getDeclaredYamlFiles } from "../src/core/checkers/getDeclaredYamlFiles.js";
 import { checkYamlFiles } from "../src/core/checkers/checkYamlFiles.js";
 import { explainComposeMergeFailure } from "../src/core/checkers/explainComposeMergeFailure.js";
 import { getBuildJson } from "../src/utils/getBuildJson.js";
 import type { BuildJson } from "../src/types/index.js";
+import { checkInfra } from "@/core/checkers/checkInfra.js";
 
 const BACKEND_DIR = path.resolve(
   __dirname,
