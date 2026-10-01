@@ -11,8 +11,21 @@ const BACKEND_DIR = path.resolve(
 describe("CLI parser and serviceUp handler", () => {
   it("initializes CLI with builder name and commands", () => {
     const cli = createCli();
-    expect(cli.name).toBe("builder");
+    expect(cli.name()).toBe("builder");
     expect(cli.commands.length).toBeGreaterThan(0);
+  });
+
+  it("registers service up and shorthand commands", () => {
+    const cli = createCli();
+    const serviceCmd = cli.commands.find((c) => c.name() === "service");
+    expect(serviceCmd).toBeDefined();
+    expect(serviceCmd?.commands.some((c) => c.name() === "up")).toBe(true);
+
+    const upCmd = cli.commands.find((c) => c.name() === "up");
+    expect(upCmd).toBeDefined();
+
+    const checkCmd = cli.commands.find((c) => c.name() === "check");
+    expect(checkCmd).toBeDefined();
   });
 
   it("handles service up dev in dry-run mode", async () => {

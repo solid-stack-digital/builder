@@ -2,12 +2,12 @@
   "name": "@solid-stack/builder",
   "version": "1.0.0",
   "description": "CLI build tool and orchestrator for Solid Stack services.",
-  "type": "module", 
+  "type": "module",
   "bin": {
     "builder": "./dist/bin.js",
     "solid-builder": "./dist/bin.js"
   },
-  "packageManager": "pnpm@11.18.0", 
+  "packageManager": "pnpm@11.18.0",
   "files": [
     "dist",
     "templates"
@@ -49,7 +49,7 @@
     }
   },
   "dependencies": {
-    "cac": "^7.0.0",
+    "commander": "^15.0.0",
     "picocolors": "^1.1.1",
     "yaml": "^2.7.0",
     "zod": "^3.24.1"
