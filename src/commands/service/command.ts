@@ -16,7 +16,7 @@ export const registerServiceCommand = (cmd: Command): void => {
 
     if (actionCommand.name() === "up") {
       const options = actionCommand.opts();
-      const stageArg = actionCommand.args[0];
+      const stageArg = actionCommand.args[0]?.toLowerCase();
 
       // If an unknown stage was given to 'up', don't run checkInfra
       if (stageArg && !SERVICE_STAGES.includes(stageArg as any)) {

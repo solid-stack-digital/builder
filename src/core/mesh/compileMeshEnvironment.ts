@@ -43,16 +43,129 @@ export function compileMeshEnvironment(
     services: {},
   };
 
-  // Helper to merge top-level resources (volumes, networks, secrets, configs)
+  // Helper to merge top-level resources (volumes, secrets, configs - not networks)
   function mergeTopLevelResources(parsed: any) {
     if (!parsed || typeof parsed !== "object") return;
-    for (const key of ["volumes", "networks", "secrets", "configs"]) {
+    for (const key of ["volumes", "secrets", "configs"]) {
       if (parsed[key] && typeof parsed[key] === "object") {
         composeConfig[key] = {
           ...(composeConfig[key] || {}),
           ...parsed[key],
         };
       }
+    }
+  }
+
+  function rewriteServiceVolume(svc: any, oldKey: string, newKey: string) {
+    if (!svc || !Array.isArray(svc.volumes)) return;
+    svc.volumes = svc.volumes.map((vol: any) => {
+      if (typeof vol === "string") {
+        if (vol === oldKey) return newKey;
+        if (vol.startsWith(`${oldKey}:`)) {
+          return `${newKey}:${vol.slice(oldKey.length + 1)}`;
+        }
+        return vol;
+      }
+      if (vol && typeof vol === "object" && vol.source === oldKey) {
+        return { ...vol, source: newKey };
+      }
+      return vol;
+    });
+  }
+
+  function rewriteServiceSecret(svc: any, oldKey: string, newKey: string) {
+    if (!svc || !svc.secrets) return;
+    if (Array.isArray(svc.secrets)) {
+      svc.secrets = svc.secrets.map((sec: any) => {
+        if (sec === oldKey) return newKey;
+        if (typeof sec === "object" && sec.source === oldKey) {
+          return { ...sec, source: newKey };
+        }
+        return sec;
+      });
+    }
+  }
+
+  function rewriteServiceConfig(svc: any, oldKey: string, newKey: string) {
+    if (!svc || !svc.configs) return;
+    if (Array.isArray(svc.configs)) {
+      svc.configs = svc.configs.map((cfg: any) => {
+        if (cfg === oldKey) return newKey;
+        if (typeof cfg === "object" && cfg.source === oldKey) {
+          return { ...cfg, source: newKey };
+        }
+        return cfg;
+      });
+    }
+  }
+
+  // Namespaces mock top-level resources using the provided prefix to isolate independent mocks
+  function mergeAndNamespaceMockResources(
+    parsed: any,
+    namespacePrefix: string,
+    baseDir: string,
+    targetMeshDir: string
+  ) {
+    if (!parsed || typeof parsed !== "object") return;
+
+    if (parsed.volumes && typeof parsed.volumes === "object") {
+      composeConfig.volumes = composeConfig.volumes || {};
+      for (const [volKey, volDef] of Object.entries(parsed.volumes)) {
+        const namespacedVolKey = `${namespacePrefix}_${volKey}`;
+        composeConfig.volumes[namespacedVolKey] = volDef ?? {};
+        if (parsed.services && typeof parsed.services === "object") {
+          for (const svc of Object.values(parsed.services) as any[]) {
+            rewriteServiceVolume(svc, volKey, namespacedVolKey);
+          }
+        }
+      }
+    }
+
+    if (parsed.secrets && typeof parsed.secrets === "object") {
+      composeConfig.secrets = composeConfig.secrets || {};
+      for (const [secKey, secDef] of Object.entries(parsed.secrets) as [string, any][]) {
+        const namespacedSecKey = `${namespacePrefix}_${secKey}`;
+        const clonedDef = { ...secDef };
+        if (clonedDef.file) {
+          clonedDef.file = toComposePath(targetMeshDir, path.resolve(baseDir, clonedDef.file));
+        }
+        composeConfig.secrets[namespacedSecKey] = clonedDef;
+        if (parsed.services && typeof parsed.services === "object") {
+          for (const svc of Object.values(parsed.services) as any[]) {
+            rewriteServiceSecret(svc, secKey, namespacedSecKey);
+          }
+        }
+      }
+    }
+
+    if (parsed.configs && typeof parsed.configs === "object") {
+      composeConfig.configs = composeConfig.configs || {};
+      for (const [cfgKey, cfgDef] of Object.entries(parsed.configs) as [string, any][]) {
+        const namespacedCfgKey = `${namespacePrefix}_${cfgKey}`;
+        const clonedDef = { ...cfgDef };
+        if (clonedDef.file) {
+          clonedDef.file = toComposePath(targetMeshDir, path.resolve(baseDir, clonedDef.file));
+        }
+        composeConfig.configs[namespacedCfgKey] = clonedDef;
+        if (parsed.services && typeof parsed.services === "object") {
+          for (const svc of Object.values(parsed.services) as any[]) {
+            rewriteServiceConfig(svc, cfgKey, namespacedCfgKey);
+          }
+        }
+      }
+    }
+  }
+
+  function applyInternalMockDependsOnMapping(svc: any, mapping: Map<string, string>) {
+    if (!svc.depends_on) return;
+    if (Array.isArray(svc.depends_on)) {
+      svc.depends_on = svc.depends_on.map((d: string) => mapping.get(d) || d);
+    } else if (typeof svc.depends_on === "object") {
+      const newDepends: any = {};
+      for (const [k, v] of Object.entries(svc.depends_on)) {
+        newDepends[mapping.get(k) || k] = v;
+      }
+      svc.depends_on = newDepends;
     }
   }
 
@@ -89,8 +202,8 @@ export function compileMeshEnvironment(
         );
       }
 
-      // Merge top-level resources
-      mergeTopLevelResources(parsed);
+      // Merge and namespace top-level resources globally for mesh root mocks
+      mergeAndNamespaceMockResources(parsed, `mesh_${depKey}`, meshDir, meshDir);
 
       const targetServiceName = depDef.service || Object.keys(parsed.services)[0];
       const serviceEntry = targetServiceName ? parsed.services[targetServiceName] : undefined;
@@ -101,9 +214,21 @@ export function compileMeshEnvironment(
         );
       }
 
+      // Map internal depends_on for sidecars inside the mock compose
+      const sidecarMapping = new Map<string, string>();
+      for (const sName of Object.keys(parsed.services)) {
+        if (sName === targetServiceName) {
+          sidecarMapping.set(sName, depKey);
+        } else {
+          const companionKey = `${depKey}-${sName}`;
+          sidecarMapping.set(sName, composeConfig.services[sName] ? companionKey : sName);
+        }
+      }
+
       const resolvedService = resolveServicePaths(serviceEntry, meshDir, meshDir);
       delete resolvedService.container_name;
       normalizeDependsOn(resolvedService);
+      applyInternalMockDependsOnMapping(resolvedService, sidecarMapping);
 
       resolvedService.networks = {
         mesh: {
@@ -115,27 +240,32 @@ export function compileMeshEnvironment(
 
       // Copy any companion services defined in this root dependency
       for (const [sName, sDef] of Object.entries(parsed.services)) {
-        if (sName !== targetServiceName && !composeConfig.services[sName]) {
+        if (sName !== targetServiceName) {
+          const finalKey = sidecarMapping.get(sName)!;
           const companion = resolveServicePaths(sDef as any, meshDir, meshDir);
           delete companion.container_name;
           normalizeDependsOn(companion);
+          applyInternalMockDependsOnMapping(companion, sidecarMapping);
+          
           companion.networks = {
             mesh: {
-              aliases: [sName],
+              aliases: [sName, finalKey],
             },
           };
-          registerService(sName, companion, `companion of root dependency "${depKey}"`);
+          registerService(finalKey, companion, `companion of root dependency "${depKey}"`);
         }
       }
     }
   }
 
   // Track provider aliases to add during second pass
-  // Map: providerServiceName -> Set of aliases (e.g. dependency keys)
   const providerAliases = new Map<string, Set<string>>();
   for (const sName of Object.keys(mesh.services)) {
     providerAliases.set(sName, new Set());
   }
+
+  // Map to track global dependency key to provider for collision detection
+  const globalDepAliasToProvider = new Map<string, string>();
 
   // 2. Process each service in mesh.services
   for (const [serviceName, serviceConfig] of Object.entries(mesh.services)) {
@@ -160,6 +290,7 @@ export function compileMeshEnvironment(
     // Check for override file (e.g. dev or prod override)
     let overrideVolumes: any[] = [];
     let overrideHealthcheck: any = undefined;
+    let overrideCommand: any = undefined;
     const stageOverride = serviceOverrides[mode];
 
     if (stageOverride && existsSync(stageOverride.path)) {
@@ -184,7 +315,7 @@ export function compileMeshEnvironment(
               if (eqIdx !== -1) {
                 environment[item.slice(0, eqIdx)] = item.slice(eqIdx + 1);
               } else {
-                environment[item] = "";
+                environment[item] = process.env[item] ?? null;
               }
             }
           } else if (
@@ -192,6 +323,10 @@ export function compileMeshEnvironment(
             typeof overrideApp.environment === "object"
           ) {
             Object.assign(environment, overrideApp.environment);
+          }
+
+          if (overrideApp.command) {
+            overrideCommand = overrideApp.command;
           }
 
           if (Array.isArray(overrideApp.volumes)) {
@@ -216,6 +351,32 @@ export function compileMeshEnvironment(
     // Apply specific mesh.json envOverrides LAST so they take highest precedence
     if (serviceConfig.envOverrides) {
       Object.assign(environment, serviceConfig.envOverrides);
+    }
+
+    // Determine the resolved port for this service across all declarations:
+    // 1. serviceConfig.port in mesh.json
+    // 2. serviceConfig.healthcheck.port in mesh.json
+    // 3. environment.PORT (from envOverrides or stage overrides)
+    // 4. .env.{mode} file in service directory
+    // 5. .env file in service directory
+    // 6. Dockerfile (process.env.PORT || <port> or EXPOSE <port>)
+    // 7. Default 3000
+    const dockerfilePath = path.resolve(serviceDir, dockerfile);
+    const envFilePort =
+      extractPortFromEnvFile(path.resolve(serviceDir, `.env.${mode}`)) ||
+      extractPortFromEnvFile(path.resolve(serviceDir, ".env"));
+    const dockerfilePort = extractPortFromDockerfile(dockerfilePath);
+
+    const resolvedPort =
+      serviceConfig.port ||
+      (serviceConfig.healthcheck as any)?.port ||
+      (environment.PORT ? parseInt(String(environment.PORT), 10) : undefined) ||
+      envFilePort ||
+      dockerfilePort ||
+      3000;
+
+    if (!environment.PORT) {
+      environment.PORT = String(resolvedPort);
     }
 
     const serviceDef: Record<string, any> = {
@@ -260,19 +421,35 @@ export function compileMeshEnvironment(
       serviceDef.ports = [`${serviceConfig.port}:${serviceConfig.port}`];
     }
 
-    // Healthcheck resolution: mesh.json > override file > default Node probe
+    if (overrideCommand) {
+      serviceDef.command = overrideCommand;
+    }
+
+    // Healthcheck resolution: mesh.json > override file > default TCP probe (POSIX/Alpine safe)
     if (serviceConfig.healthcheck) {
-      serviceDef.healthcheck = serviceConfig.healthcheck;
+      if ((serviceConfig.healthcheck as any).type === "tcp") {
+        const hcPort = (serviceConfig.healthcheck as any).port || resolvedPort;
+        serviceDef.healthcheck = {
+          test: [
+            "CMD-SHELL",
+            `nc -z 127.0.0.1 ${hcPort} || node -e "require('net').connect(${hcPort},'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))" || exit 1`,
+          ],
+          interval: "2s",
+          timeout: "2s",
+          start_period: "3s",
+          retries: 10,
+        };
+      } else {
+        serviceDef.healthcheck = serviceConfig.healthcheck;
+      }
     } else if (overrideHealthcheck) {
       serviceDef.healthcheck = overrideHealthcheck;
     } else {
-      const portValue = serviceConfig.port || 3000;
+      const portValue = resolvedPort;
       serviceDef.healthcheck = {
         test: [
-          "CMD",
-          "node",
-          "-e",
-          `require('net').connect(process.env.PORT || ${portValue}, '127.0.0.1').on('connect', () => process.exit(0)).on('error', () => process.exit(1))`,
+          "CMD-SHELL",
+          `nc -z 127.0.0.1 ${portValue} || node -e "require('net').connect(${portValue},'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))" || exit 1`,
         ],
         interval: "2s",
         timeout: "2s",
@@ -297,6 +474,36 @@ export function compileMeshEnvironment(
       ...(serviceConfig.replaceMocks || {}),
       ...(serviceConfig.provideDependency || {}),
     };
+
+    const declaredDepNames = new Set(serviceDeps.map((d) => d.name));
+    for (const [depKey, targetProvider] of Object.entries(provideMap)) {
+      if (!declaredDepNames.has(depKey)) {
+        throw new ScriptError(
+          `Service "${serviceName}" declares provideDependency/replaceMocks for "${depKey}", but "${depKey}" is not declared in its build.json dependencies.`
+        );
+      }
+      if (!mesh.services[targetProvider]) {
+        throw new ScriptError(
+          `Service "${serviceName}" maps dependency "${depKey}" to nonexistent service "${targetProvider}".`
+        );
+      }
+      if (
+        globalDepAliasToProvider.has(depKey) &&
+        globalDepAliasToProvider.get(depKey) !== targetProvider
+      ) {
+        throw new ScriptError(
+          `Dependency alias collision: Dependency key "${depKey}" is mapped to multiple different provider services ("${globalDepAliasToProvider.get(
+            depKey
+          )}" and "${targetProvider}").`
+        );
+      }
+      if (mesh.services[depKey] && depKey !== targetProvider) {
+        throw new ScriptError(
+          `Dependency alias conflict: Dependency key "${depKey}" collides with declared mesh service "${depKey}".`
+        );
+      }
+      globalDepAliasToProvider.set(depKey, targetProvider);
+    }
 
     for (const dep of serviceDeps) {
       const depKey = dep.name;
@@ -336,17 +543,33 @@ export function compileMeshEnvironment(
           );
         }
 
-        mergeTopLevelResources(parsed);
+        // Isolate local mock volumes strictly to the consuming service
+        mergeAndNamespaceMockResources(parsed, `${serviceName}_${depKey}`, serviceDir, meshDir);
 
-        const targetMockService =
-          dep.serviceName && parsed.services[dep.serviceName]
-            ? parsed.services[dep.serviceName]
-            : Object.values(parsed.services)[0];
+        if (dep.serviceName && !parsed.services[dep.serviceName]) {
+          throw new ScriptError(
+            `Service "${dep.serviceName}" declared in build.json not found in mock compose ${depComposePath}`
+          );
+        }
+
+        const targetMockService = dep.serviceName
+          ? parsed.services[dep.serviceName]
+          : Object.values(parsed.services)[0];
 
         if (!targetMockService) {
           throw new ScriptError(
-            `Service "${dep.serviceName}" not found in mock compose ${depComposePath}`
+            `No services found in mock compose ${depComposePath}`
           );
+        }
+
+        // Map internal depends_on for sidecars inside the mock compose
+        const sidecarMapping = new Map<string, string>();
+        for (const mName of Object.keys(parsed.services)) {
+          if (parsed.services[mName] === targetMockService) {
+            sidecarMapping.set(mName, namespacedDepKey);
+          } else {
+            sidecarMapping.set(mName, `${serviceName}-${mName}`);
+          }
         }
 
         const resolvedMock = resolveServicePaths(
@@ -357,6 +580,7 @@ export function compileMeshEnvironment(
         delete resolvedMock.ports;
         delete resolvedMock.container_name;
         normalizeDependsOn(resolvedMock);
+        applyInternalMockDependsOnMapping(resolvedMock, sidecarMapping);
 
         resolvedMock.networks = {
           [`${serviceName}_net`]: {
@@ -369,12 +593,14 @@ export function compileMeshEnvironment(
         // Copy companion sidecars in mock compose file if any
         for (const [mName, mDef] of Object.entries(parsed.services)) {
           if (mDef !== targetMockService) {
-            const sidecarKey = `${serviceName}-${mName}`;
+            const sidecarKey = sidecarMapping.get(mName)!;
             if (!composeConfig.services[sidecarKey]) {
               const resolvedSidecar = resolveServicePaths(mDef as any, serviceDir, meshDir);
               delete resolvedSidecar.ports;
               delete resolvedSidecar.container_name;
               normalizeDependsOn(resolvedSidecar);
+              applyInternalMockDependsOnMapping(resolvedSidecar, sidecarMapping);
+
               resolvedSidecar.networks = {
                 [`${serviceName}_net`]: {
                   aliases: [mName, sidecarKey],
@@ -394,7 +620,7 @@ export function compileMeshEnvironment(
     registerService(namespacedAppKey, serviceDef, `mesh service "${serviceName}"`);
   }
 
-  // Second pass: Add provider aliases to mesh services for dependency routing (H9)
+  // Second pass: Add provider aliases to mesh services for dependency routing
   for (const [providerName, aliases] of providerAliases.entries()) {
     const appKey = `${providerName}-app`;
     const serviceDef = composeConfig.services[appKey];
@@ -423,31 +649,53 @@ export function compileMeshEnvironment(
         const firstKey = Object.keys(parsed.services)[0];
         if (firstKey && parsed.services[firstKey]) {
           testerServiceName = firstKey;
-          const testerDef = parsed.services[firstKey];
+          for (const [tKey, tDef] of Object.entries(parsed.services) as [string, any][]) {
+            const resolvedTester = resolveServicePaths(
+              tDef,
+              testerDir,
+              meshDir
+            );
+            delete resolvedTester.container_name;
+            normalizeDependsOn(resolvedTester);
 
-          const resolvedTester = resolveServicePaths(
-            testerDef,
-            testerDir,
-            meshDir
-          );
-          delete resolvedTester.container_name;
-          normalizeDependsOn(resolvedTester);
-
-          resolvedTester.networks = {
-            mesh: {
-              aliases: ["tester", firstKey],
-            },
-          };
-
-          // Tester depends on all mesh app services
-          resolvedTester.depends_on = resolvedTester.depends_on || {};
-          for (const sName of Object.keys(mesh.services)) {
-            resolvedTester.depends_on[`${sName}-app`] = {
-              condition: "service_healthy",
+            resolvedTester.networks = {
+              mesh: {
+                aliases: [tKey, ...(tKey === firstKey ? ["tester"] : [])],
+              },
             };
-          }
 
-          registerService(firstKey, resolvedTester, `tester service "${firstKey}"`);
+            // Tester main service depends on all mesh app services
+            if (tKey === firstKey) {
+              resolvedTester.depends_on = resolvedTester.depends_on || {};
+              for (const sName of Object.keys(mesh.services)) {
+                resolvedTester.depends_on[`${sName}-app`] = {
+                  condition: "service_healthy",
+                };
+              }
+            }
+
+            registerService(tKey, resolvedTester, `tester service "${tKey}"`);
+          }
+        }
+      }
+    }
+  }
+
+  // Adjust depends_on: fall back to service_started if target service has no healthcheck
+  for (const svc of Object.values(composeConfig.services) as any[]) {
+    if (svc.depends_on && typeof svc.depends_on === "object") {
+      for (const [depTarget, depOpts] of Object.entries(svc.depends_on) as [
+        string,
+        any,
+      ][]) {
+        const targetSvc = composeConfig.services[depTarget];
+        if (
+          targetSvc &&
+          (!targetSvc.healthcheck || (targetSvc.healthcheck as any).disable) &&
+          depOpts &&
+          depOpts.condition === "service_healthy"
+        ) {
+          depOpts.condition = "service_started";
         }
       }
     }
@@ -455,12 +703,10 @@ export function compileMeshEnvironment(
 
   const generatedYaml = stringify(composeConfig);
 
-  // If validateWithDocker is explicitly false, return directly
   if (options.validateWithDocker === false) {
     return { yaml: generatedYaml, testerServiceName };
   }
 
-  // Validate and normalize through docker compose config
   const result = spawnSync(
     "docker",
     [
@@ -517,7 +763,6 @@ function resolveVolumeEntry(vol: any, baseDir: string, meshDir: string): any {
       const formattedRel = toComposePath(meshDir, absHost);
       return `${formattedRel}:${parts.slice(1).join(":")}`;
     }
-    // Named volume like db_data:/var/lib/postgresql: keep as-is
     return vol;
   }
 
@@ -533,10 +778,6 @@ function resolveVolumeEntry(vol: any, baseDir: string, meshDir: string): any {
   return vol;
 }
 
-/**
- * Helper to resolve relative file paths (build context, volumes, env_file) in a compose service block
- * relative to the mesh root directory.
- */
 function resolveServicePaths(
   service: Record<string, any>,
   baseDir: string,
@@ -581,4 +822,41 @@ function resolveServicePaths(
   normalizeDependsOn(cloned);
 
   return cloned;
+}
+
+function extractPortFromEnvFile(filePath: string): number | undefined {
+  if (!existsSync(filePath)) return undefined;
+  try {
+    const content = readFileSync(filePath, "utf-8");
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+      const [k, ...vParts] = trimmed.split("=");
+      if (k && k.trim() === "PORT") {
+        const rawVal = vParts.join("=").trim().replace(/^["']|["']$/g, "");
+        const val = parseInt(rawVal, 10);
+        if (!isNaN(val) && val > 0) return val;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
+function extractPortFromDockerfile(dockerfilePath: string): number | undefined {
+  if (!existsSync(dockerfilePath)) return undefined;
+  try {
+    const content = readFileSync(dockerfilePath, "utf-8");
+    const portMatch =
+      content.match(/process\.env\.PORT\s*\|\|\s*(\d+)/) ||
+      content.match(/EXPOSE\s+(\d+)/);
+    if (portMatch && portMatch[1]) {
+      const val = parseInt(portMatch[1], 10);
+      if (!isNaN(val) && val > 0) return val;
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
 }

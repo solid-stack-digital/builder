@@ -15,10 +15,11 @@ export const makeE2eDependOnApp = (yml: any): void => {
   }
 
   normalizeDependsOn(yml.services.tester);
+  const appHasHealthcheck = Boolean(yml.services.app?.healthcheck);
   yml.services.tester.depends_on = {
     ...(yml.services.tester.depends_on || {}),
     app: {
-      condition: "service_healthy",
+      condition: appHasHealthcheck ? "service_healthy" : "service_started",
     },
   };
 };

@@ -4,16 +4,23 @@ import { fileURLToPath } from "node:url";
 import { ScriptError } from "../errors/ScriptError.js";
 
 let cachedTemplatesDir: string | null = null;
+let lastEnvTemplatesDir: string | undefined = undefined;
 
 export function getTemplatesDir(): string {
-  if (process.env.BUILDER_TEMPLATES_DIR) {
-    const envDir = path.resolve(process.env.BUILDER_TEMPLATES_DIR);
-    if (!fs.existsSync(envDir)) {
+  const envVal = process.env.BUILDER_TEMPLATES_DIR;
+
+  if (envVal !== lastEnvTemplatesDir) {
+    cachedTemplatesDir = null;
+    lastEnvTemplatesDir = envVal;
+  }
+
+  if (envVal) {
+    const envDir = path.resolve(envVal);
+    if (!fs.existsSync(envDir) || !fs.existsSync(path.join(envDir, "docker"))) {
       throw new ScriptError(
-        `BUILDER_TEMPLATES_DIR is set to "${process.env.BUILDER_TEMPLATES_DIR}" but directory does not exist (resolved: "${envDir}").`
+        `BUILDER_TEMPLATES_DIR is set to "${envVal}" but directory does not exist or lacks a "docker/" subdirectory (resolved: "${envDir}").`
       );
     }
-    cachedTemplatesDir = envDir;
     return envDir;
   }
 

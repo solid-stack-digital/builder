@@ -3,12 +3,12 @@
   "version": "1.0.6",
   "description": "CLI build tool and orchestrator for Solid Stack services.",
   "type": "module",
-  "main": "./dist/bin.js",
-  "types": "./dist/bin.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/bin.d.ts",
-      "import": "./dist/bin.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "bin": {

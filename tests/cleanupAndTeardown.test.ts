@@ -1,5 +1,5 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { registerActiveCompose, setActiveChild, setTearingDown } from "../src/core/composeCleanup.js";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { registerActiveCompose, resetSignalHandlersForTests, setActiveChild, setTearingDown } from "../src/core/composeCleanup.js";
 import * as teardownModule from "../src/core/teardownCompose.js";
 import * as runComposeModule from "../src/core/runCompose.js";
 import { runDev } from "../src/core/runners/runDev.js";
@@ -16,11 +16,16 @@ const LARGE_PROJECT_DIR = path.resolve(__dirname, "../examples/largeProject");
 describe("Teardown and Cleanup lifecycle verification", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    resetSignalHandlersForTests();
+  });
+
+  afterEach(() => {
+    resetSignalHandlersForTests();
   });
 
   describe("Foreground dev & prod runners call teardownCompose with removeVolumes: false", () => {
     it("calls teardownCompose with removeVolumes: false in runDev", async () => {
-      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockImplementation(() => {});
+      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockResolvedValue(undefined);
       const runComposeSpy = vi.spyOn(runComposeModule, "runCompose").mockResolvedValue(130);
 
       const status = await runDev({
@@ -39,7 +44,7 @@ describe("Teardown and Cleanup lifecycle verification", () => {
     });
 
     it("skips teardownCompose when runDev is detached (-d)", async () => {
-      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockImplementation(() => {});
+      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockResolvedValue(undefined);
       const runComposeSpy = vi.spyOn(runComposeModule, "runCompose").mockResolvedValue(0);
 
       const status = await runDev({
@@ -54,7 +59,7 @@ describe("Teardown and Cleanup lifecycle verification", () => {
     });
 
     it("calls teardownCompose with removeVolumes: false in runProd", async () => {
-      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockImplementation(() => {});
+      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockResolvedValue(undefined);
       const runComposeSpy = vi.spyOn(runComposeModule, "runCompose").mockResolvedValue(0);
 
       const status = await runProd({
@@ -73,7 +78,7 @@ describe("Teardown and Cleanup lifecycle verification", () => {
     });
 
     it("calls teardownCompose with removeVolumes: false in runMeshDev", async () => {
-      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockImplementation(() => {});
+      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockResolvedValue(undefined);
       const runComposeSpy = vi.spyOn(runComposeModule, "runCompose").mockResolvedValue(130);
 
       const status = await runMeshDev({
@@ -92,7 +97,7 @@ describe("Teardown and Cleanup lifecycle verification", () => {
     });
 
     it("skips teardownCompose when runMeshDev is detached", async () => {
-      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockImplementation(() => {});
+      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockResolvedValue(undefined);
       const runComposeSpy = vi.spyOn(runComposeModule, "runCompose").mockResolvedValue(0);
 
       const status = await runMeshDev({
@@ -107,7 +112,7 @@ describe("Teardown and Cleanup lifecycle verification", () => {
     });
 
     it("calls teardownCompose with removeVolumes: false in runMeshProd", async () => {
-      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockImplementation(() => {});
+      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockResolvedValue(undefined);
       const runComposeSpy = vi.spyOn(runComposeModule, "runCompose").mockResolvedValue(130);
 
       const status = await runMeshProd({
@@ -128,7 +133,7 @@ describe("Teardown and Cleanup lifecycle verification", () => {
 
   describe("Test runners run stale-project cleanup before up and teardown with -v after", () => {
     it("runs pre-up stale cleanup and post-up teardown with removeVolumes: true in runTestUnit", async () => {
-      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockImplementation(() => {});
+      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockResolvedValue(undefined);
       const runComposeSpy = vi.spyOn(runComposeModule, "runCompose").mockResolvedValue(0);
 
       const status = await runTestUnit({
@@ -146,18 +151,18 @@ describe("Teardown and Cleanup lifecycle verification", () => {
         1,
         expect.any(String),
         expect.any(String),
-        { removeVolumes: true }
+        expect.objectContaining({ removeVolumes: true })
       );
       expect(teardownSpy).toHaveBeenNthCalledWith(
         2,
         expect.any(String),
         expect.any(String),
-        { removeVolumes: true }
+        expect.objectContaining({ removeVolumes: true })
       );
     });
 
     it("runs pre-up stale cleanup and post-up teardown with removeVolumes: true in runTestE2e", async () => {
-      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockImplementation(() => {});
+      const teardownSpy = vi.spyOn(teardownModule, "teardownCompose").mockResolvedValue(undefined);
       const runComposeSpy = vi.spyOn(runComposeModule, "runCompose").mockResolvedValue(0);
 
       const status = await runTestE2e({
@@ -174,13 +179,13 @@ describe("Teardown and Cleanup lifecycle verification", () => {
         1,
         expect.any(String),
         expect.any(String),
-        { removeVolumes: true }
+        expect.objectContaining({ removeVolumes: true })
       );
       expect(teardownSpy).toHaveBeenNthCalledWith(
         2,
         expect.any(String),
         expect.any(String),
-        { removeVolumes: true }
+        expect.objectContaining({ removeVolumes: true })
       );
     });
   });
@@ -188,6 +193,8 @@ describe("Teardown and Cleanup lifecycle verification", () => {
   describe("Signal forwarding and teardown protection in composeCleanup", () => {
     it("forwards signal to active child process", () => {
       const mockChild = {
+        exitCode: null,
+        signalCode: null,
         killed: false,
         kill: vi.fn(),
       } as any;
@@ -195,16 +202,18 @@ describe("Teardown and Cleanup lifecycle verification", () => {
       setActiveChild(mockChild);
       const unregister = registerActiveCompose("test-yaml", "/tmp/test", { removeVolumes: false });
 
-      // Simulate sending SIGINT
-      process.emit("SIGINT" as any);
+      // Simulate sending SIGTERM (forwarded directly to child)
+      process.emit("SIGTERM" as any);
 
-      expect(mockChild.kill).toHaveBeenCalledWith("SIGINT");
+      expect(mockChild.kill).toHaveBeenCalledWith("SIGTERM");
       setActiveChild(null);
       unregister();
     });
 
     it("ignores signals when isTearingDown is active", () => {
       const mockChild = {
+        exitCode: null,
+        signalCode: null,
         killed: false,
         kill: vi.fn(),
       } as any;

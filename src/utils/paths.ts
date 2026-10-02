@@ -23,7 +23,12 @@ export function toComposePath(baseDir: string, targetPath: string): string {
   // Normalize Windows backslashes to POSIX slashes
   rel = rel.replace(/\\/g, "/");
 
-  if (rel.startsWith(".") || rel.startsWith("/")) {
+  // If path is absolute (e.g. cross-drive on Windows like D:/...), do not prepend ./
+  if (path.isAbsolute(rel) || /^[a-zA-Z]:\//.test(rel)) {
+    return rel;
+  }
+
+  if (rel.startsWith("./") || rel.startsWith("../") || rel.startsWith("/")) {
     return rel;
   }
   return `./${rel}`;
@@ -53,5 +58,10 @@ export function isPathInside(parentDir: string, childPath: string): boolean {
   const absParent = path.resolve(parentDir);
   const absChild = path.resolve(absParent, childPath);
   const rel = path.relative(absParent, absChild);
-  return !rel.startsWith("..") && !path.isAbsolute(rel);
+  return (
+    rel !== ".." &&
+    !rel.startsWith(".." + path.sep) &&
+    !rel.startsWith("../") &&
+    !path.isAbsolute(rel)
+  );
 }

@@ -1,5 +1,7 @@
 import pc from "picocolors";
+import { parse } from "yaml";
 import { redactYamlSecrets } from "../../utils/redactSecrets.js";
+import { clearRunState, writeRunState } from "../../utils/runState.js";
 import { compileEnvironment } from "../compileEnvironment.js";
 import { runCompose } from "../runCompose.js";
 import type { RunOptions } from "../RunOptions.js";
@@ -12,6 +14,8 @@ export const runTestE2e = async (options: RunOptions): Promise<number> => {
     console.log(pc.bold(pc.blue(`========================================\n`)));
   }
   const finalYamlConfig = compileEnvironment("e2e", options.projectDir);
+  const parsed = parse(finalYamlConfig);
+  const projectName = parsed?.name || "e2e";
 
   if (options.debug) {
     console.log(
@@ -25,8 +29,18 @@ export const runTestE2e = async (options: RunOptions): Promise<number> => {
     return 0;
   }
 
-  // Stale-project cleanup before up
-  teardownCompose(finalYamlConfig, options.projectDir, { removeVolumes: true });
+  // Stale-project cleanup before up (quietly)
+  await teardownCompose(finalYamlConfig, options.projectDir, {
+    removeVolumes: true,
+    silent: true,
+  });
+
+  // Stateful tracking
+  writeRunState(options.projectDir, {
+    projectName,
+    stage: "test-e2e",
+    projectDir: options.projectDir,
+  });
 
   let status = 0;
   try {
@@ -43,7 +57,8 @@ export const runTestE2e = async (options: RunOptions): Promise<number> => {
       { removeVolumes: true }
     );
   } finally {
-    teardownCompose(finalYamlConfig, options.projectDir, { removeVolumes: true });
+    await teardownCompose(finalYamlConfig, options.projectDir, { removeVolumes: true });
+    clearRunState(options.projectDir);
   }
 
   if (status === 0) {

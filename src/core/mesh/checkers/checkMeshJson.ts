@@ -6,13 +6,33 @@ export function checkMeshJson(mesh: MeshConfig): void {
   const result = meshSchema.safeParse(mesh);
   if (!result.success) {
     const errorDetails = result.error.issues
-      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+      .map((issue) =>
+        issue.path.length > 0
+          ? `${issue.path.join(".")}: ${issue.message}`
+          : issue.message
+      )
       .join("; ");
     throw new ScriptError(`Invalid mesh.json: ${errorDetails}`);
   }
 
   const services = result.data.services;
   const serviceKeys = new Set(Object.keys(services));
+
+  // Check for host port collisions between mesh services
+  const seenPorts = new Map<number, string>();
+  for (const [serviceName, serviceConfig] of Object.entries(services)) {
+    if (serviceConfig.port) {
+      const portNum = Number(serviceConfig.port);
+      if (!isNaN(portNum)) {
+        if (seenPorts.has(portNum)) {
+          throw new ScriptError(
+            `Host port collision in mesh.json: Port ${portNum} is declared by both "${seenPorts.get(portNum)}" and "${serviceName}".`
+          );
+        }
+        seenPorts.set(portNum, serviceName);
+      }
+    }
+  }
 
   // Build dependency graph for cycle detection and validate providers exist
   const graph = new Map<string, Set<string>>();

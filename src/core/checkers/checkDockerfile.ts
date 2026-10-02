@@ -34,7 +34,7 @@ export function checkDockerfile(buildJson: BuildJson, projectDir: string): void 
   console.log(pc.cyan(`\n🔍 Linting Dockerfile (${dockerfileRel})...`));
   runStep(
     "docker",
-    ["run", "--rm", "-i", HADOLINT_IMAGE, "hadolint", "--failure-threshold", "error", "-"],
+    ["run", "--rm", "-i", "--network", "none", HADOLINT_IMAGE, "hadolint", "--failure-threshold", "error", "-"],
     projectDir,
     { stepName: "Dockerfile Linting", targetFile: dockerfileRel, input: content }
   );

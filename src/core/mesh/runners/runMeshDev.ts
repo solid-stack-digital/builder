@@ -1,6 +1,9 @@
 import pc from "picocolors";
+import { parse } from "yaml";
+import { checkHostPortCollisions, extractHostPorts } from "../../../utils/checkPortCollision.js";
 import { resolveProjectDir } from "../../../utils/paths.js";
 import { redactYamlSecrets } from "../../../utils/redactSecrets.js";
+import { clearRunState, writeRunState } from "../../../utils/runState.js";
 import { runCompose } from "../../runCompose.js";
 import { teardownCompose } from "../../teardownCompose.js";
 import { checkMesh } from "../checkers/checkMesh.js";
@@ -16,6 +19,8 @@ export async function runMeshDev(options: MeshRunOptions = {}): Promise<number> 
   }
 
   const { yaml } = compileMeshEnvironment("dev", meshDir);
+  const parsed = parse(yaml);
+  const projectName = parsed?.name || "mesh-dev";
 
   if (options.debug) {
     console.log(
@@ -29,6 +34,17 @@ export async function runMeshDev(options: MeshRunOptions = {}): Promise<number> 
     return 0;
   }
 
+  // Pre-flight host port collision warning
+  const hostPorts = extractHostPorts(yaml);
+  await checkHostPortCollisions(hostPorts);
+
+  // Stateful tracking
+  writeRunState(meshDir, {
+    projectName,
+    stage: "dev",
+    projectDir: meshDir,
+  });
+
   const upArgs = ["up", "--build"];
   if (options.detach) {
     upArgs.push("-d");
@@ -41,7 +57,8 @@ export async function runMeshDev(options: MeshRunOptions = {}): Promise<number> 
     });
   } finally {
     if (!options.detach) {
-      teardownCompose(yaml, meshDir, { removeVolumes: false });
+      await teardownCompose(yaml, meshDir, { removeVolumes: false });
+      clearRunState(meshDir);
     }
   }
   return status;

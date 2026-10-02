@@ -48,17 +48,20 @@ export const compileEnvironment = (
     composeFlags.push("--env-file", defaultEnv);
   }
 
-  // Include stage-specific .env.<stage> if present
-  const stageEnv = path.resolve(absProjectDir, `.env.${environment}`);
-  if (existsSync(stageEnv)) {
-    composeFlags.push("--env-file", stageEnv);
-  }
-
-  // For e2e, also include .env.prod if present and different
+  // M1: E2E env precedence: .env -> .env.prod -> .env.e2e (later flags take precedence)
   if (environment === "e2e") {
     const prodEnv = path.resolve(absProjectDir, ".env.prod");
-    if (existsSync(prodEnv) && prodEnv !== stageEnv) {
+    if (existsSync(prodEnv)) {
       composeFlags.push("--env-file", prodEnv);
+    }
+    const e2eEnv = path.resolve(absProjectDir, ".env.e2e");
+    if (existsSync(e2eEnv)) {
+      composeFlags.push("--env-file", e2eEnv);
+    }
+  } else {
+    const stageEnv = path.resolve(absProjectDir, `.env.${environment}`);
+    if (existsSync(stageEnv)) {
+      composeFlags.push("--env-file", stageEnv);
     }
   }
 

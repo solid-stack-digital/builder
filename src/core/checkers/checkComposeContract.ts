@@ -51,8 +51,10 @@ export function checkComposeContract(
     [
       "run",
       "--rm",
-      "-v",
-      `${absProjectDir}:/project`,
+      "--network",
+      "none",
+      "--mount",
+      `type=bind,src=${absProjectDir},dst=/project,readonly`,
       "-w",
       "/project",
       CONFTEST_IMAGE,

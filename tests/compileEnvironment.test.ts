@@ -35,7 +35,7 @@ describe("compileEnvironment integration", () => {
     const yamlString = compileEnvironment("prod", EXAMPLE_BACKEND_DIR);
     const parsed = parse(yamlString);
 
-    expect(parsed.name).toBe("example-backend");
+    expect(parsed.name).toBe("example-backend-prod");
     expect(parsed.services.app).toBeDefined();
     expect(parsed.services.app.build.target).toBe("prod");
     expect(parsed.services.app.environment.ENVIRONMENT).toBe("prod");
@@ -71,7 +71,7 @@ describe("compileEnvironment integration", () => {
     expect(parsed.services.tester).toBeDefined();
     expect(parsed.services.tester.build.target).toBe("test-e2e");
     expect(parsed.services.tester.depends_on.app).toEqual({
-      condition: "service_healthy",
+      condition: "service_started",
     });
   });
 });

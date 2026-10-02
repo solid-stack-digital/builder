@@ -3,7 +3,7 @@ import path from "node:path";
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/bin.ts"],
+  entry: ["src/bin.ts", "src/index.ts"],
   format: ["esm"],
   dts: false,
   clean: true, 

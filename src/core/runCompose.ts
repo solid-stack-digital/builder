@@ -68,7 +68,7 @@ export async function runCompose(
         const signalNumber = os.constants.signals[signal] ?? 0;
         resolve(128 + signalNumber);
       } else {
-        resolve(code ?? 0);
+        resolve(code ?? 1);
       }
     });
   });

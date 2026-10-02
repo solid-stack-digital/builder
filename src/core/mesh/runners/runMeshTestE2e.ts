@@ -1,7 +1,9 @@
 import pc from "picocolors";
+import { parse } from "yaml";
 import { ScriptError } from "../../../errors/ScriptError.js";
 import { resolveProjectDir } from "../../../utils/paths.js";
 import { redactYamlSecrets } from "../../../utils/redactSecrets.js";
+import { clearRunState, writeRunState } from "../../../utils/runState.js";
 import { runCompose } from "../../runCompose.js";
 import { teardownCompose } from "../../teardownCompose.js";
 import { checkMesh } from "../checkers/checkMesh.js";
@@ -41,8 +43,18 @@ export async function runMeshTestE2e(options: MeshRunOptions = {}): Promise<numb
     return 0;
   }
 
-  // Stale-project cleanup before up
-  teardownCompose(yaml, meshDir, { removeVolumes: true });
+  const parsed = parse(yaml);
+  const projectName = parsed?.name || "mesh-e2e";
+
+  // Stale-project cleanup before up (quietly)
+  await teardownCompose(yaml, meshDir, { removeVolumes: true, silent: true });
+
+  // Stateful tracking
+  writeRunState(meshDir, {
+    projectName,
+    stage: "test-e2e",
+    projectDir: meshDir,
+  });
 
   let status = 0;
   try {
@@ -60,7 +72,8 @@ export async function runMeshTestE2e(options: MeshRunOptions = {}): Promise<numb
     );
   } finally {
     console.log(pc.cyan("\n🧹 Cleaning up global mesh containers and volumes..."));
-    teardownCompose(yaml, meshDir, { removeVolumes: true });
+    await teardownCompose(yaml, meshDir, { removeVolumes: true });
+    clearRunState(meshDir);
   }
 
   if (status === 0) {

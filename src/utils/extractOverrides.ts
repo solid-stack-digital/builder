@@ -1,7 +1,7 @@
 import path from "node:path";
 import { z } from "zod";
 import { ScriptError } from "../errors/ScriptError.js";
-import type { BuildOverride, Environment } from "../types/index.js";
+import type { BuildOverride } from "../types/index.js";
 
 const VALID_STAGES = ["dev", "prod", "test", "e2e"] as const;
 

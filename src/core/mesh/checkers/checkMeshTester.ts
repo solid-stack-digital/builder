@@ -86,7 +86,7 @@ export function checkMeshTester(
   console.log(pc.cyan(`\n🔍 Linting E2E Tester Dockerfile (${dockerfileRel})...`));
   runStep(
     "docker",
-    ["run", "--rm", "-i", HADOLINT_IMAGE, "hadolint", "--failure-threshold", "error", "-"],
+    ["run", "--rm", "-i", "--network", "none", HADOLINT_IMAGE, "hadolint", "--failure-threshold", "error", "-"],
     absTesterDir,
     {
       stepName: "E2E Tester Dockerfile Linting",
@@ -110,8 +110,10 @@ export function checkMeshTester(
       [
         "run",
         "--rm",
-        "-v",
-        `${absTesterDir}:/project`,
+        "--network",
+        "none",
+        "--mount",
+        `type=bind,src=${absTesterDir},dst=/project,readonly`,
         "-w",
         "/project",
         CONFTEST_IMAGE,
@@ -136,8 +138,10 @@ export function checkMeshTester(
       [
         "run",
         "--rm",
-        "-v",
-        `${absTesterDir}:/project`,
+        "--network",
+        "none",
+        "--mount",
+        `type=bind,src=${absTesterDir},dst=/project,readonly`,
         "-w",
         "/project",
         CONFTEST_IMAGE,

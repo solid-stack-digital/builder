@@ -92,6 +92,35 @@ export function explainComposeMergeFailure(
     lines.push(
       `  - Ensure the file declaring service "${serviceName}" with an "image:" or "build:" is referenced in build.json under dependencies or overrides.`
     );
+  } else if (/env_file.*must be a string/i.test(rawOutput)) {
+    lines.push(
+      `ROOT CAUSE: Docker Compose schema error for env_file. Your Docker Compose version is likely older than 2.24.0, which does not support the object syntax { path, required: false }.`
+    );
+    lines.push("");
+    lines.push("HOW TO FIX:");
+    lines.push(
+      `  - Upgrade Docker Compose to version 2.24.0 or newer to support modern compose templates.`
+    );
+  } else if (/required variable "?([^"\s]+)"? is missing a value/i.test(rawOutput)) {
+    const varMatch = rawOutput.match(/required variable "?([^"\s]+)"? is missing a value/i);
+    const varName = varMatch ? varMatch[1] : "VARIABLE";
+    lines.push(
+      `ROOT CAUSE: Required environment variable "${varName}" is missing a value.`
+    );
+    lines.push("");
+    lines.push("HOW TO FIX:");
+    lines.push(
+      `  - Define "${varName}" in your shell environment or inside your .env file.`
+    );
+  } else if (/port is already allocated|address already in use/i.test(rawOutput)) {
+    lines.push(
+      `ROOT CAUSE: Host port collision. A requested host port is already allocated or in use by another running process or container.`
+    );
+    lines.push("");
+    lines.push("HOW TO FIX:");
+    lines.push(
+      `  - Stop the conflicting process or container, or change the exposed host port in build.json / compose overrides.`
+    );
   } else if (envMissingMatch) {
     lines.push(`ROOT CAUSE: A referenced .env file could not be found.`);
     lines.push("");

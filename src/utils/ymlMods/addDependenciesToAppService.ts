@@ -17,8 +17,10 @@ export const addDependenciesToAppService = (
   normalizeDependsOn(yml.services.app);
   yml.services.app.depends_on = yml.services.app.depends_on || {};
   dependencies.forEach((dep) => {
+    const targetSvc = yml.services[dep.name];
+    const hasHealthcheck = Boolean(targetSvc?.healthcheck);
     yml.services.app.depends_on[dep.name] = {
-      condition: "service_healthy",
+      condition: hasHealthcheck ? "service_healthy" : "service_started",
     };
   });
 };

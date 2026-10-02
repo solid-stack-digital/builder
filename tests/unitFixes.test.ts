@@ -1,11 +1,9 @@
 import path from "node:path";
-import os from "node:os";
 import { describe, expect, it } from "vitest";
 import { normalizeProjectName, deriveProjectName } from "../src/utils/projectName.js";
-import { resolveProjectDir, toComposePath, isBindMount, isPathInside } from "../src/utils/paths.js";
+import { toComposePath, isBindMount, isPathInside } from "../src/utils/paths.js";
 import { extractOverrides } from "../src/utils/extractOverrides.js";
 import { redactYamlSecrets } from "../src/utils/redactSecrets.js";
-import { checkYamlFiles } from "../src/core/checkers/checkYamlFiles.js";
 import { ScriptError } from "../src/errors/ScriptError.js";
 
 describe("Audit-1 fixes unit test suite", () => {
@@ -25,7 +23,7 @@ describe("Audit-1 fixes unit test suite", () => {
 
     it("derives stage-scoped names for test and e2e to prevent volume collision", () => {
       expect(deriveProjectName("my-app", "dev")).toBe("my-app");
-      expect(deriveProjectName("my-app", "prod")).toBe("my-app");
+      expect(deriveProjectName("my-app", "prod")).toBe("my-app-prod");
       expect(deriveProjectName("my-app", "test")).toBe("my-app-test");
       expect(deriveProjectName("my-app", "test-unit")).toBe("my-app-test");
       expect(deriveProjectName("my-app", "e2e")).toBe("my-app-e2e");
@@ -89,24 +87,30 @@ describe("Audit-1 fixes unit test suite", () => {
     });
   });
 
-  describe("Secret redaction in debug logs (M10)", () => {
-    it("redacts sensitive environment variables and tokens", () => {
+  describe("Secret redaction in debug logs (M10, M16)", () => {
+    it("redacts sensitive environment variables, tokens, and URLs while preserving author/keyboard", () => {
       const yaml = `
 services:
   app:
     environment:
       SECRET_KEY: super_secret_123
-      API_TOKEN=xyz987
+      API_TOKEN: xyz987
       DB_PASSWORD: mypassword
       AUTH_TOKEN: authsecret
+      DATABASE_URL: postgres://admin:supersecret@localhost:5432/mydb
       PUBLIC_PORT: 3000
+      AUTHOR_NAME: John Doe
+      KEYBOARD_TYPE: mechanical
 `;
       const redacted = redactYamlSecrets(yaml);
       expect(redacted).toContain("SECRET_KEY: ********");
-      expect(redacted).toContain("API_TOKEN=********");
+      expect(redacted).toContain("API_TOKEN: ********");
       expect(redacted).toContain("DB_PASSWORD: ********");
       expect(redacted).toContain("AUTH_TOKEN: ********");
+      expect(redacted).toContain("DATABASE_URL: postgres://admin:********@localhost:5432/mydb");
       expect(redacted).toContain("PUBLIC_PORT: 3000");
+      expect(redacted).toContain("AUTHOR_NAME: John Doe");
+      expect(redacted).toContain("KEYBOARD_TYPE: mechanical");
     });
   });
 

@@ -1,5 +1,5 @@
 import path from "node:path";
-import z from "zod";
+import { z } from "zod";
 import { ScriptError } from "../errors/ScriptError.js";
 import type { BuildDependency } from "../types/index.js";
 
@@ -21,15 +21,18 @@ export const extractBuildDeps = (
       z.string(),
       z.object({
         path: z.string(),
-        service: z.string(),
+        service: z.string().optional(),
       })
     ),
   });
 
   const result = schema.safeParse(buildJson);
   if (!result.success) {
+    const errorDetails = result.error.issues
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+      .join("; ");
     throw new ScriptError(
-      `Invalid build.json structure for dependencies: ${result.error.message}`
+      `Invalid build.json structure for dependencies: ${errorDetails}`
     );
   }
 
@@ -40,7 +43,7 @@ export const extractBuildDeps = (
       return {
         path: path.resolve(projectDir, service.path),
         name: name,
-        serviceName: service.service,
+        serviceName: service.service as string,
       };
     }
   );
