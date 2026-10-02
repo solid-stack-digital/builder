@@ -1,5 +1,6 @@
 import path from "node:path";
 import pc from "picocolors";
+import { resolveProjectDir } from "../../../utils/paths.js";
 import { runTest } from "../../runners/runTest.js";
 import { checkMesh } from "../checkers/checkMesh.js";
 import { getMeshJson } from "../getMeshJson.js";
@@ -7,14 +8,16 @@ import type { MeshRunOptions } from "../MeshRunOptions.js";
 import { runMeshTestE2e } from "./runMeshTestE2e.js";
 
 export function runMeshTest(options: MeshRunOptions = {}): number {
-  const meshDir = path.resolve(options.projectDir || process.cwd());
+  const meshDir = resolveProjectDir(options.projectDir);
 
   console.log(pc.bold(pc.blue(`\n========================================`)));
   console.log(pc.bold(pc.blue(`🧪 GLOBAL MESH TEST PIPELINE`)));
   console.log(pc.bold(pc.blue(`========================================\n`)));
 
   // Initial checks: verify services, build.json, tester dockerfile and compose
-  checkMesh(meshDir, { requireTester: true });
+  if (!options.skipChecks) {
+    checkMesh(meshDir, { requireTester: true });
+  }
   const mesh = getMeshJson(meshDir);
 
   // --- STAGE 1: Isolated Service Testing (Unit + Local E2E) ---
@@ -68,7 +71,8 @@ export function runMeshTest(options: MeshRunOptions = {}): number {
   );
   console.log(pc.bold(pc.blue(`========================================\n`)));
 
-  const e2eStatus = runMeshTestE2e(options);
+  // Pass skipChecks: true so runMeshTestE2e does not duplicate checkMesh
+  const e2eStatus = runMeshTestE2e({ ...options, skipChecks: true });
   if (e2eStatus !== 0) {
     return e2eStatus;
   }

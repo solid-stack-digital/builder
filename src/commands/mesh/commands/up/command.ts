@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { handleMeshUp } from "./handler.js";
 
-export const registerMeshUpCommand = (cmd: Command) => {
+export const registerMeshUpCommand = (cmd: Command): void => {
   cmd
     .command("up [stage]")
     .description(
@@ -9,7 +9,14 @@ export const registerMeshUpCommand = (cmd: Command) => {
     )
     .option("--debug", "Output the merged Docker Compose YAML configuration")
     .option("-d, --detach", "Run containers in the background")
-    .option("--dry-run", "Compile configuration and validate checks without starting containers")
+    .option(
+      "--dry-run",
+      "Compile configuration and validate checks without starting containers"
+    )
+    .option(
+      "--skip-checks",
+      "Skip hadolint and conftest pre-flight checks"
+    )
     .option(
       "-C, --project-dir <dir>",
       "Mesh project directory containing mesh.json (defaults to cwd)"
@@ -30,6 +37,7 @@ export const registerMeshUpCommand = (cmd: Command) => {
           debug: options.debug,
           detach: options.detach,
           dryRun: options.dryRun,
+          skipChecks: options.skipChecks,
         });
         if (exitCode !== 0) {
           process.exit(exitCode);

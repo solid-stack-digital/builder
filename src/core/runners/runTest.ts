@@ -9,7 +9,7 @@ export const runTest = (options: RunOptions): number => {
   console.log(pc.bold(pc.blue(`🧪 [1/2] STAGE: UNIT & ISOLATED TESTS`)));
   console.log(pc.bold(pc.blue(`========================================\n`)));
 
-  const unitStatus = runTestUnit(options);
+  const unitStatus = runTestUnit({ ...options, skipBanner: true });
 
   if (unitStatus !== 0) {
     console.error(
@@ -29,7 +29,8 @@ export const runTest = (options: RunOptions): number => {
   console.log(pc.bold(pc.blue(`🚦 [2/2] STAGE: INTEGRATED E2E TESTS`)));
   console.log(pc.bold(pc.blue(`========================================\n`)));
 
-  const e2eStatus = runTestE2e(options);
+  const e2eStatus = runTestE2e({ ...options, skipBanner: true });
+
 
   if (e2eStatus !== 0) {
     console.error(

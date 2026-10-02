@@ -3,9 +3,13 @@ import path from "node:path";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { ScriptError } from "../errors/ScriptError.js";
 import type { BuildJson } from "../types/index.js";
+import { errorMessage } from "./errorMessage.js";
+import { resolveProjectDir } from "./paths.js";
+import { normalizeDependsOn } from "./ymlMods/normalizeDependsOn.js";
 
 export const getBuildJson = (projectDir: string = process.cwd()): BuildJson => {
-  const buildJsonPath = path.join(projectDir, "build.json");
+  const absProjectDir = resolveProjectDir(projectDir);
+  const buildJsonPath = path.join(absProjectDir, "build.json");
 
   if (!existsSync(buildJsonPath)) {
     throw new NotFoundError(
@@ -13,43 +17,40 @@ export const getBuildJson = (projectDir: string = process.cwd()): BuildJson => {
     );
   }
 
-  let buildJson: Record<string, any>;
-
+  let rawData: string;
   try {
-    const rawData = readFileSync(buildJsonPath, "utf-8");
-    buildJson = JSON.parse(rawData);
-  } catch (error) {
+    rawData = readFileSync(buildJsonPath, "utf-8");
+  } catch (error: unknown) {
     throw new ScriptError(
-      `Failed to parse build.json: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to read build.json at ${buildJsonPath}: ${errorMessage(error)}`
     );
   }
 
-  // Detect services, check if depends_on is an array, and convert it to the long-form object syntax
-  if (buildJson && typeof buildJson === "object" && "services" in buildJson) {
-    const services = buildJson.services;
+  let buildJson: unknown;
+  try {
+    buildJson = JSON.parse(rawData);
+  } catch (error: unknown) {
+    throw new ScriptError(
+      `Failed to parse build.json at ${buildJsonPath}: ${errorMessage(error)}`
+    );
+  }
 
-    if (services && typeof services === "object") {
-      for (const serviceConfig of Object.values(services)) {
-        if (
-          serviceConfig &&
-          typeof serviceConfig === "object" &&
-          "depends_on" in serviceConfig
-        ) {
-          const dependsOn = (serviceConfig as any).depends_on;
+  if (!buildJson || typeof buildJson !== "object" || Array.isArray(buildJson)) {
+    throw new ScriptError(
+      `Invalid build.json at ${buildJsonPath}: root must be a JSON object.`
+    );
+  }
 
-          if (Array.isArray(dependsOn)) {
-            (serviceConfig as any).depends_on = dependsOn.reduce(
-              (acc: Record<string, { condition: string }>, dep: string) => {
-                acc[dep] = { condition: "service_started" };
-                return acc;
-              },
-              {}
-            );
-          }
-        }
+  const typedBuildJson = buildJson as Record<string, any>;
+
+  // Normalize array-form depends_on in any declared services
+  if (typedBuildJson.services && typeof typedBuildJson.services === "object") {
+    for (const serviceConfig of Object.values(typedBuildJson.services)) {
+      if (serviceConfig && typeof serviceConfig === "object") {
+        normalizeDependsOn(serviceConfig);
       }
     }
   }
 
-  return buildJson;
+  return typedBuildJson as BuildJson;
 };

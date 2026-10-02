@@ -8,20 +8,25 @@ RUN pnpm install --frozen-lockfile
 # development
 FROM base AS dev
 COPY . .
+USER node
 CMD ["pnpm", "dev"]
 
 # testing
 FROM base AS test
 COPY . .
+USER node
 CMD ["pnpm", "test"]
 
 # production build
 FROM base AS builder
 COPY . .
 RUN pnpm build
-CMD ["pnpm", "build"]
 
 # production package verification
-FROM base AS prod
+FROM node:22-alpine AS prod
+WORKDIR /app
+COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/dist ./dist
-CMD ["pnpm", "test"]
+COPY --from=builder /app/templates ./templates
+USER node
+CMD ["node", "dist/bin.js", "--version"]

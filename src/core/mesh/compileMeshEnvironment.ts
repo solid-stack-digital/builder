@@ -3,14 +3,18 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { parse, stringify } from "yaml";
 import { ScriptError } from "../../errors/ScriptError.js";
+import { extractBuildDeps } from "../../utils/extractBuildDeps.js";
 import { extractOverrides } from "../../utils/extractOverrides.js";
 import { getBuildJson } from "../../utils/getBuildJson.js";
+import { isBindMount, resolveProjectDir, toComposePath } from "../../utils/paths.js";
+import { deriveProjectName } from "../../utils/projectName.js";
+import { normalizeDependsOn } from "../../utils/ymlMods/normalizeDependsOn.js";
 import { getMeshJson } from "./getMeshJson.js";
-import type { MeshConfig } from "./types.js";
+import type { MeshConfig, MeshServiceConfig } from "./types.js";
 
 export interface CompileMeshOptions {
-  includeTester?: boolean;
-  validateWithDocker?: boolean;
+  includeTester?: boolean | undefined;
+  validateWithDocker?: boolean | undefined;
 }
 
 export interface CompileMeshResult {
@@ -18,19 +22,18 @@ export interface CompileMeshResult {
   testerServiceName?: string | undefined;
 }
 
-function normalizeProjectName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
-}
-
 export function compileMeshEnvironment(
   mode: "dev" | "prod",
   rawMeshDir: string = process.cwd(),
   options: CompileMeshOptions = {}
 ): CompileMeshResult {
-  const meshDir = path.resolve(rawMeshDir);
+  const meshDir = resolveProjectDir(rawMeshDir);
   const mesh: MeshConfig = getMeshJson(meshDir);
   const rawProjectName = mesh.name || path.basename(meshDir);
-  const projectName = normalizeProjectName(rawProjectName);
+  const projectName = deriveProjectName(
+    rawProjectName,
+    options.includeTester ? "e2e" : mode
+  );
 
   const composeConfig: Record<string, any> = {
     name: projectName,
@@ -39,6 +42,29 @@ export function compileMeshEnvironment(
     },
     services: {},
   };
+
+  // Helper to merge top-level resources (volumes, networks, secrets, configs)
+  function mergeTopLevelResources(parsed: any) {
+    if (!parsed || typeof parsed !== "object") return;
+    for (const key of ["volumes", "networks", "secrets", "configs"]) {
+      if (parsed[key] && typeof parsed[key] === "object") {
+        composeConfig[key] = {
+          ...(composeConfig[key] || {}),
+          ...parsed[key],
+        };
+      }
+    }
+  }
+
+  // Helper to safely register a service with collision detection
+  function registerService(key: string, serviceDef: any, origin: string) {
+    if (composeConfig.services[key]) {
+      throw new ScriptError(
+        `Service name collision in mesh compose configuration: Service "${key}" from ${origin} conflicts with an existing service definition.`
+      );
+    }
+    composeConfig.services[key] = serviceDef;
+  }
 
   // Pre-register private networks for each mesh service
   for (const serviceName of Object.keys(mesh.services)) {
@@ -49,29 +75,66 @@ export function compileMeshEnvironment(
   if (mesh.dependencies && typeof mesh.dependencies === "object") {
     for (const [depKey, depDef] of Object.entries(mesh.dependencies)) {
       const depComposePath = path.resolve(meshDir, depDef.path);
-      if (existsSync(depComposePath)) {
-        const raw = readFileSync(depComposePath, "utf-8");
-        const parsed = parse(raw);
-        if (parsed && parsed.services) {
-          const serviceEntry = depDef.service
-            ? parsed.services[depDef.service]
-            : Object.values(parsed.services)[0];
-          if (serviceEntry) {
-            const resolvedService = resolveServicePaths(
-              serviceEntry,
-              meshDir,
-              meshDir
-            );
-            resolvedService.networks = {
-              mesh: {
-                aliases: [depKey],
-              },
-            };
-            composeConfig.services[depKey] = resolvedService;
-          }
+      if (!existsSync(depComposePath)) {
+        throw new ScriptError(
+          `Root dependency compose file not found: ${depComposePath}`
+        );
+      }
+
+      const raw = readFileSync(depComposePath, "utf-8");
+      const parsed = parse(raw);
+      if (!parsed?.services || typeof parsed.services !== "object") {
+        throw new ScriptError(
+          `Root dependency compose file "${depDef.path}" does not define any services.`
+        );
+      }
+
+      // Merge top-level resources
+      mergeTopLevelResources(parsed);
+
+      const targetServiceName = depDef.service || Object.keys(parsed.services)[0];
+      const serviceEntry = targetServiceName ? parsed.services[targetServiceName] : undefined;
+
+      if (!serviceEntry) {
+        throw new ScriptError(
+          `Service "${targetServiceName}" not found in root dependency compose file: ${depComposePath}`
+        );
+      }
+
+      const resolvedService = resolveServicePaths(serviceEntry, meshDir, meshDir);
+      delete resolvedService.container_name;
+      normalizeDependsOn(resolvedService);
+
+      resolvedService.networks = {
+        mesh: {
+          aliases: [depKey, targetServiceName].filter(Boolean),
+        },
+      };
+
+      registerService(depKey, resolvedService, `root dependency "${depKey}"`);
+
+      // Copy any companion services defined in this root dependency
+      for (const [sName, sDef] of Object.entries(parsed.services)) {
+        if (sName !== targetServiceName && !composeConfig.services[sName]) {
+          const companion = resolveServicePaths(sDef as any, meshDir, meshDir);
+          delete companion.container_name;
+          normalizeDependsOn(companion);
+          companion.networks = {
+            mesh: {
+              aliases: [sName],
+            },
+          };
+          registerService(sName, companion, `companion of root dependency "${depKey}"`);
         }
       }
     }
+  }
+
+  // Track provider aliases to add during second pass
+  // Map: providerServiceName -> Set of aliases (e.g. dependency keys)
+  const providerAliases = new Map<string, Set<string>>();
+  for (const sName of Object.keys(mesh.services)) {
+    providerAliases.set(sName, new Set());
   }
 
   // 2. Process each service in mesh.services
@@ -79,32 +142,40 @@ export function compileMeshEnvironment(
     const serviceDir = path.resolve(meshDir, serviceConfig.path);
     const serviceBuildJson = getBuildJson(serviceDir);
     const serviceOverrides = extractOverrides(serviceBuildJson, serviceDir);
-    const rawRelServiceDir = path.relative(meshDir, serviceDir) || ".";
-    const relServiceDir =
-      rawRelServiceDir.startsWith(".") || rawRelServiceDir.startsWith("/")
-        ? rawRelServiceDir
-        : `./${rawRelServiceDir}`;
+    const serviceDeps = extractBuildDeps(serviceBuildJson, serviceDir);
+    const relServiceDir = toComposePath(meshDir, serviceDir);
 
     const dockerfile = (serviceBuildJson.dockerfile as string) || "Dockerfile";
 
-    // Collect environment variables
-    const envOverrides = serviceConfig.envOverrides || {};
+    // Build base environment
     const environment: Record<string, any> = {
       INFRA_MODE: "integrated",
       EXEC_MODE: mode,
-      ...envOverrides,
     };
 
+    if (serviceConfig.port) {
+      environment.PORT = String(serviceConfig.port);
+    }
+
     // Check for override file (e.g. dev or prod override)
-    let overrideVolumes: string[] = [];
+    let overrideVolumes: any[] = [];
+    let overrideHealthcheck: any = undefined;
     const stageOverride = serviceOverrides[mode];
+
     if (stageOverride && existsSync(stageOverride.path)) {
       try {
         const overrideYaml = parse(readFileSync(stageOverride.path, "utf-8"));
+        mergeTopLevelResources(overrideYaml);
+
         const overrideApp =
           overrideYaml?.services?.app ||
-          overrideYaml?.services?.[serviceName] ||
-          Object.values(overrideYaml?.services || {})[0];
+          overrideYaml?.services?.[serviceName];
+
+        if (!overrideApp && overrideYaml?.services && Object.keys(overrideYaml.services).length > 0) {
+          throw new ScriptError(
+            `Override file "${stageOverride.path}" must define service "app" or "${serviceName}".`
+          );
+        }
 
         if (overrideApp) {
           if (Array.isArray(overrideApp.environment)) {
@@ -112,6 +183,8 @@ export function compileMeshEnvironment(
               const eqIdx = item.indexOf("=");
               if (eqIdx !== -1) {
                 environment[item.slice(0, eqIdx)] = item.slice(eqIdx + 1);
+              } else {
+                environment[item] = "";
               }
             }
           } else if (
@@ -122,22 +195,27 @@ export function compileMeshEnvironment(
           }
 
           if (Array.isArray(overrideApp.volumes)) {
-            overrideVolumes = overrideApp.volumes.map((vol: string) => {
-              if (vol.startsWith("/") || !vol.includes(":")) return vol;
-              const [host, container] = vol.split(":");
-              if (!host || !container) return vol;
-              const rel = path.relative(meshDir, path.resolve(serviceDir, host));
-              const formattedRel =
-                rel.startsWith(".") || rel.startsWith("/") ? rel : `./${rel}`;
-              return `${formattedRel}:${container}`;
-            });
+            overrideVolumes = overrideApp.volumes.map((vol: any) =>
+              resolveVolumeEntry(vol, serviceDir, meshDir)
+            );
+          }
+
+          if (overrideApp.healthcheck) {
+            overrideHealthcheck = overrideApp.healthcheck;
           }
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
+        if (err instanceof ScriptError) throw err;
+        const msg = err instanceof Error ? err.message : String(err);
         throw new ScriptError(
-          `Failed to parse override file ${stageOverride.path}: ${err?.message || String(err)}`
+          `Failed to parse override file ${stageOverride.path}: ${msg}`
         );
       }
+    }
+
+    // Apply specific mesh.json envOverrides LAST so they take highest precedence
+    if (serviceConfig.envOverrides) {
+      Object.assign(environment, serviceConfig.envOverrides);
     }
 
     const serviceDef: Record<string, any> = {
@@ -161,10 +239,7 @@ export function compileMeshEnvironment(
     // Check for service-level .env file
     const envFilePath = path.resolve(serviceDir, `.env.${mode}`);
     if (existsSync(envFilePath)) {
-      const relEnv = path.relative(meshDir, envFilePath);
-      serviceDef.env_file = [
-        relEnv.startsWith(".") || relEnv.startsWith("/") ? relEnv : `./${relEnv}`,
-      ];
+      serviceDef.env_file = [toComposePath(meshDir, envFilePath)];
     }
 
     // Hot-reloading volumes for dev mode
@@ -173,7 +248,9 @@ export function compileMeshEnvironment(
       volSet.add(`${relServiceDir}:/app`);
       volSet.add("/app/node_modules");
       for (const v of overrideVolumes) {
-        volSet.add(v);
+        if (typeof v === "string") {
+          volSet.add(v);
+        }
       }
       serviceDef.volumes = Array.from(volSet);
     }
@@ -183,21 +260,28 @@ export function compileMeshEnvironment(
       serviceDef.ports = [`${serviceConfig.port}:${serviceConfig.port}`];
     }
 
-    // Default healthcheck to ensure service_healthy condition works in dev and prod
-    serviceDef.healthcheck = {
-      test: [
-        "CMD",
-        "node",
-        "-e",
-        "require('net').connect(process.env.PORT || 3000, '127.0.0.1').on('connect', () => process.exit(0)).on('error', () => process.exit(1))",
-      ],
-      interval: "2s",
-      timeout: "2s",
-      start_period: "3s",
-      retries: 10,
-    };
+    // Healthcheck resolution: mesh.json > override file > default Node probe
+    if (serviceConfig.healthcheck) {
+      serviceDef.healthcheck = serviceConfig.healthcheck;
+    } else if (overrideHealthcheck) {
+      serviceDef.healthcheck = overrideHealthcheck;
+    } else {
+      const portValue = serviceConfig.port || 3000;
+      serviceDef.healthcheck = {
+        test: [
+          "CMD",
+          "node",
+          "-e",
+          `require('net').connect(process.env.PORT || ${portValue}, '127.0.0.1').on('connect', () => process.exit(0)).on('error', () => process.exit(1))`,
+        ],
+        interval: "2s",
+        timeout: "2s",
+        start_period: "3s",
+        retries: 10,
+      };
+    }
 
-    // Networks for app service: connected to both global mesh and service private network
+    // Networks for app service
     const namespacedAppKey = `${serviceName}-app`;
     serviceDef.networks = {
       mesh: {
@@ -208,76 +292,97 @@ export function compileMeshEnvironment(
       },
     };
 
-    // Resolve dependencies
+    // Resolve dependencies using validated extractBuildDeps
     const provideMap = {
       ...(serviceConfig.replaceMocks || {}),
       ...(serviceConfig.provideDependency || {}),
     };
 
-    if (serviceBuildJson.dependencies) {
-      for (const [depKey, depInfo] of Object.entries(
-        serviceBuildJson.dependencies as Record<string, any>
-      )) {
-        if (provideMap[depKey]) {
-          // Dependency is provided by fellow service in the mesh
-          const fellowService = provideMap[depKey];
-          const fellowAppKey = `${fellowService}-app`;
-          serviceDef.depends_on[fellowAppKey] = {
-            condition: "service_healthy",
-          };
-        } else if (mesh.dependencies && mesh.dependencies[depKey]) {
-          // Dependency is provided at the root mesh.json level
-          serviceDef.depends_on[depKey] = {
-            condition: "service_healthy",
-          };
-        } else {
-          // Dependency is scoped to this service: `${serviceName}-${depKey}`
-          const namespacedDepKey = `${serviceName}-${depKey}`;
-          serviceDef.depends_on[namespacedDepKey] = {
-            condition: "service_healthy",
-          };
+    for (const dep of serviceDeps) {
+      const depKey = dep.name;
 
-          const depComposePath = path.resolve(serviceDir, depInfo.path);
-          if (!existsSync(depComposePath)) {
-            throw new ScriptError(
-              `Mock compose file for dependency "${depKey}" not found: ${depComposePath}`
-            );
-          }
-          const raw = readFileSync(depComposePath, "utf-8");
-          const parsed = parse(raw);
-          if (!parsed?.services) {
-            throw new ScriptError(
-              `Invalid compose file for dependency "${depKey}": missing "services"`
-            );
-          }
+      if (provideMap[depKey]) {
+        // Dependency is provided by fellow service in the mesh
+        const fellowService = provideMap[depKey]!;
+        const fellowAppKey = `${fellowService}-app`;
+        serviceDef.depends_on[fellowAppKey] = {
+          condition: "service_healthy",
+        };
+        // Record that fellowService should alias depKey on mesh network
+        providerAliases.get(fellowService)?.add(depKey);
+      } else if (mesh.dependencies && mesh.dependencies[depKey]) {
+        // Dependency is provided at root mesh.json level
+        serviceDef.depends_on[depKey] = {
+          condition: "service_healthy",
+        };
+      } else {
+        // Local mock dependency
+        const namespacedDepKey = `${serviceName}-${depKey}`;
+        serviceDef.depends_on[namespacedDepKey] = {
+          condition: "service_healthy",
+        };
 
-          const mockServiceEntry = depInfo.service
-            ? parsed.services[depInfo.service]
+        const depComposePath = dep.path;
+        if (!existsSync(depComposePath)) {
+          throw new ScriptError(
+            `Mock compose file for dependency "${depKey}" not found: ${depComposePath}`
+          );
+        }
+        const raw = readFileSync(depComposePath, "utf-8");
+        const parsed = parse(raw);
+        if (!parsed?.services || typeof parsed.services !== "object") {
+          throw new ScriptError(
+            `Invalid compose file for dependency "${depKey}": missing "services"`
+          );
+        }
+
+        mergeTopLevelResources(parsed);
+
+        const targetMockService =
+          dep.serviceName && parsed.services[dep.serviceName]
+            ? parsed.services[dep.serviceName]
             : Object.values(parsed.services)[0];
 
-          if (!mockServiceEntry) {
-            throw new ScriptError(
-              `Service "${depInfo.service}" not found in mock compose ${depComposePath}`
-            );
-          }
-
-          const resolvedMock = resolveServicePaths(
-            mockServiceEntry,
-            serviceDir,
-            meshDir
+        if (!targetMockService) {
+          throw new ScriptError(
+            `Service "${dep.serviceName}" not found in mock compose ${depComposePath}`
           );
+        }
 
-          // Strip ports from mock service to avoid host port allocation collisions
-          delete resolvedMock.ports;
+        const resolvedMock = resolveServicePaths(
+          targetMockService,
+          serviceDir,
+          meshDir
+        );
+        delete resolvedMock.ports;
+        delete resolvedMock.container_name;
+        normalizeDependsOn(resolvedMock);
 
-          // Connect mock service exclusively to this service's private network
-          resolvedMock.networks = {
-            [`${serviceName}_net`]: {
-              aliases: [depKey, namespacedDepKey],
-            },
-          };
+        resolvedMock.networks = {
+          [`${serviceName}_net`]: {
+            aliases: [depKey, namespacedDepKey],
+          },
+        };
 
-          composeConfig.services[namespacedDepKey] = resolvedMock;
+        registerService(namespacedDepKey, resolvedMock, `mock dependency for "${serviceName}"`);
+
+        // Copy companion sidecars in mock compose file if any
+        for (const [mName, mDef] of Object.entries(parsed.services)) {
+          if (mDef !== targetMockService) {
+            const sidecarKey = `${serviceName}-${mName}`;
+            if (!composeConfig.services[sidecarKey]) {
+              const resolvedSidecar = resolveServicePaths(mDef as any, serviceDir, meshDir);
+              delete resolvedSidecar.ports;
+              delete resolvedSidecar.container_name;
+              normalizeDependsOn(resolvedSidecar);
+              resolvedSidecar.networks = {
+                [`${serviceName}_net`]: {
+                  aliases: [mName, sidecarKey],
+                },
+              };
+              registerService(sidecarKey, resolvedSidecar, `sidecar of mock "${depKey}"`);
+            }
+          }
         }
       }
     }
@@ -286,7 +391,20 @@ export function compileMeshEnvironment(
       delete serviceDef.depends_on;
     }
 
-    composeConfig.services[namespacedAppKey] = serviceDef;
+    registerService(namespacedAppKey, serviceDef, `mesh service "${serviceName}"`);
+  }
+
+  // Second pass: Add provider aliases to mesh services for dependency routing (H9)
+  for (const [providerName, aliases] of providerAliases.entries()) {
+    const appKey = `${providerName}-app`;
+    const serviceDef = composeConfig.services[appKey];
+    if (serviceDef && serviceDef.networks?.mesh) {
+      const existingAliases = new Set<string>(serviceDef.networks.mesh.aliases || []);
+      for (const alias of aliases) {
+        existingAliases.add(alias);
+      }
+      serviceDef.networks.mesh.aliases = Array.from(existingAliases);
+    }
   }
 
   // 3. Optional Tester inclusion (for global test & test-e2e)
@@ -299,7 +417,9 @@ export function compileMeshEnvironment(
     if (existsSync(testerComposePath)) {
       const raw = readFileSync(testerComposePath, "utf-8");
       const parsed = parse(raw);
-      if (parsed?.services) {
+      mergeTopLevelResources(parsed);
+
+      if (parsed?.services && typeof parsed.services === "object") {
         const firstKey = Object.keys(parsed.services)[0];
         if (firstKey && parsed.services[firstKey]) {
           testerServiceName = firstKey;
@@ -310,6 +430,8 @@ export function compileMeshEnvironment(
             testerDir,
             meshDir
           );
+          delete resolvedTester.container_name;
+          normalizeDependsOn(resolvedTester);
 
           resolvedTester.networks = {
             mesh: {
@@ -325,7 +447,7 @@ export function compileMeshEnvironment(
             };
           }
 
-          composeConfig.services[firstKey] = resolvedTester;
+          registerService(firstKey, resolvedTester, `tester service "${firstKey}"`);
         }
       }
     }
@@ -360,7 +482,8 @@ export function compileMeshEnvironment(
 
   if (result.error) {
     throw new ScriptError(
-      `Failed to run docker compose config: ${result.error.message}`
+      `Failed to run docker compose config: ${result.error.message}`,
+      { cause: result.error }
     );
   }
 
@@ -379,7 +502,39 @@ export function compileMeshEnvironment(
 }
 
 /**
- * Helper to resolve relative file paths (build context, volumes) in a compose service block
+ * Resolves a volume entry (string or object form), rebasing host bind mounts
+ * relative to the mesh root directory while preserving named volumes.
+ */
+function resolveVolumeEntry(vol: any, baseDir: string, meshDir: string): any {
+  if (typeof vol === "string") {
+    if (!vol.includes(":")) {
+      return vol; // anonymous volume, e.g. /app/node_modules
+    }
+    const parts = vol.split(":");
+    const host = parts[0]!;
+    if (isBindMount(host)) {
+      const absHost = path.resolve(baseDir, host);
+      const formattedRel = toComposePath(meshDir, absHost);
+      return `${formattedRel}:${parts.slice(1).join(":")}`;
+    }
+    // Named volume like db_data:/var/lib/postgresql: keep as-is
+    return vol;
+  }
+
+  if (vol && typeof vol === "object") {
+    const cloned = { ...vol };
+    if (cloned.type === "bind" && cloned.source && typeof cloned.source === "string") {
+      const absSource = path.resolve(baseDir, cloned.source);
+      cloned.source = toComposePath(meshDir, absSource);
+    }
+    return cloned;
+  }
+
+  return vol;
+}
+
+/**
+ * Helper to resolve relative file paths (build context, volumes, env_file) in a compose service block
  * relative to the mesh root directory.
  */
 function resolveServicePaths(
@@ -391,31 +546,39 @@ function resolveServicePaths(
 
   if (cloned.build) {
     if (typeof cloned.build === "string") {
-      const absContext = path.resolve(baseDir, cloned.build);
-      const rel = path.relative(meshDir, absContext) || ".";
-      cloned.build = rel.startsWith(".") || rel.startsWith("/") ? rel : `./${rel}`;
+      cloned.build = toComposePath(meshDir, path.resolve(baseDir, cloned.build));
     } else if (cloned.build.context) {
-      const absContext = path.resolve(baseDir, cloned.build.context);
-      const rel = path.relative(meshDir, absContext) || ".";
-      cloned.build.context = rel.startsWith(".") || rel.startsWith("/") ? rel : `./${rel}`;
+      cloned.build.context = toComposePath(
+        meshDir,
+        path.resolve(baseDir, cloned.build.context)
+      );
     }
   }
 
   if (Array.isArray(cloned.volumes)) {
-    cloned.volumes = cloned.volumes.map((vol: string) => {
-      if (typeof vol !== "string") return vol;
-      const parts = vol.split(":");
-      const host = parts[0];
-      if (parts.length >= 2 && host && !host.startsWith("/")) {
-        const absHost = path.resolve(baseDir, host);
-        const relHost = path.relative(meshDir, absHost);
-        const formattedRelHost =
-          relHost.startsWith(".") || relHost.startsWith("/") ? relHost : `./${relHost}`;
-        return `${formattedRelHost}:${parts.slice(1).join(":")}`;
-      }
-      return vol;
-    });
+    cloned.volumes = cloned.volumes.map((vol: any) =>
+      resolveVolumeEntry(vol, baseDir, meshDir)
+    );
   }
+
+  if (Array.isArray(cloned.env_file)) {
+    cloned.env_file = cloned.env_file.map((ef: any) => {
+      if (typeof ef === "string") {
+        return toComposePath(meshDir, path.resolve(baseDir, ef));
+      }
+      if (ef && typeof ef === "object" && ef.path) {
+        return {
+          ...ef,
+          path: toComposePath(meshDir, path.resolve(baseDir, ef.path)),
+        };
+      }
+      return ef;
+    });
+  } else if (typeof cloned.env_file === "string") {
+    cloned.env_file = toComposePath(meshDir, path.resolve(baseDir, cloned.env_file));
+  }
+
+  normalizeDependsOn(cloned);
 
   return cloned;
 }

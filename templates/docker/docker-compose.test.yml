@@ -3,8 +3,10 @@ services:
     build: 
       target: test
     env_file:
-      - .env.test 
+      - path: .env.test
+        required: false
     environment:
       - INFRA_MODE=isolated
       - EXEC_MODE=test
+
  

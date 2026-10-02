@@ -1,53 +1,47 @@
-import pc from "picocolors";
+import { runDev } from "../../../../core/runners/runDev.js";
+import { runProd } from "../../../../core/runners/runProd.js";
+import { runTest } from "../../../../core/runners/runTest.js";
+import { runTestE2e } from "../../../../core/runners/runTestE2e.js";
+import { runTestUnit } from "../../../../core/runners/runTestUnit.js";
 import { ScriptError } from "../../../../errors/ScriptError.js";
-import type { ServiceUpOptions } from "../../../../types/index.js";
-import { checkDependencies } from "../../../../utils/checkDependencies.js";
-import { runDev } from "@/core/runners/runDev.js";
-import { runProd } from "@/core/runners/runProd.js";
-import { runTestE2e } from "@/core/runners/runTestE2e.js";
-import { runTestUnit } from "@/core/runners/runTestUnit.js";
-import { runTest } from "@/core/runners/runTest.js";
-import { checkInfra } from "@/core/checkers/checkInfra.js";
+import { SERVICE_STAGES, type ServiceUpOptions } from "../../../../types/index.js";
+import { resolveProjectDir } from "../../../../utils/paths.js";
 
 export async function handleServiceUp(
   rawStage?: string,
-  options: ServiceUpOptions = {},
+  options: ServiceUpOptions = {}
 ): Promise<number> {
-  const projectDir = options.projectDir || process.cwd();
+  const projectDir = resolveProjectDir(options.projectDir);
   const stage = (rawStage || "dev").toLowerCase();
 
   const runOptions = {
     projectDir,
-    debug: options.debug || false,
-    detach: options.detach || false,
+    debug: Boolean(options.debug),
+    detach: Boolean(options.detach),
+    dryRun: Boolean(options.dryRun),
   };
 
   if (stage === "dev") {
-    const status = runDev(runOptions);
-    return status;
+    return runDev(runOptions);
   }
 
   if (stage === "prod") {
-    const status = runProd(runOptions);
-    return status;
+    return runProd(runOptions);
   }
 
   if (stage === "test-unit") {
-    const status = runTestUnit(runOptions);
-    return status;
+    return runTestUnit(runOptions);
   }
 
   if (stage === "test-e2e") {
-    const status = runTestE2e(runOptions);
-    return status;
+    return runTestE2e(runOptions);
   }
 
   if (stage === "test") {
-    const status = runTest(runOptions);
-    return status;
+    return runTest(runOptions);
   }
 
   throw new ScriptError(
-    `Unknown environment stage: "${rawStage}". Supported stages: dev, prod, test, test-unit, test-e2e`,
+    `Unknown environment stage: "${rawStage}". Supported stages: ${SERVICE_STAGES.join(", ")}`
   );
 }

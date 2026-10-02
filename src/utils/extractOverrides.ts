@@ -1,7 +1,9 @@
 import path from "node:path";
-import z from "zod";
+import { z } from "zod";
 import { ScriptError } from "../errors/ScriptError.js";
-import type { BuildOverride } from "../types/index.js";
+import type { BuildOverride, Environment } from "../types/index.js";
+
+const VALID_STAGES = ["dev", "prod", "test", "e2e"] as const;
 
 export const extractOverrides = (
   buildJson: any,
@@ -17,17 +19,24 @@ export const extractOverrides = (
 
   const schema = z.object({
     overrides: z.record(
-      z.string(),
+      z.enum(VALID_STAGES, {
+        errorMap: () => ({
+          message: `Unknown stage override. Supported stages are: ${VALID_STAGES.join(", ")}`,
+        }),
+      }),
       z.object({
-        path: z.string(),
+        path: z.string({ required_error: "Override 'path' is required" }),
       })
     ),
   });
 
   const result = schema.safeParse(buildJson);
   if (!result.success) {
+    const errorDetails = result.error.issues
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+      .join("; ");
     throw new ScriptError(
-      `Invalid build.json structure for overrides: ${result.error.message}`
+      `Invalid build.json structure for overrides: ${errorDetails}`
     );
   }
 
@@ -40,3 +49,4 @@ export const extractOverrides = (
 
   return resolvedOverrides;
 };
+

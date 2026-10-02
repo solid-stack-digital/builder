@@ -37,4 +37,4 @@ patch:
 
 
 lookci: 
-	@find src docker scripts templates tests package.json tsconfig.json vitest.config tsup.config -type f -exec tail -n +1 {} + 
+	@find src docker scripts templates tests package.json tsconfig.json vitest.config.ts tsup.config.ts -type f -exec tail -n +1 {} + 

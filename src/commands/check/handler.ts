@@ -1,13 +1,16 @@
 import { checkInfra } from "../../core/checkers/checkInfra.js";
+import { checkDependencies } from "../../utils/checkDependencies.js";
+import { resolveProjectDir } from "../../utils/paths.js";
 
 export interface CheckHandlerOptions {
   projectDir?: string;
 }
 
 export async function handleCheck(
-  options: CheckHandlerOptions = {},
+  options: CheckHandlerOptions = {}
 ): Promise<number> {
-  const projectDir = options.projectDir || process.cwd();
+  const projectDir = resolveProjectDir(options.projectDir);
+  checkDependencies();
   checkInfra(projectDir);
   return 0;
 }

@@ -1,6 +1,7 @@
 export interface MeshRunOptions {
-  projectDir?: string;
-  debug?: boolean;
-  detach?: boolean;
-  dryRun?: boolean;
+  projectDir?: string | undefined;
+  debug?: boolean | undefined;
+  detach?: boolean | undefined;
+  dryRun?: boolean | undefined;
+  skipChecks?: boolean | undefined;
 }

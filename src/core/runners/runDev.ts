@@ -1,7 +1,8 @@
+import pc from "picocolors";
+import { redactYamlSecrets } from "../../utils/redactSecrets.js";
 import { compileEnvironment } from "../compileEnvironment.js";
 import { runCompose } from "../runCompose.js";
 import type { RunOptions } from "../RunOptions.js";
-import pc from "picocolors";
 
 export const runDev = (options: RunOptions): number => {
   console.log(pc.cyan(`🚀 Starting DEV environment...`));
@@ -10,8 +11,13 @@ export const runDev = (options: RunOptions): number => {
   if (options.debug) {
     console.log(
       pc.yellow("Final merged YAML configuration:\n"),
-      finalYamlConfig,
+      redactYamlSecrets(finalYamlConfig)
     );
+  }
+
+  if (options.dryRun) {
+    console.log(pc.green("Dry run complete. Compose was not started."));
+    return 0;
   }
 
   const upArgs = ["up", "--build"];

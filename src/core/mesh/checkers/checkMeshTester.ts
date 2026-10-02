@@ -1,8 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import pc from "picocolors";
-import { parse } from "yaml";
+import { parseAllDocuments } from "yaml";
 import { ScriptError } from "../../../errors/ScriptError.js";
+import { errorMessage } from "../../../utils/errorMessage.js";
+import { isPathInside, resolveProjectDir } from "../../../utils/paths.js";
+import { CONFTEST_IMAGE, HADOLINT_IMAGE } from "../../checkers/constants.js";
 import { runStep } from "../../checkers/runStep.js";
 import type { MeshConfig } from "../types.js";
 
@@ -20,6 +23,7 @@ export function checkMeshTester(
     return;
   }
 
+  const absMeshDir = resolveProjectDir(meshDir);
   const testerConfig = mesh.tester;
   if (!testerConfig.path || typeof testerConfig.path !== "string") {
     throw new ScriptError(
@@ -27,10 +31,16 @@ export function checkMeshTester(
     );
   }
 
-  const testerDir = path.resolve(meshDir, testerConfig.path);
-  if (!existsSync(testerDir)) {
+  const absTesterDir = path.resolve(absMeshDir, testerConfig.path);
+  if (!isPathInside(absMeshDir, absTesterDir)) {
     throw new ScriptError(
-      `E2E tester directory does not exist: ${testerDir} (declared path: "${testerConfig.path}")`
+      `Security error: Tester directory path "${testerConfig.path}" escapes the mesh project directory.`
+    );
+  }
+
+  if (!existsSync(absTesterDir)) {
+    throw new ScriptError(
+      `E2E tester directory does not exist: ${absTesterDir} (declared path: "${testerConfig.path}")`
     );
   }
 
@@ -40,7 +50,7 @@ export function checkMeshTester(
 
   // 1. Check Compose file
   const composeRel = testerConfig.compose || "docker-compose.yml";
-  const composePath = path.resolve(testerDir, composeRel);
+  const composePath = path.resolve(absTesterDir, composeRel);
 
   if (!existsSync(composePath)) {
     throw new ScriptError(
@@ -50,18 +60,20 @@ export function checkMeshTester(
 
   try {
     const composeContent = readFileSync(composePath, "utf-8");
-    parse(composeContent);
-  } catch (err: any) {
+    const docs = parseAllDocuments(composeContent);
+    const docErrors = docs.flatMap((doc) => doc.errors);
+    if (docErrors.length > 0) {
+      throw new Error(docErrors.map((e) => e.message).join("\n"));
+    }
+  } catch (err: unknown) {
     throw new ScriptError(
-      `Invalid YAML syntax in tester docker compose (${composeRel}): ${
-        err?.message || String(err)
-      }`
+      `Invalid YAML syntax in tester docker compose (${composeRel}): ${errorMessage(err)}`
     );
   }
 
   // 2. Check Dockerfile
   const dockerfileRel = testerConfig.dockerfile || "Dockerfile";
-  const dockerfilePath = path.resolve(testerDir, dockerfileRel);
+  const dockerfilePath = path.resolve(absTesterDir, dockerfileRel);
 
   if (!existsSync(dockerfilePath)) {
     throw new ScriptError(
@@ -69,17 +81,24 @@ export function checkMeshTester(
     );
   }
 
+  const dockerfileContent = readFileSync(dockerfilePath, "utf-8");
+
   console.log(pc.cyan(`\n🔍 Linting E2E Tester Dockerfile (${dockerfileRel})...`));
   runStep(
-    `docker run --rm -i hadolint/hadolint hadolint --failure-threshold error - < "${dockerfileRel}"`,
-    testerDir,
-    { stepName: "E2E Tester Dockerfile Linting", targetFile: dockerfileRel }
+    "docker",
+    ["run", "--rm", "-i", HADOLINT_IMAGE, "hadolint", "--failure-threshold", "error", "-"],
+    absTesterDir,
+    {
+      stepName: "E2E Tester Dockerfile Linting",
+      targetFile: dockerfileRel,
+      input: dockerfileContent,
+    }
   );
 
   // 3. Optional policy/contract checks if policies exist
   const dockerfilePolicyRel =
     testerConfig.policy?.dockerfile || "policy/dockerfile";
-  const dockerfilePolicyDir = path.resolve(testerDir, dockerfilePolicyRel);
+  const dockerfilePolicyDir = path.resolve(absTesterDir, dockerfilePolicyRel);
   if (existsSync(dockerfilePolicyDir)) {
     console.log(
       pc.cyan(
@@ -87,21 +106,48 @@ export function checkMeshTester(
       )
     );
     runStep(
-      `docker run --rm -v "${testerDir}:/project" -w /project openpolicyagent/conftest test "${dockerfileRel}" -p "${dockerfilePolicyRel}/"`,
-      testerDir,
+      "docker",
+      [
+        "run",
+        "--rm",
+        "-v",
+        `${absTesterDir}:/project`,
+        "-w",
+        "/project",
+        CONFTEST_IMAGE,
+        "test",
+        dockerfileRel,
+        "-p",
+        `${dockerfilePolicyRel}/`,
+      ],
+      absTesterDir,
       { stepName: "E2E Tester Dockerfile Contract", targetFile: dockerfileRel }
     );
   }
 
   const composePolicyRel = testerConfig.policy?.compose || "policy/compose";
-  const composePolicyDir = path.resolve(testerDir, composePolicyRel);
+  const composePolicyDir = path.resolve(absTesterDir, composePolicyRel);
   if (existsSync(composePolicyDir)) {
     console.log(
       pc.cyan(`\n🔍 Validating Tester Compose Contract (${composePolicyRel})...`)
     );
     runStep(
-      `docker run --rm -v "${testerDir}:/project" -w /project openpolicyagent/conftest test "${composeRel}" -p "${composePolicyRel}/" --all-namespaces`,
-      testerDir,
+      "docker",
+      [
+        "run",
+        "--rm",
+        "-v",
+        `${absTesterDir}:/project`,
+        "-w",
+        "/project",
+        CONFTEST_IMAGE,
+        "test",
+        composeRel,
+        "-p",
+        `${composePolicyRel}/`,
+        "--all-namespaces",
+      ],
+      absTesterDir,
       { stepName: "E2E Tester Compose Contract", targetFile: composeRel }
     );
   }

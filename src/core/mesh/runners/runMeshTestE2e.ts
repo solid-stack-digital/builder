@@ -1,6 +1,7 @@
-import path from "node:path";
 import pc from "picocolors";
 import { ScriptError } from "../../../errors/ScriptError.js";
+import { resolveProjectDir } from "../../../utils/paths.js";
+import { redactYamlSecrets } from "../../../utils/redactSecrets.js";
 import { runCompose } from "../../runCompose.js";
 import { teardownCompose } from "../../teardownCompose.js";
 import { checkMesh } from "../checkers/checkMesh.js";
@@ -8,13 +9,15 @@ import { compileMeshEnvironment } from "../compileMeshEnvironment.js";
 import type { MeshRunOptions } from "../MeshRunOptions.js";
 
 export function runMeshTestE2e(options: MeshRunOptions = {}): number {
-  const meshDir = path.resolve(options.projectDir || process.cwd());
+  const meshDir = resolveProjectDir(options.projectDir);
 
   console.log(pc.bold(pc.blue(`\n========================================`)));
   console.log(pc.bold(pc.blue(`🚦 [MESH] STAGE: GLOBAL INTEGRATED E2E TESTS`)));
   console.log(pc.bold(pc.blue(`========================================\n`)));
 
-  checkMesh(meshDir, { requireTester: true });
+  if (!options.skipChecks) {
+    checkMesh(meshDir, { requireTester: true });
+  }
 
   const { yaml, testerServiceName } = compileMeshEnvironment("prod", meshDir, {
     includeTester: true,
@@ -29,7 +32,7 @@ export function runMeshTestE2e(options: MeshRunOptions = {}): number {
   if (options.debug) {
     console.log(
       pc.yellow("\nFinal merged Mesh E2E YAML configuration:\n"),
-      yaml
+      redactYamlSecrets(yaml)
     );
   }
 

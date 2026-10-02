@@ -1,28 +1,22 @@
 import pc from "picocolors";
+import { resolveProjectDir } from "../../../utils/paths.js";
 import { getMeshJson } from "../getMeshJson.js";
-import { checkMeshJson } from "./checkMeshJson.js";
 import { checkMeshServices } from "./checkMeshServices.js";
 import { checkMeshTester } from "./checkMeshTester.js";
 
 export interface CheckMeshOptions {
-  requireTester?: boolean;
+  requireTester?: boolean | undefined;
 }
 
 export function checkMesh(
   meshDir: string = process.cwd(),
   options: CheckMeshOptions = {}
 ): void {
-  const mesh = getMeshJson(meshDir);
+  const absMeshDir = resolveProjectDir(meshDir);
+  const mesh = getMeshJson(absMeshDir);
 
-  checkMeshJson(mesh);
-  checkMeshServices(mesh, meshDir);
-  checkMeshTester(
-    mesh,
-    meshDir,
-    options.requireTester !== undefined
-      ? { required: options.requireTester }
-      : {}
-  );
+  checkMeshServices(mesh, absMeshDir);
+  checkMeshTester(mesh, absMeshDir, { required: Boolean(options.requireTester) });
 
   console.log(
     pc.bold(

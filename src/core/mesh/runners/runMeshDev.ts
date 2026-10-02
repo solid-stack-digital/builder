@@ -1,22 +1,25 @@
-import path from "node:path";
 import pc from "picocolors";
+import { resolveProjectDir } from "../../../utils/paths.js";
+import { redactYamlSecrets } from "../../../utils/redactSecrets.js";
 import { runCompose } from "../../runCompose.js";
 import { checkMesh } from "../checkers/checkMesh.js";
 import { compileMeshEnvironment } from "../compileMeshEnvironment.js";
 import type { MeshRunOptions } from "../MeshRunOptions.js";
 
 export function runMeshDev(options: MeshRunOptions = {}): number {
-  const meshDir = path.resolve(options.projectDir || process.cwd());
+  const meshDir = resolveProjectDir(options.projectDir);
 
   console.log(pc.cyan(`\n🚀 Starting Global DEV Mesh Environment...`));
-  checkMesh(meshDir, { requireTester: false });
+  if (!options.skipChecks) {
+    checkMesh(meshDir, { requireTester: false });
+  }
 
   const { yaml } = compileMeshEnvironment("dev", meshDir);
 
   if (options.debug) {
     console.log(
       pc.yellow("\nFinal merged Mesh Dev YAML configuration:\n"),
-      yaml
+      redactYamlSecrets(yaml)
     );
   }
 

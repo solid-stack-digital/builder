@@ -4,6 +4,8 @@ services:
       context: .
       target: test-e2e
     env_file:
-      - .env.e2e
+      - path: .env.e2e
+        required: false
     environment: 
       - API_URL=http://app:${PORT:-3000}
+

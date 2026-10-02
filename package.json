@@ -3,6 +3,14 @@
   "version": "1.0.6",
   "description": "CLI build tool and orchestrator for Solid Stack services.",
   "type": "module",
+  "main": "./dist/bin.js",
+  "types": "./dist/bin.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/bin.d.ts",
+      "import": "./dist/bin.js"
+    }
+  },
   "bin": {
     "builder": "./dist/bin.js",
     "solid-builder": "./dist/bin.js"
@@ -13,7 +21,7 @@
     "templates"
   ],
   "scripts": {
-    "build": "tsc --project tsconfig.build.json --outDir dist && tsc-alias -p tsconfig.build.json",
+    "build": "tsx scripts/build.ts",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -30,8 +38,7 @@
     "orchestrator",
     "compose",
     "typescript",
-    "esm",
-    "cjs"
+    "esm"
   ],
   "author": "Solid Stack Digital",
   "license": "UNLICENSED",
@@ -39,7 +46,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "devEngines": {
     "packageManager": {
@@ -56,7 +63,6 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
-    "@types/yaml": "^1.9.7",
     "tsc-alias": "^1.9.5",
     "tsup": "^8.5.1",
     "tsx": "^4.23.1",

@@ -36,6 +36,29 @@ describe("Mesh orchestration and verification", () => {
         } as any)
       ).toThrow(ScriptError);
     });
+
+    it("detects dependency cycles in checkMeshJson (H9)", () => {
+      const cyclicMesh = {
+        services: {
+          svcA: { path: "./services/svcA", provideDependency: { depB: "svcB" } },
+          svcB: { path: "./services/svcB", provideDependency: { depA: "svcA" } },
+        },
+      };
+      expect(() => checkMeshJson(cyclicMesh as any)).toThrow(
+        /Dependency cycle detected in mesh\.json/
+      );
+    });
+
+    it("validates provider targets exist in mesh.services (H9)", () => {
+      const invalidTarget = {
+        services: {
+          svcA: { path: "./services/svcA", provideDependency: { depB: "nonexistent" } },
+        },
+      };
+      expect(() => checkMeshJson(invalidTarget as any)).toThrow(
+        /nonexistent service "nonexistent"/
+      );
+    });
   });
 
   describe("checkMesh checker suite", () => {
@@ -102,6 +125,22 @@ describe("Mesh orchestration and verification", () => {
       expect(backend.environment.EXEC_MODE).toBe("prod");
       expect(backend.environment.INFRA_MODE).toBe("integrated");
     });
+
+    it("injects PORT env var and sets healthcheck to configured port (H7)", () => {
+      const { yaml } = compileMeshEnvironment("dev", LARGE_PROJECT_DIR);
+      const parsed = parse(yaml);
+
+      const backend = parsed.services["backend-app"];
+      expect(backend.environment.PORT).toBe("3000");
+      const hasPort3000 = backend.ports.some((p: any) =>
+        typeof p === "string"
+          ? p.includes("3000")
+          : p.target === 3000 || p.published === "3000"
+      );
+      expect(hasPort3000).toBe(true);
+      expect(backend.healthcheck.test.join(" ")).toContain("3000");
+    });
+
   });
 
   describe("CLI mesh commands and handlers", () => {

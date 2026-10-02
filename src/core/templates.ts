@@ -1,21 +1,30 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ScriptError } from "../errors/ScriptError.js";
 
 let cachedTemplatesDir: string | null = null;
 
 export function getTemplatesDir(): string {
-  if (process.env.BUILDER_TEMPLATES_DIR && fs.existsSync(process.env.BUILDER_TEMPLATES_DIR)) {
-    return process.env.BUILDER_TEMPLATES_DIR;
+  if (process.env.BUILDER_TEMPLATES_DIR) {
+    const envDir = path.resolve(process.env.BUILDER_TEMPLATES_DIR);
+    if (!fs.existsSync(envDir)) {
+      throw new ScriptError(
+        `BUILDER_TEMPLATES_DIR is set to "${process.env.BUILDER_TEMPLATES_DIR}" but directory does not exist (resolved: "${envDir}").`
+      );
+    }
+    cachedTemplatesDir = envDir;
+    return envDir;
   }
 
   if (cachedTemplatesDir && fs.existsSync(cachedTemplatesDir)) {
     return cachedTemplatesDir;
   }
 
-  const currentDir = typeof __dirname !== "undefined"
-    ? __dirname
-    : path.dirname(fileURLToPath(import.meta.url));
+  const currentDir =
+    typeof __dirname !== "undefined"
+      ? __dirname
+      : path.dirname(fileURLToPath(import.meta.url));
 
   const candidates = [
     // When executing compiled output in dist/ (e.g. dist/templates)
@@ -34,7 +43,7 @@ export function getTemplatesDir(): string {
     }
   }
 
-  throw new Error(
+  throw new ScriptError(
     `Templates directory not found. Searched candidates:\n${candidates.join("\n")}`
   );
 }
@@ -43,7 +52,7 @@ export function getDockerComposeTemplate(filename: string): string {
   const templatesDir = getTemplatesDir();
   const filePath = path.join(templatesDir, "docker", filename);
   if (!fs.existsSync(filePath)) {
-    throw new Error(`Docker compose template not found: ${filePath}`);
+    throw new ScriptError(`Docker compose template not found: ${filePath}`);
   }
   return filePath;
 }

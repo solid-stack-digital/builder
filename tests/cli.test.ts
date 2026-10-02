@@ -1,12 +1,12 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createCli } from "../src/cli.js";
-import { handleServiceUp } from "../src/commands/service/commands/up/handler.js";
 import { handleCheck } from "../src/commands/check/handler.js";
+import { handleServiceUp } from "../src/commands/service/commands/up/handler.js";
 
-const BACKEND_DIR = path.resolve(
+const EXAMPLE_BACKEND_DIR = path.resolve(
   __dirname,
-  "../../agnostic-build-sys/services/backend"
+  "../examples/backend"
 );
 
 describe("CLI parser and command handlers", () => {
@@ -26,9 +26,26 @@ describe("CLI parser and command handlers", () => {
     expect(checkCmd).toBeDefined();
   });
 
-  it("handles check command", async () => {
+  it("handles check command with absolute path", async () => {
     const exitCode = await handleCheck({
-      projectDir: BACKEND_DIR,
+      projectDir: EXAMPLE_BACKEND_DIR,
+    });
+    expect(exitCode).toBe(0);
+  });
+
+  it("handles check command with relative path without doubling path", async () => {
+    const relPath = path.relative(process.cwd(), EXAMPLE_BACKEND_DIR);
+    const exitCode = await handleCheck({
+      projectDir: relPath.startsWith(".") ? relPath : `./${relPath}`,
+    });
+    expect(exitCode).toBe(0);
+  });
+
+  it("handles service up with dry-run and skip-checks", async () => {
+    const exitCode = await handleServiceUp("dev", {
+      projectDir: EXAMPLE_BACKEND_DIR,
+      dryRun: true,
+      skipChecks: true,
     });
     expect(exitCode).toBe(0);
   });
@@ -36,7 +53,7 @@ describe("CLI parser and command handlers", () => {
   it("rejects unknown stage", async () => {
     await expect(
       handleServiceUp("unknown-stage", {
-        projectDir: BACKEND_DIR,
+        projectDir: EXAMPLE_BACKEND_DIR,
       })
     ).rejects.toThrow("Unknown environment stage");
   });

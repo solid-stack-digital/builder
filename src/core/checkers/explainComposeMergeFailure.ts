@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { parse } from "yaml";
 import type { BuildJson } from "../../types/index.js";
 import { getDeclaredYamlFiles } from "./getDeclaredYamlFiles.js";
 
@@ -12,16 +13,26 @@ export function findServiceDefinersInDeclaredFiles(
 
   for (const file of declaredFiles) {
     if (!existsSync(file.absolutePath)) continue;
-    const content = readFileSync(file.absolutePath, "utf-8");
-    const hasBlock = new RegExp(`^\\s{2}${serviceName}:\\s*$`, "m").test(content);
-    if (!hasBlock) continue;
-    const hasImageOrBuild = new RegExp(
-      `^\\s{2}${serviceName}:[\\s\\S]*?^\\s{4,}(image|build):`,
-      "m"
-    ).test(content);
-    hits.push(
-      `    - ${file.relativePath} (${file.source})${hasImageOrBuild ? "  [defines image/build]" : "  [no image/build]"}`
-    );
+    try {
+      const content = readFileSync(file.absolutePath, "utf-8");
+      const parsed = parse(content);
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        parsed.services &&
+        typeof parsed.services === "object"
+      ) {
+        const svc = parsed.services[serviceName];
+        if (svc) {
+          const hasImageOrBuild = Boolean(svc.image || svc.build);
+          hits.push(
+            `    - ${file.relativePath} (${file.source})${hasImageOrBuild ? "  [defines image/build]" : "  [no image/build]"}`
+          );
+        }
+      }
+    } catch {
+      // ignore parsing errors here
+    }
   }
 
   return hits;
@@ -41,11 +52,18 @@ export function explainComposeMergeFailure(
   const envMissingMatch =
     /env file .* not found|no such file or directory.*\.env/i.test(rawOutput);
 
+  // Filter down to actual file paths (not flags like -f, -p, --project-directory)
+  const actualComposeFiles = filesUsed.filter(
+    (f) => !f.startsWith("-") && (f.endsWith(".yml") || f.endsWith(".yaml"))
+  );
+
   lines.push(`Environment          : ${envName}`);
   lines.push(`Compose files merged :`);
-  filesUsed
-    .filter((f) => f !== "-f")
-    .forEach((f) => lines.push(`    - ${f}`));
+  if (actualComposeFiles.length > 0) {
+    actualComposeFiles.forEach((f) => lines.push(`    - ${f}`));
+  } else {
+    filesUsed.filter((f) => f !== "-f").forEach((f) => lines.push(`    - ${f}`));
+  }
   lines.push("");
 
   if (serviceMatch && serviceMatch[1]) {

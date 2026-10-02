@@ -1,21 +1,28 @@
- 
-import pc from "picocolors"; 
+import pc from "picocolors";
+import { redactYamlSecrets } from "../../utils/redactSecrets.js";
 import { compileEnvironment } from "../compileEnvironment.js";
 import { runCompose } from "../runCompose.js";
 import type { RunOptions } from "../RunOptions.js";
 import { teardownCompose } from "../teardownCompose.js";
 
 export const runTestE2e = (options: RunOptions): number => {
-  console.log(pc.bold(pc.blue(`\n========================================`)));
-  console.log(pc.bold(pc.blue(`🚦 STAGE: INTEGRATED E2E TESTS`)));
-  console.log(pc.bold(pc.blue(`========================================\n`)));
+  if (!options.skipBanner) {
+    console.log(pc.bold(pc.blue(`\n========================================`)));
+    console.log(pc.bold(pc.blue(`🚦 STAGE: INTEGRATED E2E TESTS`)));
+    console.log(pc.bold(pc.blue(`========================================\n`)));
+  }
   const finalYamlConfig = compileEnvironment("e2e", options.projectDir);
 
   if (options.debug) {
     console.log(
       pc.yellow("Final merged YAML configuration:\n"),
-      finalYamlConfig,
+      redactYamlSecrets(finalYamlConfig)
     );
+  }
+
+  if (options.dryRun) {
+    console.log(pc.green("[DRY-RUN] E2E tests simulated. Compose was not started."));
+    return 0;
   }
 
   let status = 0;
@@ -29,7 +36,7 @@ export const runTestE2e = (options: RunOptions): number => {
         "tester",
       ],
       finalYamlConfig,
-      options.projectDir,
+      options.projectDir
     );
   } finally {
     teardownCompose(finalYamlConfig, options.projectDir);

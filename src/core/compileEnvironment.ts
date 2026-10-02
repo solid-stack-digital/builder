@@ -7,112 +7,169 @@ import type { Environment } from "../types/index.js";
 import { extractBuildDeps } from "../utils/extractBuildDeps.js";
 import { extractOverrides } from "../utils/extractOverrides.js";
 import { getBuildJson } from "../utils/getBuildJson.js";
+import { resolveProjectDir } from "../utils/paths.js";
+import { deriveProjectName } from "../utils/projectName.js";
 import { addDependenciesToAppService } from "../utils/ymlMods/addDependenciesToAppService.js";
 import { attachName } from "../utils/ymlMods/attachName.js";
 import { makeE2eDependOnApp } from "../utils/ymlMods/makeE2eDependOnApp.js";
 import { renameServicesWithDependencies } from "../utils/ymlMods/renameServicesWithDependencies.js";
+import { explainComposeMergeFailure } from "./checkers/explainComposeMergeFailure.js";
 import { getDockerComposeTemplate } from "./templates.js";
 
 export const compileEnvironment = (
   environment: Environment,
   projectDir: string = process.cwd()
 ): string => {
-  const buildJson = getBuildJson(projectDir);
-  const overrides = extractOverrides(buildJson, projectDir);
-  const dependencies = extractBuildDeps(buildJson, projectDir);
+  const absProjectDir = resolveProjectDir(projectDir);
+  const buildJson = getBuildJson(absProjectDir);
+  const overrides = extractOverrides(buildJson, absProjectDir);
+  const dependencies = extractBuildDeps(buildJson, absProjectDir);
+
+  const rawProjectName = buildJson.name || path.basename(absProjectDir);
+  const projectName = deriveProjectName(rawProjectName, environment);
 
   const baseComposePath = getDockerComposeTemplate("docker-compose.base.yml");
-  const baseComposeDevPath = getDockerComposeTemplate("docker-compose.dev.yml");
-  const baseComposeProdPath = getDockerComposeTemplate("docker-compose.prod.yml");
-  const baseComposeTestPath = getDockerComposeTemplate("docker-compose.test.yml");
-  const baseComposeE2ePath = getDockerComposeTemplate("docker-compose.e2e.yml");
-  const baseComposeStandalonePath = getDockerComposeTemplate("docker-compose.standalone.yml");
 
-  const projectName = buildJson.name || path.basename(projectDir);
   const composeFlags: string[] = [
     "compose",
     "-p",
     projectName,
     "--project-directory",
-    projectDir,
+    absProjectDir,
     "-f",
     baseComposePath,
   ];
 
-  const envFile = path.resolve(projectDir, `.env.${environment}`);
-  const hasEnvFile = existsSync(envFile);
+  const filesUsed: string[] = [baseComposePath];
+
+  // Include .env if present
+  const defaultEnv = path.resolve(absProjectDir, ".env");
+  if (existsSync(defaultEnv)) {
+    composeFlags.push("--env-file", defaultEnv);
+  }
+
+  // Include stage-specific .env.<stage> if present
+  const stageEnv = path.resolve(absProjectDir, `.env.${environment}`);
+  if (existsSync(stageEnv)) {
+    composeFlags.push("--env-file", stageEnv);
+  }
+
+  // For e2e, also include .env.prod if present and different
+  if (environment === "e2e") {
+    const prodEnv = path.resolve(absProjectDir, ".env.prod");
+    if (existsSync(prodEnv) && prodEnv !== stageEnv) {
+      composeFlags.push("--env-file", prodEnv);
+    }
+  }
 
   switch (environment) {
-    case "dev":
-      if (hasEnvFile) {
-        composeFlags.push("--env-file", envFile);
-      }
-      composeFlags.push("-f", baseComposeDevPath);
+    case "dev": {
+      const devPath = getDockerComposeTemplate("docker-compose.dev.yml");
+      const standalonePath = getDockerComposeTemplate("docker-compose.standalone.yml");
+
+      composeFlags.push("-f", devPath);
+      filesUsed.push(devPath);
+
       if (overrides.dev) {
         composeFlags.push("-f", overrides.dev.path);
+        filesUsed.push(overrides.dev.path);
       }
-      composeFlags.push("-f", baseComposeStandalonePath);
-      break;
 
-    case "test":
-      if (hasEnvFile) {
-        composeFlags.push("--env-file", envFile);
-      }
-      composeFlags.push("-f", baseComposeTestPath);
+      composeFlags.push("-f", standalonePath);
+      filesUsed.push(standalonePath);
+      break;
+    }
+
+    case "test": {
+      const testPath = getDockerComposeTemplate("docker-compose.test.yml");
+      composeFlags.push("-f", testPath);
+      filesUsed.push(testPath);
+
       if (overrides.test) {
         composeFlags.push("-f", overrides.test.path);
+        filesUsed.push(overrides.test.path);
       }
       break;
+    }
 
-    case "prod":
-      if (hasEnvFile) {
-        composeFlags.push("--env-file", envFile);
-      }
-      composeFlags.push("-f", baseComposeProdPath);
+    case "prod": {
+      const prodPath = getDockerComposeTemplate("docker-compose.prod.yml");
+      const standalonePath = getDockerComposeTemplate("docker-compose.standalone.yml");
+
+      composeFlags.push("-f", prodPath);
+      filesUsed.push(prodPath);
+
       if (overrides.prod) {
         composeFlags.push("-f", overrides.prod.path);
+        filesUsed.push(overrides.prod.path);
       }
+
       if (dependencies.length > 0) {
-        composeFlags.push(...dependencies.flatMap((dep) => ["-f", dep.path]));
+        for (const dep of dependencies) {
+          composeFlags.push("-f", dep.path);
+          filesUsed.push(dep.path);
+        }
       }
-      composeFlags.push("-f", baseComposeStandalonePath);
+
+      composeFlags.push("-f", standalonePath);
+      filesUsed.push(standalonePath);
       break;
+    }
 
-    case "e2e":
-      if (hasEnvFile) {
-        composeFlags.push("--env-file", envFile);
-      }
-      composeFlags.push("-f", baseComposeProdPath);
+    case "e2e": {
+      const prodPath = getDockerComposeTemplate("docker-compose.prod.yml");
+      const e2ePath = getDockerComposeTemplate("docker-compose.e2e.yml");
+
+      composeFlags.push("-f", prodPath);
+      filesUsed.push(prodPath);
+
       if (overrides.prod) {
         composeFlags.push("-f", overrides.prod.path);
+        filesUsed.push(overrides.prod.path);
       }
+
       if (dependencies.length > 0) {
-        composeFlags.push(...dependencies.flatMap((dep) => ["-f", dep.path]));
+        for (const dep of dependencies) {
+          composeFlags.push("-f", dep.path);
+          filesUsed.push(dep.path);
+        }
       }
-      composeFlags.push("-f", baseComposeE2ePath);
+
+      composeFlags.push("-f", e2ePath);
+      filesUsed.push(e2ePath);
+
       if (overrides.e2e) {
         composeFlags.push("-f", overrides.e2e.path);
+        filesUsed.push(overrides.e2e.path);
       }
       break;
+    }
   }
 
   composeFlags.push("config");
 
   const result = spawnSync("docker", composeFlags, {
-    cwd: projectDir,
+    cwd: absProjectDir,
     encoding: "utf-8",
   });
 
   if (result.error) {
     throw new ScriptError(
-      `Failed to run docker compose: ${result.error.message}`
+      `Failed to run docker compose: ${result.error.message}`,
+      { cause: result.error }
     );
   }
 
   if (result.status !== 0) {
-    throw new ScriptError(
-      `❌ Failed to merge compose files:\n${result.stderr || result.stdout}`
+    const rawOutput = result.stderr || result.stdout;
+    const explanation = explainComposeMergeFailure(
+      buildJson,
+      absProjectDir,
+      environment,
+      filesUsed,
+      rawOutput
     );
+    throw new ScriptError(`❌ Failed to merge compose files:\n${explanation}`);
   }
 
   const mergedYamlConfig = result.stdout;
@@ -127,7 +184,7 @@ export const compileEnvironment = (
     makeE2eDependOnApp(yml);
   }
 
-  attachName(yml, buildJson);
+  attachName(yml, projectName);
 
   const finalYamlConfig = stringify(yml);
   return finalYamlConfig;

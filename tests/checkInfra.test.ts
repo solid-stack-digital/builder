@@ -5,17 +5,13 @@ import { checkYamlFiles } from "../src/core/checkers/checkYamlFiles.js";
 import { explainComposeMergeFailure } from "../src/core/checkers/explainComposeMergeFailure.js";
 import { getBuildJson } from "../src/utils/getBuildJson.js";
 import type { BuildJson } from "../src/types/index.js";
-import { checkInfra } from "@/core/checkers/checkInfra.js";
-
-const BACKEND_DIR = path.resolve(
-  __dirname,
-  "../../agnostic-build-sys/services/backend"
-);
+import { checkInfra } from "../src/core/checkers/checkInfra.js";
 
 const EXAMPLE_BACKEND_DIR = path.resolve(
   __dirname,
   "../examples/backend"
 );
+
 
 describe("checkInfra and focused checkers", () => {
   it("extracts declared YAML files purely from build.json without guessing directories", () => {

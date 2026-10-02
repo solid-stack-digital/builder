@@ -1,18 +1,21 @@
 import path from "node:path";
 import pc from "picocolors";
+import { resolveProjectDir } from "../../../utils/paths.js";
 import { runTestUnit } from "../../runners/runTestUnit.js";
 import { checkMesh } from "../checkers/checkMesh.js";
 import { getMeshJson } from "../getMeshJson.js";
 import type { MeshRunOptions } from "../MeshRunOptions.js";
 
 export function runMeshTestUnit(options: MeshRunOptions = {}): number {
-  const meshDir = path.resolve(options.projectDir || process.cwd());
+  const meshDir = resolveProjectDir(options.projectDir);
 
   console.log(pc.bold(pc.blue(`\n========================================`)));
   console.log(pc.bold(pc.blue(`🧪 [MESH] STAGE: ISOLATED UNIT TESTS`)));
   console.log(pc.bold(pc.blue(`========================================\n`)));
 
-  checkMesh(meshDir, { requireTester: false });
+  if (!options.skipChecks) {
+    checkMesh(meshDir, { requireTester: false });
+  }
   const mesh = getMeshJson(meshDir);
 
   for (const [serviceName, serviceConfig] of Object.entries(mesh.services)) {
@@ -30,6 +33,7 @@ export function runMeshTestUnit(options: MeshRunOptions = {}): number {
       projectDir: serviceDir,
       debug: Boolean(options.debug),
       detach: Boolean(options.detach),
+      skipBanner: true,
     });
 
     if (unitStatus !== 0) {
