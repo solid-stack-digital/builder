@@ -21,15 +21,15 @@ export async function handleMeshUp(
 
   switch (stage) {
     case "dev":
-      return runMeshDev(runOptions);
+      return await runMeshDev(runOptions);
     case "prod":
-      return runMeshProd(runOptions);
+      return await runMeshProd(runOptions);
     case "test-unit":
-      return runMeshTestUnit(runOptions);
+      return await runMeshTestUnit(runOptions);
     case "test-e2e":
-      return runMeshTestE2e(runOptions);
+      return await runMeshTestE2e(runOptions);
     case "test":
-      return runMeshTest(runOptions);
+      return await runMeshTest(runOptions);
     default:
       throw new ScriptError(
         `Unknown mesh stage: "${rawStage}". Supported stages: dev, prod, test, test-unit, test-e2e`

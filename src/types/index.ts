@@ -44,3 +44,9 @@ export interface ServiceUpOptions {
   dryRun?: boolean | undefined;
   skipChecks?: boolean | undefined;
 }
+
+export interface ServiceDownOptions {
+  projectDir?: string | undefined;
+  volumes?: boolean | undefined;
+  debug?: boolean | undefined;
+}

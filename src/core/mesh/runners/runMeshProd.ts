@@ -2,11 +2,12 @@ import pc from "picocolors";
 import { resolveProjectDir } from "../../../utils/paths.js";
 import { redactYamlSecrets } from "../../../utils/redactSecrets.js";
 import { runCompose } from "../../runCompose.js";
+import { teardownCompose } from "../../teardownCompose.js";
 import { checkMesh } from "../checkers/checkMesh.js";
 import { compileMeshEnvironment } from "../compileMeshEnvironment.js";
 import type { MeshRunOptions } from "../MeshRunOptions.js";
 
-export function runMeshProd(options: MeshRunOptions = {}): number {
+export async function runMeshProd(options: MeshRunOptions = {}): Promise<number> {
   const meshDir = resolveProjectDir(options.projectDir);
 
   console.log(pc.cyan(`\n🏭 Starting Global PROD Mesh Environment...`));
@@ -33,6 +34,15 @@ export function runMeshProd(options: MeshRunOptions = {}): number {
     upArgs.push("-d");
   }
 
-  const status = runCompose(upArgs, yaml, meshDir);
+  let status = 0;
+  try {
+    status = await runCompose(upArgs, yaml, meshDir, {
+      removeVolumes: false,
+    });
+  } finally {
+    if (!options.detach) {
+      teardownCompose(yaml, meshDir, { removeVolumes: false });
+    }
+  }
   return status;
 }

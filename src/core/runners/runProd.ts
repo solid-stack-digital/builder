@@ -3,8 +3,9 @@ import { redactYamlSecrets } from "../../utils/redactSecrets.js";
 import { compileEnvironment } from "../compileEnvironment.js";
 import { runCompose } from "../runCompose.js";
 import type { RunOptions } from "../RunOptions.js";
+import { teardownCompose } from "../teardownCompose.js";
 
-export const runProd = (options: RunOptions): number => {
+export const runProd = async (options: RunOptions): Promise<number> => {
   console.log(pc.cyan(`🏭 Starting PROD environment...`));
   const finalYamlConfig = compileEnvironment("prod", options.projectDir);
 
@@ -25,6 +26,17 @@ export const runProd = (options: RunOptions): number => {
     upArgs.push("-d");
   }
 
-  const status = runCompose(upArgs, finalYamlConfig, options.projectDir);
+  let status = 0;
+  try {
+    status = await runCompose(upArgs, finalYamlConfig, options.projectDir, {
+      removeVolumes: false,
+    });
+  } finally {
+    if (!options.detach) {
+      teardownCompose(finalYamlConfig, options.projectDir, {
+        removeVolumes: false,
+      });
+    }
+  }
   return status;
 };

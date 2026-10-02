@@ -151,6 +151,7 @@ describe("Mesh orchestration and verification", () => {
 
       const subcommands = meshCmd?.commands.map((c) => c.name());
       expect(subcommands).toContain("up");
+      expect(subcommands).toContain("down");
       expect(subcommands).toContain("check");
     });
 
@@ -205,6 +206,25 @@ describe("Mesh orchestration and verification", () => {
     it("rejects invalid mesh stages", async () => {
       await expect(
         handleMeshUp("invalid-stage", { projectDir: LARGE_PROJECT_DIR })
+      ).rejects.toThrow(ScriptError);
+    });
+
+    it("handles mesh down command successfully", async () => {
+      const { handleMeshDown } = await import(
+        "../src/commands/mesh/commands/down/handler.js"
+      );
+      const exitCode = await handleMeshDown("dev", {
+        projectDir: LARGE_PROJECT_DIR,
+      });
+      expect(exitCode).toBe(0);
+    });
+
+    it("rejects invalid mesh stages in mesh down", async () => {
+      const { handleMeshDown } = await import(
+        "../src/commands/mesh/commands/down/handler.js"
+      );
+      await expect(
+        handleMeshDown("invalid-stage", { projectDir: LARGE_PROJECT_DIR })
       ).rejects.toThrow(ScriptError);
     });
   });

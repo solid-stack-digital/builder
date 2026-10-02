@@ -8,7 +8,7 @@ import { checkMesh } from "../checkers/checkMesh.js";
 import { compileMeshEnvironment } from "../compileMeshEnvironment.js";
 import type { MeshRunOptions } from "../MeshRunOptions.js";
 
-export function runMeshTestE2e(options: MeshRunOptions = {}): number {
+export async function runMeshTestE2e(options: MeshRunOptions = {}): Promise<number> {
   const meshDir = resolveProjectDir(options.projectDir);
 
   console.log(pc.bold(pc.blue(`\n========================================`)));
@@ -41,9 +41,12 @@ export function runMeshTestE2e(options: MeshRunOptions = {}): number {
     return 0;
   }
 
+  // Stale-project cleanup before up
+  teardownCompose(yaml, meshDir, { removeVolumes: true });
+
   let status = 0;
   try {
-    status = runCompose(
+    status = await runCompose(
       [
         "up",
         "--build",
@@ -52,11 +55,12 @@ export function runMeshTestE2e(options: MeshRunOptions = {}): number {
         testerServiceName,
       ],
       yaml,
-      meshDir
+      meshDir,
+      { removeVolumes: true }
     );
   } finally {
     console.log(pc.cyan("\n🧹 Cleaning up global mesh containers and volumes..."));
-    teardownCompose(yaml, meshDir);
+    teardownCompose(yaml, meshDir, { removeVolumes: true });
   }
 
   if (status === 0) {

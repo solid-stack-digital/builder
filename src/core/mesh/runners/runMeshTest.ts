@@ -7,7 +7,7 @@ import { getMeshJson } from "../getMeshJson.js";
 import type { MeshRunOptions } from "../MeshRunOptions.js";
 import { runMeshTestE2e } from "./runMeshTestE2e.js";
 
-export function runMeshTest(options: MeshRunOptions = {}): number {
+export async function runMeshTest(options: MeshRunOptions = {}): Promise<number> {
   const meshDir = resolveProjectDir(options.projectDir);
 
   console.log(pc.bold(pc.blue(`\n========================================`)));
@@ -42,7 +42,7 @@ export function runMeshTest(options: MeshRunOptions = {}): number {
       continue;
     }
 
-    const serviceStatus = runTest({
+    const serviceStatus = await runTest({
       projectDir: serviceDir,
       debug: Boolean(options.debug),
       detach: Boolean(options.detach),
@@ -72,7 +72,7 @@ export function runMeshTest(options: MeshRunOptions = {}): number {
   console.log(pc.bold(pc.blue(`========================================\n`)));
 
   // Pass skipChecks: true so runMeshTestE2e does not duplicate checkMesh
-  const e2eStatus = runMeshTestE2e({ ...options, skipChecks: true });
+  const e2eStatus = await runMeshTestE2e({ ...options, skipChecks: true });
   if (e2eStatus !== 0) {
     return e2eStatus;
   }

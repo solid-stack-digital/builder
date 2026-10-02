@@ -16,11 +16,12 @@ describe("CLI parser and command handlers", () => {
     expect(cli.commands.length).toBeGreaterThan(0);
   });
 
-  it("registers service up and check commands", () => {
+  it("registers service up, down, and check commands", () => {
     const cli = createCli();
     const serviceCmd = cli.commands.find((c) => c.name() === "service");
     expect(serviceCmd).toBeDefined();
     expect(serviceCmd?.commands.some((c) => c.name() === "up")).toBe(true);
+    expect(serviceCmd?.commands.some((c) => c.name() === "down")).toBe(true);
 
     const checkCmd = cli.commands.find((c) => c.name() === "check");
     expect(checkCmd).toBeDefined();
@@ -53,6 +54,27 @@ describe("CLI parser and command handlers", () => {
   it("rejects unknown stage", async () => {
     await expect(
       handleServiceUp("unknown-stage", {
+        projectDir: EXAMPLE_BACKEND_DIR,
+      })
+    ).rejects.toThrow("Unknown environment stage");
+  });
+
+  it("handles service down command successfully", async () => {
+    const { handleServiceDown } = await import(
+      "../src/commands/service/commands/down/handler.js"
+    );
+    const exitCode = await handleServiceDown("dev", {
+      projectDir: EXAMPLE_BACKEND_DIR,
+    });
+    expect(exitCode).toBe(0);
+  });
+
+  it("rejects unknown stage in service down", async () => {
+    const { handleServiceDown } = await import(
+      "../src/commands/service/commands/down/handler.js"
+    );
+    await expect(
+      handleServiceDown("unknown-stage", {
         projectDir: EXAMPLE_BACKEND_DIR,
       })
     ).rejects.toThrow("Unknown environment stage");

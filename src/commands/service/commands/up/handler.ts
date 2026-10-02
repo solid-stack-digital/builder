@@ -22,23 +22,23 @@ export async function handleServiceUp(
   };
 
   if (stage === "dev") {
-    return runDev(runOptions);
+    return await runDev(runOptions);
   }
 
   if (stage === "prod") {
-    return runProd(runOptions);
+    return await runProd(runOptions);
   }
 
   if (stage === "test-unit") {
-    return runTestUnit(runOptions);
+    return await runTestUnit(runOptions);
   }
 
   if (stage === "test-e2e") {
-    return runTestE2e(runOptions);
+    return await runTestE2e(runOptions);
   }
 
   if (stage === "test") {
-    return runTest(runOptions);
+    return await runTest(runOptions);
   }
 
   throw new ScriptError(

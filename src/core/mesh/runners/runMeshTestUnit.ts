@@ -6,7 +6,7 @@ import { checkMesh } from "../checkers/checkMesh.js";
 import { getMeshJson } from "../getMeshJson.js";
 import type { MeshRunOptions } from "../MeshRunOptions.js";
 
-export function runMeshTestUnit(options: MeshRunOptions = {}): number {
+export async function runMeshTestUnit(options: MeshRunOptions = {}): Promise<number> {
   const meshDir = resolveProjectDir(options.projectDir);
 
   console.log(pc.bold(pc.blue(`\n========================================`)));
@@ -29,7 +29,7 @@ export function runMeshTestUnit(options: MeshRunOptions = {}): number {
       continue;
     }
 
-    const unitStatus = runTestUnit({
+    const unitStatus = await runTestUnit({
       projectDir: serviceDir,
       debug: Boolean(options.debug),
       detach: Boolean(options.detach),
