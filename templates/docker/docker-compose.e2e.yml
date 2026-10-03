@@ -3,9 +3,9 @@ services:
     build: 
       context: .
       target: test-e2e
+    network_mode: "host"
     env_file:
       - path: .env.e2e
         required: false
     environment: 
-      - API_URL=http://app:${PORT:-3000}
-
+      - API_URL=http://localhost:${PUBLIC_PORT:-3000}

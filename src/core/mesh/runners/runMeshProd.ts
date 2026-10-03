@@ -18,7 +18,9 @@ export async function runMeshProd(options: MeshRunOptions = {}): Promise<number>
     checkMesh(meshDir, { requireTester: false });
   }
 
-  const { yaml } = compileMeshEnvironment("prod", meshDir);
+  const { yaml } = compileMeshEnvironment("prod", meshDir, {
+    silenceWarnings: options.silenceWarnings,
+  });
   const parsed = parse(yaml);
   const projectName = parsed?.name || "mesh-prod";
 

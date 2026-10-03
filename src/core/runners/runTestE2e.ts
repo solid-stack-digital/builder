@@ -13,7 +13,9 @@ export const runTestE2e = async (options: RunOptions): Promise<number> => {
     console.log(pc.bold(pc.blue(`🚦 STAGE: INTEGRATED E2E TESTS`)));
     console.log(pc.bold(pc.blue(`========================================\n`)));
   }
-  const finalYamlConfig = compileEnvironment("e2e", options.projectDir);
+  const finalYamlConfig = compileEnvironment("e2e", options.projectDir, {
+    silenceWarnings: options.silenceWarnings,
+  });
   const parsed = parse(finalYamlConfig);
   const projectName = parsed?.name || "e2e";
 

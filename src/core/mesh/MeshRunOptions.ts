@@ -4,6 +4,7 @@ export interface MeshRunOptions {
   detach?: boolean | undefined;
   dryRun?: boolean | undefined;
   skipChecks?: boolean | undefined;
+  silenceWarnings?: boolean | undefined;
 }
 
 export interface MeshDownOptions {

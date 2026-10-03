@@ -10,7 +10,9 @@ import { teardownCompose } from "../teardownCompose.js";
 
 export const runProd = async (options: RunOptions): Promise<number> => {
   console.log(pc.cyan(`🏭 Starting PROD environment...`));
-  const finalYamlConfig = compileEnvironment("prod", options.projectDir);
+  const finalYamlConfig = compileEnvironment("prod", options.projectDir, {
+    silenceWarnings: options.silenceWarnings,
+  });
   const parsed = parse(finalYamlConfig);
   const projectName = parsed?.name || "prod";
 

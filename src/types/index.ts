@@ -50,6 +50,7 @@ export interface ServiceUpOptions {
   detach?: boolean | undefined;
   dryRun?: boolean | undefined;
   skipChecks?: boolean | undefined;
+  silenceWarnings?: boolean | undefined;
 }
 
 export interface ServiceDownOptions {

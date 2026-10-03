@@ -19,6 +19,7 @@ export async function handleServiceUp(
     debug: Boolean(options.debug),
     detach: Boolean(options.detach),
     dryRun: Boolean(options.dryRun),
+    silenceWarnings: Boolean(options.silenceWarnings),
   };
 
   if (stage === "dev") {

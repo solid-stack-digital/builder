@@ -13,7 +13,9 @@ export const runTestUnit = async (options: RunOptions): Promise<number> => {
     console.log(pc.bold(pc.blue(`🧪 STAGE: UNIT & ISOLATED TESTS`)));
     console.log(pc.bold(pc.blue(`========================================\n`)));
   }
-  const finalYamlConfig = compileEnvironment("test", options.projectDir);
+  const finalYamlConfig = compileEnvironment("test", options.projectDir, {
+    silenceWarnings: options.silenceWarnings,
+  });
   const parsed = parse(finalYamlConfig);
   const projectName = parsed?.name || "test";
 

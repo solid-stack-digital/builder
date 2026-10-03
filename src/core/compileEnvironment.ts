@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import pc from "picocolors";
 import { parse, stringify } from "yaml";
 import { ScriptError } from "../errors/ScriptError.js";
 import type { Environment } from "../types/index.js";
@@ -18,7 +19,8 @@ import { getDockerComposeTemplate } from "./templates.js";
 
 export const compileEnvironment = (
   environment: Environment,
-  projectDir: string = process.cwd()
+  projectDir: string = process.cwd(),
+  options: { silenceWarnings?: boolean | undefined } = {}
 ): string => {
   const absProjectDir = resolveProjectDir(projectDir);
   const buildJson = getBuildJson(absProjectDir);
@@ -122,6 +124,7 @@ export const compileEnvironment = (
     case "e2e": {
       const prodPath = getDockerComposeTemplate("docker-compose.prod.yml");
       const e2ePath = getDockerComposeTemplate("docker-compose.e2e.yml");
+      const standalonePath = getDockerComposeTemplate("docker-compose.standalone.yml");
 
       composeFlags.push("-f", prodPath);
       filesUsed.push(prodPath);
@@ -137,6 +140,9 @@ export const compileEnvironment = (
           filesUsed.push(dep.path);
         }
       }
+
+      composeFlags.push("-f", standalonePath);
+      filesUsed.push(standalonePath);
 
       composeFlags.push("-f", e2ePath);
       filesUsed.push(e2ePath);
@@ -220,6 +226,13 @@ export const compileEnvironment = (
 
   // 3. Interpolation Helper
   const interpolateEnv = (val: string, context: string): string => {
+    // 🚨 SMART WARNING: E2E Network Mode Host Context
+    if (!options.silenceWarnings && context.includes("Tester") && val.includes(".network_url")) {
+      console.warn(
+        pc.yellow(`\n⚠️  WARNING: You are passing a '.network_url' template to the E2E tester ("${val}"). Since the tester runs in 'network_mode: host', it cannot resolve internal Docker DNS. Use '.public_url' instead. (Mute with --silence-warnings)\n`)
+      );
+    }
+
     let output = val;
     for (const [sName, urls] of urlRegistry.entries()) {
       const escaped = sName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -235,12 +248,26 @@ export const compileEnvironment = (
       }
     }
 
+    // Strict validation for unresolved variables and missing public ports
     const unresolvedMatch = output.match(/\$\{([^}]+?)\.(network_url|public_url)\}/);
     if (unresolvedMatch) {
-      throw new ScriptError(
-        `[${context}] Unresolved template variable: ${unresolvedMatch[0]}. Check build.json dependencies.`
-      );
+      const variable = unresolvedMatch[0];
+      const targetService = unresolvedMatch[1];
+      const type = unresolvedMatch[2];
+
+      if (!urlRegistry.has(targetService!)) {
+        throw new ScriptError(
+          `[${context}] Unresolved template variable: ${variable}. Check build.json dependencies.`
+        );
+      } else if (type === "public_url") {
+        throw new ScriptError(
+          `[${context}] Unresolved template variable: ${variable}. Service "${targetService}" does not expose a public port (missing 'port' explicitly defined in build.json).`
+        );
+      } else {
+        throw new ScriptError(`[${context}] Unresolved template variable: ${variable}.`);
+      }
     }
+
     return output;
   };
 

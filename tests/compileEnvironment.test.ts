@@ -1,5 +1,5 @@
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { parse } from "yaml";
 import { compileEnvironment } from "../src/core/compileEnvironment.js";
 
@@ -210,6 +210,96 @@ describe("compileEnvironment integration", () => {
       expect(() => compileEnvironment("e2e", tmpDir)).toThrow(
         "[Tester EnvOverrides] Unresolved template variable: ${unknown_db.network_url}. Check build.json dependencies."
       );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("compiles e2e environment with tester in network_mode host", () => {
+    const yamlString = compileEnvironment("e2e", EXAMPLE_BACKEND_DIR);
+    const parsed = parse(yamlString);
+    expect(parsed.services.tester.network_mode).toBe("host");
+  });
+
+  it("exposes app port in e2e mode when port is defined in build.json", async () => {
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "builder-e2e-port-"));
+    try {
+      fs.cpSync(EXAMPLE_BACKEND_DIR, tmpDir, { recursive: true });
+      const buildJsonPath = path.join(tmpDir, "build.json");
+      const buildJson = JSON.parse(fs.readFileSync(buildJsonPath, "utf-8"));
+      buildJson.port = 8080;
+      fs.writeFileSync(buildJsonPath, JSON.stringify(buildJson, null, 2));
+
+      const yamlString = compileEnvironment("e2e", tmpDir);
+      const parsed = parse(yamlString);
+      const ports = parsed.services.app.ports;
+      const hasPort8080 = ports.some((p: any) =>
+        typeof p === "string"
+          ? p.includes("8080:3000")
+          : String(p.published) === "8080" && p.target === 3000
+      );
+      expect(hasPort8080).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("throws clear ScriptError when referencing public_url of service without port in build.json", async () => {
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "builder-e2e-nopub-"));
+    try {
+      fs.cpSync(EXAMPLE_BACKEND_DIR, tmpDir, { recursive: true });
+      const buildJsonPath = path.join(tmpDir, "build.json");
+      const buildJson = JSON.parse(fs.readFileSync(buildJsonPath, "utf-8"));
+      delete buildJson.port;
+      buildJson.tester = {
+        envOverrides: {
+          API_URL: "${app.public_url}",
+        },
+      };
+      fs.writeFileSync(buildJsonPath, JSON.stringify(buildJson, null, 2));
+
+      expect(() => compileEnvironment("e2e", tmpDir)).toThrow(
+        '[Tester EnvOverrides] Unresolved template variable: ${app.public_url}. Service "app" does not expose a public port (missing \'port\' explicitly defined in build.json).'
+      );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("logs warning when .network_url is passed to tester envOverrides and can be silenced", async () => {
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "builder-e2e-warn-"));
+    try {
+      fs.cpSync(EXAMPLE_BACKEND_DIR, tmpDir, { recursive: true });
+      const buildJsonPath = path.join(tmpDir, "build.json");
+      const buildJson = JSON.parse(fs.readFileSync(buildJsonPath, "utf-8"));
+      buildJson.tester = {
+        envOverrides: {
+          API_URL: "${app.network_url}",
+        },
+      };
+      fs.writeFileSync(buildJsonPath, JSON.stringify(buildJson, null, 2));
+
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      // Without silenceWarnings
+      compileEnvironment("e2e", tmpDir);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Since the tester runs in 'network_mode: host'")
+      );
+
+      warnSpy.mockClear();
+
+      // With silenceWarnings: true
+      compileEnvironment("e2e", tmpDir, { silenceWarnings: true });
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      warnSpy.mockRestore();
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

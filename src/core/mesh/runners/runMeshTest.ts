@@ -46,6 +46,7 @@ export async function runMeshTest(options: MeshRunOptions = {}): Promise<number>
       projectDir: serviceDir,
       debug: Boolean(options.debug),
       detach: Boolean(options.detach),
+      silenceWarnings: options.silenceWarnings,
     });
 
     if (serviceStatus !== 0) {

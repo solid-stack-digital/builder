@@ -18,6 +18,10 @@ export const registerMeshUpCommand = (cmd: Command): void => {
       "Skip hadolint and conftest pre-flight checks"
     )
     .option(
+      "--silence-warnings",
+      "Silence non-critical warnings like URL templating hints"
+    )
+    .option(
       "-C, --project-dir <dir>",
       "Mesh project directory containing mesh.json (defaults to cwd)"
     )
@@ -38,6 +42,7 @@ export const registerMeshUpCommand = (cmd: Command): void => {
           detach: options.detach,
           dryRun: options.dryRun,
           skipChecks: options.skipChecks,
+          silenceWarnings: options.silenceWarnings,
         });
         if (exitCode !== 0) {
           process.exit(exitCode);

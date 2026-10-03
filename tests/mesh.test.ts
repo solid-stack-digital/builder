@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { parse } from "yaml";
 import { createCli } from "../src/cli.js";
 import { handleMeshCheck } from "../src/commands/mesh/commands/check/handler.js";
@@ -249,6 +249,40 @@ describe("Mesh orchestration and verification", () => {
         expect(tester.environment.AUTH_URL).toBe("http://auth-api:3000");
         expect(tester.environment.BACKEND_URL).toBe("http://localhost:8080");
         expect(tester.environment.BACKEND_VIA_GATEWAY_URL).toBe("http://localhost:8080/api");
+        expect(tester.network_mode).toBe("host");
+        expect(tester.networks).toBeUndefined();
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("logs warning when .network_url is passed to mesh tester envOverrides and can be silenced", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mesh-warn-test-"));
+      try {
+        fs.cpSync(LARGE_PROJECT_DIR, tmpDir, { recursive: true });
+        const meshJsonPath = path.join(tmpDir, "mesh.json");
+        const meshJson = JSON.parse(fs.readFileSync(meshJsonPath, "utf-8"));
+        meshJson.tester = meshJson.tester || { path: "./e2e" };
+        meshJson.tester.envOverrides = {
+          AUTH_URL: "${auth-api.network_url}",
+        };
+        fs.writeFileSync(meshJsonPath, JSON.stringify(meshJson, null, 2));
+
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        // Without silenceWarnings
+        compileMeshEnvironment("prod", tmpDir, { includeTester: true });
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining("Since the tester runs in 'network_mode: host'")
+        );
+
+        warnSpy.mockClear();
+
+        // With silenceWarnings: true
+        compileMeshEnvironment("prod", tmpDir, { includeTester: true, silenceWarnings: true });
+        expect(warnSpy).not.toHaveBeenCalled();
+
+        warnSpy.mockRestore();
       } finally {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }

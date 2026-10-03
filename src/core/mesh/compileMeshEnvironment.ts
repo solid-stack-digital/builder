@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import pc from "picocolors";
 import { parse, stringify } from "yaml";
 import { ScriptError } from "../../errors/ScriptError.js";
 import { extractBuildDeps } from "../../utils/extractBuildDeps.js";
@@ -15,6 +16,7 @@ import type { MeshConfig, MeshServiceConfig } from "./types.js";
 export interface CompileMeshOptions {
   includeTester?: boolean | undefined;
   validateWithDocker?: boolean | undefined;
+  silenceWarnings?: boolean | undefined;
 }
 
 export interface CompileMeshResult {
@@ -303,6 +305,14 @@ export function compileMeshEnvironment(
     if (typeof value !== "string") {
       return value;
     }
+
+    // 🚨 SMART WARNING: E2E Network Mode Host Context
+    if (!options.silenceWarnings && context.includes("Tester") && value.includes(".network_url")) {
+      console.warn(
+        pc.yellow(`\n⚠️  WARNING: You are passing a '.network_url' template to the E2E tester ("${value}"). Since the tester runs in 'network_mode: host', it cannot resolve internal Docker DNS. Use '.public_url' instead. (Mute with --silence-warnings)\n`)
+      );
+    }
+
     let interpolated = value;
     for (const [sName, urls] of serviceUrls.entries()) {
       interpolated = interpolated.replace(
@@ -709,11 +719,9 @@ export function compileMeshEnvironment(
             delete resolvedTester.container_name;
             normalizeDependsOn(resolvedTester);
 
-            resolvedTester.networks = {
-              mesh: {
-                aliases: [tKey, ...(tKey === firstKey ? ["tester"] : [])],
-              },
-            };
+            // ---> Strip internal networks and apply host mode
+            resolvedTester.network_mode = "host";
+            delete resolvedTester.networks;
 
             // Tester main service depends on all mesh app services
             if (tKey === firstKey) {
