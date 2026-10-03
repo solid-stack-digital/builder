@@ -14,8 +14,8 @@
         "mailer": "mailer"
       },
       "envOverrides": {
-        "FILESYSTEM_URL": "http://filesystem:3003",
-        "MAILER_URL": "http://mailer:3004"
+        "FILESYSTEM_URL": "${filesystem.network_url}",
+        "MAILER_URL": "${mailer.network_url}"
       }
     },
     "frontend": {
@@ -24,7 +24,7 @@
         "backend": "backend"
       },
       "envOverrides": {
-        "BACKEND_URL": "http://backend:3002"
+        "BACKEND_URL": "${gateway.public_url}/api"
       }
     },
     "gateway": {
@@ -35,8 +35,8 @@
         "backend": "backend"
       },
       "envOverrides": {
-        "FRONTEND_URL": "http://frontend:3001",
-        "BACKEND_URL": "http://backend:3002"
+        "FRONTEND_URL": "${frontend.network_url}",
+        "BACKEND_URL": "${backend.network_url}"
       }
     }
   },

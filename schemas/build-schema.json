@@ -1,0 +1,136 @@
+{
+  "$ref": "#/definitions/BuildJson",
+  "definitions": {
+    "BuildJson": {
+      "type": "object",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "JSON Schema URL or relative path"
+        },
+        "name": {
+          "type": "string",
+          "description": "Service project name"
+        },
+        "dockerfile": {
+          "type": "string",
+          "description": "Relative path to the Dockerfile (defaults to 'Dockerfile')"
+        },
+        "port": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Host port exposed by this service when listening publicly"
+        },
+        "policy": {
+          "type": "object",
+          "properties": {
+            "dockerfile": {
+              "type": "string",
+              "description": "Relative path to policy directory for Dockerfile checks"
+            },
+            "compose": {
+              "type": "string",
+              "description": "Relative path to policy directory for Compose contract checks"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Policy configurations for infra/contract verification"
+        },
+        "policies": {
+          "type": "object",
+          "properties": {
+            "dockerfile": {
+              "type": "string",
+              "description": "Relative path to policy directory for Dockerfile checks"
+            },
+            "compose": {
+              "type": "string",
+              "description": "Relative path to policy directory for Compose contract checks"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Policy configurations for infra/contract verification"
+        },
+        "composeFiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Additional compose files to merge"
+        },
+        "dependencies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "Relative path to mock Docker Compose file"
+              },
+              "service": {
+                "type": "string",
+                "description": "Target service name in the mock compose file"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "additionalProperties": false,
+            "description": "Service dependency specification"
+          },
+          "description": "Service dependencies and mocks"
+        },
+        "overrides": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "Relative path to the environment stage override file"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "additionalProperties": false,
+            "description": "Environment override specification"
+          },
+          "propertyNames": {
+            "enum": [
+              "dev",
+              "prod",
+              "test",
+              "e2e"
+            ]
+          },
+          "description": "Stage overrides (dev, prod, test, e2e)"
+        },
+        "services": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional Docker Compose service overrides"
+        },
+        "tester": {
+          "type": "object",
+          "properties": {
+            "envOverrides": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Environment variable overrides for the individual E2E tester with URL templating"
+            }
+          },
+          "additionalProperties": false,
+          "description": "E2E tester configuration"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Solid Stack service build and deployment configuration"
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

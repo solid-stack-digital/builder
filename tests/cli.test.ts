@@ -1,8 +1,9 @@
 import path from "node:path";
-import { describe, expect, it } from "vitest";
-import { createCli } from "../src/cli.js";
+import { describe, expect, it, vi } from "vitest";
+import { createCli, runCli } from "../src/cli.js";
 import { handleCheck } from "../src/commands/check/handler.js";
 import { handleServiceUp } from "../src/commands/service/commands/up/handler.js";
+import { version } from "../src/version.js";
 
 const EXAMPLE_BACKEND_DIR = path.resolve(
   __dirname,
@@ -78,5 +79,40 @@ describe("CLI parser and command handlers", () => {
         projectDir: EXAMPLE_BACKEND_DIR,
       })
     ).rejects.toThrow("Unknown environment stage");
+  });
+
+  describe("runCli version declaration", () => {
+    it("prints version banner when invoked with no arguments", async () => {
+      const logs: string[] = [];
+      const spy = vi.spyOn(console, "log").mockImplementation((msg) => {
+        logs.push(String(msg));
+      });
+      await runCli(["node", "builder"]);
+      spy.mockRestore();
+      expect(logs.some((l) => l.includes(`builder v${version}`))).toBe(true);
+    });
+
+    it("prints version banner when running commands", async () => {
+      const logs: string[] = [];
+      const spy = vi.spyOn(console, "log").mockImplementation((msg) => {
+        logs.push(String(msg));
+      });
+      await runCli(["node", "builder", "check", "--project-dir", EXAMPLE_BACKEND_DIR]);
+      spy.mockRestore();
+      expect(logs.some((l) => l.includes(`builder v${version}`))).toBe(true);
+    });
+
+    it("does not print version banner for help or version flags", async () => {
+      const logs: string[] = [];
+      const spy = vi.spyOn(console, "log").mockImplementation((msg) => {
+        logs.push(String(msg));
+      });
+      await runCli(["node", "builder", "--help"]);
+      await runCli(["node", "builder", "-h"]);
+      await runCli(["node", "builder", "--version"]);
+      await runCli(["node", "builder", "-V"]);
+      spy.mockRestore();
+      expect(logs.some((l) => l.includes(`builder v${version}`))).toBe(false);
+    });
   });
 });

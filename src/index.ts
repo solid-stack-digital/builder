@@ -4,6 +4,8 @@ export { compileEnvironment } from "./core/compileEnvironment.js";
 export { compileMeshEnvironment } from "./core/mesh/compileMeshEnvironment.js";
 export { teardownCompose } from "./core/teardownCompose.js";
 export { runCompose } from "./core/runCompose.js";
+export { buildJsonSchema } from "./core/buildSchema.js";
+export { meshSchema } from "./core/mesh/meshSchema.js";
 export { ScriptError } from "./errors/ScriptError.js";
 export { NotFoundError } from "./errors/NotFoundError.js";
 export { version } from "./version.js";

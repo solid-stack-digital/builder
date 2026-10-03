@@ -12,6 +12,7 @@ export type MeshHealthcheckConfig =
 export interface MeshServiceConfig {
   path: string;
   port?: number | string | undefined;
+  preservePort?: boolean | undefined;
   provideDependency?: Record<string, string> | undefined;
   replaceMocks?: Record<string, string> | undefined;
   envOverrides?: Record<string, string> | undefined;
@@ -22,6 +23,7 @@ export interface MeshTesterConfig {
   path: string;
   compose?: string | undefined;
   dockerfile?: string | undefined;
+  envOverrides?: Record<string, string> | undefined;
   policy?:
     | {
         dockerfile?: string | undefined;
@@ -31,6 +33,7 @@ export interface MeshTesterConfig {
 }
 
 export interface MeshConfig {
+  $schema?: string | undefined;
   name?: string | undefined;
   services: Record<string, MeshServiceConfig>;
   dependencies?: Record<string, { path: string; service?: string | undefined }> | undefined;

@@ -267,6 +267,79 @@ export function compileMeshEnvironment(
   // Map to track global dependency key to provider for collision detection
   const globalDepAliasToProvider = new Map<string, string>();
 
+  // --- PASS 1: Build URL Registry ---
+  const INTERNAL_PORT = 3000;
+  const serviceUrls = new Map<string, { networkUrl: string; publicUrl: string | null }>();
+
+  for (const [serviceName, serviceConfig] of Object.entries(mesh.services)) {
+    const serviceDir = path.resolve(meshDir, serviceConfig.path);
+    const serviceBuildJson = getBuildJson(serviceDir);
+
+    let publicPort: number | null = null;
+    if (serviceConfig.port !== undefined && serviceConfig.port !== null && serviceConfig.port !== "") {
+      const p = Number(serviceConfig.port);
+      if (!isNaN(p) && p > 0) {
+        publicPort = p;
+      }
+    } else if (serviceConfig.preservePort && serviceBuildJson.port) {
+      const p = Number(serviceBuildJson.port);
+      if (!isNaN(p) && p > 0) {
+        publicPort = p;
+      }
+    }
+
+    serviceUrls.set(serviceName, {
+      networkUrl: `http://${serviceName}:${INTERNAL_PORT}`,
+      publicUrl: publicPort ? `http://localhost:${publicPort}` : null,
+    });
+  }
+
+  function escapeRegExp(string: string): string {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  // Helper to interpolate and validate templates
+  function interpolateEnvTemplates(value: string, context: string): string {
+    if (typeof value !== "string") {
+      return value;
+    }
+    let interpolated = value;
+    for (const [sName, urls] of serviceUrls.entries()) {
+      interpolated = interpolated.replace(
+        new RegExp(`\\$\\{${escapeRegExp(sName)}\\.network_url\\}`, "g"),
+        urls.networkUrl
+      );
+      if (urls.publicUrl) {
+        interpolated = interpolated.replace(
+          new RegExp(`\\$\\{${escapeRegExp(sName)}\\.public_url\\}`, "g"),
+          urls.publicUrl
+        );
+      }
+    }
+
+    // Validation: Catch any unresolved ${service.xxx_url}
+    const unresolvedMatch = interpolated.match(/\$\{([^}]+?)\.(network_url|public_url)\}/);
+    if (unresolvedMatch) {
+      const variable = unresolvedMatch[0];
+      const targetService = unresolvedMatch[1];
+      const type = unresolvedMatch[2];
+
+      if (!serviceUrls.has(targetService!)) {
+        throw new ScriptError(
+          `[${context}] Unresolved template variable: ${variable}. Service "${targetService}" is not defined in mesh.json.`
+        );
+      } else if (type === "public_url") {
+        throw new ScriptError(
+          `[${context}] Unresolved template variable: ${variable}. Service "${targetService}" does not expose a public port (missing 'port' or 'preservePort' in mesh.json).`
+        );
+      } else {
+        throw new ScriptError(`[${context}] Unresolved template variable: ${variable}.`);
+      }
+    }
+
+    return interpolated;
+  }
+
   // 2. Process each service in mesh.services
   for (const [serviceName, serviceConfig] of Object.entries(mesh.services)) {
     const serviceDir = path.resolve(meshDir, serviceConfig.path);
@@ -282,10 +355,6 @@ export function compileMeshEnvironment(
       INFRA_MODE: "integrated",
       EXEC_MODE: mode,
     };
-
-    if (serviceConfig.port) {
-      environment.PORT = String(serviceConfig.port);
-    }
 
     // Check for override file (e.g. dev or prod override)
     let overrideVolumes: any[] = [];
@@ -348,35 +417,14 @@ export function compileMeshEnvironment(
       }
     }
 
-    // Apply specific mesh.json envOverrides LAST so they take highest precedence
+    // 1. Force standard internal port
+    environment.PORT = String(INTERNAL_PORT);
+
+    // 2. Interpolate envOverrides
     if (serviceConfig.envOverrides) {
-      Object.assign(environment, serviceConfig.envOverrides);
-    }
-
-    // Determine the resolved port for this service across all declarations:
-    // 1. serviceConfig.port in mesh.json
-    // 2. serviceConfig.healthcheck.port in mesh.json
-    // 3. environment.PORT (from envOverrides or stage overrides)
-    // 4. .env.{mode} file in service directory
-    // 5. .env file in service directory
-    // 6. Dockerfile (process.env.PORT || <port> or EXPOSE <port>)
-    // 7. Default 3000
-    const dockerfilePath = path.resolve(serviceDir, dockerfile);
-    const envFilePort =
-      extractPortFromEnvFile(path.resolve(serviceDir, `.env.${mode}`)) ||
-      extractPortFromEnvFile(path.resolve(serviceDir, ".env"));
-    const dockerfilePort = extractPortFromDockerfile(dockerfilePath);
-
-    const resolvedPort =
-      serviceConfig.port ||
-      (serviceConfig.healthcheck as any)?.port ||
-      (environment.PORT ? parseInt(String(environment.PORT), 10) : undefined) ||
-      envFilePort ||
-      dockerfilePort ||
-      3000;
-
-    if (!environment.PORT) {
-      environment.PORT = String(resolvedPort);
+      for (const [k, v] of Object.entries(serviceConfig.envOverrides)) {
+        environment[k] = interpolateEnvTemplates(v, `Service: ${serviceName}`);
+      }
     }
 
     const serviceDef: Record<string, any> = {
@@ -416,19 +464,23 @@ export function compileMeshEnvironment(
       serviceDef.volumes = Array.from(volSet);
     }
 
-    // Port mapping if serviceConfig.port is declared
-    if (serviceConfig.port) {
-      serviceDef.ports = [`${serviceConfig.port}:${serviceConfig.port}`];
+    // 3. Apply port mappings based on Pass 1 registry
+    const urls = serviceUrls.get(serviceName)!;
+    if (urls.publicUrl) {
+      const pubPort = urls.publicUrl.split(":").pop();
+      serviceDef.ports = [`${pubPort}:${INTERNAL_PORT}`];
+    } else {
+      delete serviceDef.ports;
     }
 
     if (overrideCommand) {
       serviceDef.command = overrideCommand;
     }
 
-    // Healthcheck resolution: mesh.json > override file > default TCP probe (POSIX/Alpine safe)
+    // 4. Override Healthcheck to strictly use the fixed INTERNAL_PORT
     if (serviceConfig.healthcheck) {
       if ((serviceConfig.healthcheck as any).type === "tcp") {
-        const hcPort = (serviceConfig.healthcheck as any).port || resolvedPort;
+        const hcPort = (serviceConfig.healthcheck as any).port || INTERNAL_PORT;
         serviceDef.healthcheck = {
           test: [
             "CMD-SHELL",
@@ -445,11 +497,10 @@ export function compileMeshEnvironment(
     } else if (overrideHealthcheck) {
       serviceDef.healthcheck = overrideHealthcheck;
     } else {
-      const portValue = resolvedPort;
       serviceDef.healthcheck = {
         test: [
           "CMD-SHELL",
-          `nc -z 127.0.0.1 ${portValue} || node -e "require('net').connect(${portValue},'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))" || exit 1`,
+          `nc -z 127.0.0.1 ${INTERNAL_PORT} || node -e "require('net').connect(${INTERNAL_PORT},'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))" || exit 1`,
         ],
         interval: "2s",
         timeout: "2s",
@@ -672,6 +723,32 @@ export function compileMeshEnvironment(
                   condition: "service_healthy",
                 };
               }
+
+              // Apply mesh tester envOverrides
+              if (mesh.tester.envOverrides) {
+                if (Array.isArray(resolvedTester.environment)) {
+                  const envObj: Record<string, any> = {};
+                  for (const item of resolvedTester.environment) {
+                    if (typeof item === "string") {
+                      const eqIdx = item.indexOf("=");
+                      if (eqIdx !== -1) {
+                        envObj[item.slice(0, eqIdx)] = item.slice(eqIdx + 1);
+                      } else {
+                        envObj[item] = process.env[item] ?? null;
+                      }
+                    }
+                  }
+                  resolvedTester.environment = envObj;
+                } else if (
+                  !resolvedTester.environment ||
+                  typeof resolvedTester.environment !== "object"
+                ) {
+                  resolvedTester.environment = {};
+                }
+                for (const [k, v] of Object.entries(mesh.tester.envOverrides)) {
+                  resolvedTester.environment[k] = interpolateEnvTemplates(v, `Tester: ${tKey}`);
+                }
+              }
             }
 
             registerService(tKey, resolvedTester, `tester service "${tKey}"`);
@@ -822,41 +899,4 @@ function resolveServicePaths(
   normalizeDependsOn(cloned);
 
   return cloned;
-}
-
-function extractPortFromEnvFile(filePath: string): number | undefined {
-  if (!existsSync(filePath)) return undefined;
-  try {
-    const content = readFileSync(filePath, "utf-8");
-    for (const line of content.split("\n")) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith("#") || !trimmed.includes("=")) continue;
-      const [k, ...vParts] = trimmed.split("=");
-      if (k && k.trim() === "PORT") {
-        const rawVal = vParts.join("=").trim().replace(/^["']|["']$/g, "");
-        const val = parseInt(rawVal, 10);
-        if (!isNaN(val) && val > 0) return val;
-      }
-    }
-  } catch {
-    // ignore
-  }
-  return undefined;
-}
-
-function extractPortFromDockerfile(dockerfilePath: string): number | undefined {
-  if (!existsSync(dockerfilePath)) return undefined;
-  try {
-    const content = readFileSync(dockerfilePath, "utf-8");
-    const portMatch =
-      content.match(/process\.env\.PORT\s*\|\|\s*(\d+)/) ||
-      content.match(/EXPOSE\s+(\d+)/);
-    if (portMatch && portMatch[1]) {
-      const val = parseInt(portMatch[1], 10);
-      if (!isNaN(val) && val > 0) return val;
-    }
-  } catch {
-    // ignore
-  }
-  return undefined;
 }

@@ -36,8 +36,17 @@ export function createCli(): Command {
 export async function runCli(argv: string[] = process.argv): Promise<void> {
   const cli = createCli();
 
+  // Print version banner for all commands except help/version flags
+  const isHelpOrVersion = argv.some(
+    (arg) => arg === "-h" || arg === "--help" || arg === "-V" || arg === "--version"
+  );
+  if (!isHelpOrVersion && argv.length > 2) {
+    console.log(pc.dim(`builder v${version}`));
+  }
+
   // No arguments provided: print help and exit 0 (M17)
   if (argv.length <= 2) {
+    console.log(pc.dim(`builder v${version}\n`));
     cli.outputHelp();
     return;
   }

@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
@@ -141,6 +143,160 @@ describe("Mesh orchestration and verification", () => {
       expect(backend.healthcheck.test.join(" ")).toContain("3000");
     });
 
+    it("handles port precedence: mesh port overrides build.json port, preservePort uses build.json port, absence exposes no host port", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mesh-port-test-"));
+      try {
+        fs.cpSync(LARGE_PROJECT_DIR, tmpDir, { recursive: true });
+
+        // Give auth-api a port in build.json
+        const authBuildJsonPath = path.join(tmpDir, "services/auth-api/build.json");
+        const authBuildJson = JSON.parse(fs.readFileSync(authBuildJsonPath, "utf-8"));
+        authBuildJson.port = 4001;
+        fs.writeFileSync(authBuildJsonPath, JSON.stringify(authBuildJson, null, 2));
+
+        // Give backend a port in build.json
+        const backendBuildJsonPath = path.join(tmpDir, "services/backend/build.json");
+        const backendBuildJson = JSON.parse(fs.readFileSync(backendBuildJsonPath, "utf-8"));
+        backendBuildJson.port = 5001;
+        fs.writeFileSync(backendBuildJsonPath, JSON.stringify(backendBuildJson, null, 2));
+
+        // Update mesh.json
+        // auth-api: preservePort: true -> should use 4001
+        // backend: port: 8080, preservePort: true -> mesh port 8080 should override 5001
+        const meshJsonPath = path.join(tmpDir, "mesh.json");
+        const meshJson = JSON.parse(fs.readFileSync(meshJsonPath, "utf-8"));
+        meshJson.services["auth-api"].preservePort = true;
+        meshJson.services.backend.port = 8080;
+        meshJson.services.backend.preservePort = true;
+        fs.writeFileSync(meshJsonPath, JSON.stringify(meshJson, null, 2));
+
+        const { yaml } = compileMeshEnvironment("dev", tmpDir);
+        const parsed = parse(yaml);
+
+        const authApp = parsed.services["auth-api-app"];
+        expect(authApp.environment.PORT).toBe("3000");
+        const hasAuth4001 = authApp.ports.some((p: any) =>
+          typeof p === "string"
+            ? p.includes("4001:3000")
+            : String(p.published) === "4001" && p.target === 3000
+        );
+        expect(hasAuth4001).toBe(true);
+
+        const backendApp = parsed.services["backend-app"];
+        expect(backendApp.environment.PORT).toBe("3000");
+        const hasBackend8080 = backendApp.ports.some((p: any) =>
+          typeof p === "string"
+            ? p.includes("8080:3000")
+            : String(p.published) === "8080" && p.target === 3000
+        );
+        expect(hasBackend8080).toBe(true);
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("does not expose host ports if port and preservePort are absent", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mesh-no-port-test-"));
+      try {
+        fs.cpSync(LARGE_PROJECT_DIR, tmpDir, { recursive: true });
+
+        const meshJsonPath = path.join(tmpDir, "mesh.json");
+        const meshJson = JSON.parse(fs.readFileSync(meshJsonPath, "utf-8"));
+        delete meshJson.services.backend.port;
+        delete meshJson.services.backend.preservePort;
+        delete meshJson.services["auth-api"].port;
+        delete meshJson.services["auth-api"].preservePort;
+        fs.writeFileSync(meshJsonPath, JSON.stringify(meshJson, null, 2));
+
+        const { yaml } = compileMeshEnvironment("dev", tmpDir);
+        const parsed = parse(yaml);
+
+        expect(parsed.services["auth-api-app"].ports).toBeUndefined();
+        expect(parsed.services["backend-app"].ports).toBeUndefined();
+        expect(parsed.services["auth-api-app"].environment.PORT).toBe("3000");
+        expect(parsed.services["backend-app"].environment.PORT).toBe("3000");
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("interpolates URL templates in service envOverrides and tester envOverrides", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mesh-template-test-"));
+      try {
+        fs.cpSync(LARGE_PROJECT_DIR, tmpDir, { recursive: true });
+
+        const meshJsonPath = path.join(tmpDir, "mesh.json");
+        const meshJson = JSON.parse(fs.readFileSync(meshJsonPath, "utf-8"));
+        meshJson.services.backend.port = 8080;
+        meshJson.services.backend.envOverrides = {
+          AUTH_URL: "${auth-api.network_url}",
+        };
+        meshJson.tester = meshJson.tester || { path: "./e2e" };
+        meshJson.tester.envOverrides = {
+          AUTH_URL: "${auth-api.network_url}",
+          BACKEND_URL: "${backend.public_url}",
+          BACKEND_VIA_GATEWAY_URL: "${backend.public_url}/api",
+        };
+        fs.writeFileSync(meshJsonPath, JSON.stringify(meshJson, null, 2));
+
+        const { yaml } = compileMeshEnvironment("prod", tmpDir, { includeTester: true });
+        const parsed = parse(yaml);
+
+        const backend = parsed.services["backend-app"];
+        expect(backend.environment.AUTH_URL).toBe("http://auth-api:3000");
+
+        const tester = parsed.services["global-e2e"];
+        expect(tester.environment.AUTH_URL).toBe("http://auth-api:3000");
+        expect(tester.environment.BACKEND_URL).toBe("http://localhost:8080");
+        expect(tester.environment.BACKEND_VIA_GATEWAY_URL).toBe("http://localhost:8080/api");
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("throws clear ScriptError for unresolved template with nonexistent service", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mesh-template-err-test-"));
+      try {
+        fs.cpSync(LARGE_PROJECT_DIR, tmpDir, { recursive: true });
+
+        const meshJsonPath = path.join(tmpDir, "mesh.json");
+        const meshJson = JSON.parse(fs.readFileSync(meshJsonPath, "utf-8"));
+        meshJson.services.backend.envOverrides = {
+          UNKNOWN_URL: "${unknown-service.network_url}",
+        };
+        fs.writeFileSync(meshJsonPath, JSON.stringify(meshJson, null, 2));
+
+        expect(() => compileMeshEnvironment("dev", tmpDir)).toThrow(
+          'Unresolved template variable: ${unknown-service.network_url}. Service "unknown-service" is not defined in mesh.json.'
+        );
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("throws clear ScriptError when referencing public_url of service that does not expose a public port", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mesh-template-nopub-test-"));
+      try {
+        fs.cpSync(LARGE_PROJECT_DIR, tmpDir, { recursive: true });
+
+        const meshJsonPath = path.join(tmpDir, "mesh.json");
+        const meshJson = JSON.parse(fs.readFileSync(meshJsonPath, "utf-8"));
+        // auth-api has no port or preservePort
+        delete meshJson.services["auth-api"].port;
+        delete meshJson.services["auth-api"].preservePort;
+
+        meshJson.services.backend.envOverrides = {
+          AUTH_PUB_URL: "${auth-api.public_url}",
+        };
+        fs.writeFileSync(meshJsonPath, JSON.stringify(meshJson, null, 2));
+
+        expect(() => compileMeshEnvironment("dev", tmpDir)).toThrow(
+          'Unresolved template variable: ${auth-api.public_url}. Service "auth-api" does not expose a public port (missing \'port\' or \'preservePort\' in mesh.json).'
+        );
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("CLI mesh commands and handlers", () => {

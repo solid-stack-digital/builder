@@ -26,14 +26,21 @@ export interface BuildPolicyConfig {
 }
 
 export type BuildJson = {
+  $schema?: string | undefined;
   name?: string | undefined;
   dockerfile?: string | undefined;
+  port?: number | string | undefined;
   policy?: BuildPolicyConfig | undefined;
   policies?: BuildPolicyConfig | undefined;
   composeFiles?: string[] | undefined;
   dependencies?: Record<string, { path: string; service?: string | undefined }> | undefined;
   overrides?: Record<string, { path: string }> | undefined;
   services?: Record<string, any> | undefined;
+  tester?:
+    | {
+        envOverrides?: Record<string, string> | undefined;
+      }
+    | undefined;
 };
 
 export interface ServiceUpOptions {
