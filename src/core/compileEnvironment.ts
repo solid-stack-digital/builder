@@ -194,10 +194,11 @@ export const compileEnvironment = (
 
   if (environment === "e2e") {
     makeE2eDependOnApp(yml);
+  }
 
-    // --- INDIVIDUAL E2E ENV INJECTION & TEMPLATING ---
-    if (buildJson.tester?.envOverrides && yml.services && yml.services.tester) {
-      // 1. Build a local registry for templating (App + Dependencies)
+  // --- INDIVIDUAL E2E ENV INJECTION & TEMPLATING ---
+  if (buildJson.tester?.envOverrides && yml.services && yml.services.tester) {
+    // 1. Build a local registry for templating (App + Dependencies)
       const INTERNAL_PORT = 3000;
       const urlRegistry = new Map<string, { networkUrl: string; publicUrl: string | null }>();
 
@@ -271,7 +272,6 @@ export const compileEnvironment = (
         yml.services.tester.environment[k] = interpolateEnv(v);
       }
     }
-  }
 
   attachName(yml, projectName);
 

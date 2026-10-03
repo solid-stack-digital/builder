@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1
+
+### Patch Changes
+
+- Refactor individual service tester environment overrides and URL templating in `compileEnvironment` to run directly before compose name attachment, ensuring consistent interpolation of `${<dependency>.network_url}`, `${app.network_url}`, and `${app.public_url}` for declared dependencies in individual service E2E testing.
+
 ## 1.1.0
 
 ### Minor Changes

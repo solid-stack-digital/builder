@@ -130,6 +130,40 @@ describe("compileEnvironment integration", () => {
     }
   });
 
+  it("supports dependency network_url and app network_url templating in tester envOverrides", async () => {
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "builder-e2e-user-"));
+    try {
+      fs.cpSync(EXAMPLE_BACKEND_DIR, tmpDir, { recursive: true });
+      const buildJsonPath = path.join(tmpDir, "build.json");
+      const buildJson = JSON.parse(fs.readFileSync(buildJsonPath, "utf-8"));
+      buildJson.name = "backend";
+      buildJson.port = 3000;
+      buildJson.dependencies = {
+        auth: {
+          path: ".docker/mocks/docker-compose.filesystem.yml",
+        },
+      };
+      buildJson.tester = {
+        envOverrides: {
+          AUTH_URL: "${auth.network_url}",
+          API_URL: "${app.network_url}",
+        },
+      };
+      fs.writeFileSync(buildJsonPath, JSON.stringify(buildJson, null, 2));
+
+      const yamlString = compileEnvironment("e2e", tmpDir);
+      const parsed = parse(yamlString);
+      const testerEnv = parsed.services.tester.environment;
+
+      expect(testerEnv.AUTH_URL).toBe("http://auth:3000");
+      expect(testerEnv.API_URL).toBe("http://app:3000");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it("throws clear ScriptError for unresolved template variable in individual tester", async () => {
     const fs = await import("node:fs");
     const os = await import("node:os");
