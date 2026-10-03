@@ -82,6 +82,13 @@
           },
           "description": "Service dependencies and mocks"
         },
+        "envOverrides": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Environment variable overrides for the app service with URL templating"
+        },
         "overrides": {
           "type": "object",
           "additionalProperties": {

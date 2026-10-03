@@ -75,6 +75,10 @@ export const buildJsonSchema = z
       .record(z.string(), buildDependencySchema)
       .optional()
       .describe("Service dependencies and mocks"),
+    envOverrides: z
+      .record(z.string(), z.string())
+      .optional()
+      .describe("Environment variable overrides for the app service with URL templating"),
     overrides: z
       .record(
         z.enum(["dev", "prod", "test", "e2e"]),

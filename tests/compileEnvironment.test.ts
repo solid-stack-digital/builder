@@ -164,6 +164,34 @@ describe("compileEnvironment integration", () => {
     }
   });
 
+  it("injects templated envOverrides into app service", async () => {
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "builder-app-env-"));
+    try {
+      fs.cpSync(EXAMPLE_BACKEND_DIR, tmpDir, { recursive: true });
+      const buildJsonPath = path.join(tmpDir, "build.json");
+      const buildJson = JSON.parse(fs.readFileSync(buildJsonPath, "utf-8"));
+      buildJson.port = 8080;
+      buildJson.envOverrides = {
+        MY_PUBLIC_URL: "${app.public_url}",
+        INTERNAL_API: "${app.network_url}",
+        FS_URL: "${filesystem.network_url}",
+      };
+      fs.writeFileSync(buildJsonPath, JSON.stringify(buildJson, null, 2));
+
+      const yamlString = compileEnvironment("dev", tmpDir);
+      const parsed = parse(yamlString);
+      const appEnv = parsed.services.app.environment;
+
+      expect(appEnv.MY_PUBLIC_URL).toBe("http://localhost:8080");
+      expect(appEnv.INTERNAL_API).toBe("http://app:3000");
+      expect(appEnv.FS_URL).toBe("http://filesystem:3000");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it("throws clear ScriptError for unresolved template variable in individual tester", async () => {
     const fs = await import("node:fs");
     const os = await import("node:os");
@@ -180,7 +208,7 @@ describe("compileEnvironment integration", () => {
       fs.writeFileSync(buildJsonPath, JSON.stringify(buildJson, null, 2));
 
       expect(() => compileEnvironment("e2e", tmpDir)).toThrow(
-        "[Local E2E Tester] Unresolved template variable: ${unknown_db.network_url}. Check build.json dependencies."
+        "[Tester EnvOverrides] Unresolved template variable: ${unknown_db.network_url}. Check build.json dependencies."
       );
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });

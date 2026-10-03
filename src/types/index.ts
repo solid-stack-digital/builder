@@ -36,6 +36,7 @@ export type BuildJson = {
   dependencies?: Record<string, { path: string; service?: string | undefined }> | undefined;
   overrides?: Record<string, { path: string }> | undefined;
   services?: Record<string, any> | undefined;
+  envOverrides?: Record<string, string> | undefined;
   tester?:
     | {
         envOverrides?: Record<string, string> | undefined;

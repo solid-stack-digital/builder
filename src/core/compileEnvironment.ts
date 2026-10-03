@@ -196,82 +196,89 @@ export const compileEnvironment = (
     makeE2eDependOnApp(yml);
   }
 
-  // --- INDIVIDUAL E2E ENV INJECTION & TEMPLATING ---
-  if (buildJson.tester?.envOverrides && yml.services && yml.services.tester) {
-    // 1. Build a local registry for templating (App + Dependencies)
-      const INTERNAL_PORT = 3000;
-      const urlRegistry = new Map<string, { networkUrl: string; publicUrl: string | null }>();
+  // --- URL TEMPLATING REGISTRY ---
+  const INTERNAL_PORT = 3000;
+  const urlRegistry = new Map<string, { networkUrl: string; publicUrl: string | null }>();
 
-      // The app itself
-      const appPublicPort = buildJson.port ? Number(buildJson.port) : null;
-      urlRegistry.set("app", {
-        networkUrl: `http://app:${INTERNAL_PORT}`,
-        publicUrl: appPublicPort ? `http://localhost:${appPublicPort}` : null,
-      });
-      if (buildJson.name && buildJson.name !== "app") {
-        urlRegistry.set(buildJson.name, urlRegistry.get("app")!);
-      }
+  // 1. Register App
+  const appPublicPort = buildJson.port ? Number(buildJson.port) : null;
+  urlRegistry.set("app", {
+    networkUrl: `http://app:${INTERNAL_PORT}`,
+    publicUrl: appPublicPort ? `http://localhost:${appPublicPort}` : null,
+  });
+  if (buildJson.name && buildJson.name !== "app") {
+    urlRegistry.set(buildJson.name, urlRegistry.get("app")!);
+  }
 
-      // The dependencies declared in build.json
-      for (const dep of dependencies) {
-        urlRegistry.set(dep.name, {
-          networkUrl: `http://${dep.name}:${INTERNAL_PORT}`,
-          publicUrl: null,
-        });
-      }
+  // 2. Register Dependencies
+  for (const dep of dependencies) {
+    urlRegistry.set(dep.name, {
+      networkUrl: `http://${dep.name}:${INTERNAL_PORT}`,
+      publicUrl: null,
+    });
+  }
 
-      // 2. Helper to apply templates
-      const interpolateEnv = (val: string): string => {
-        let output = val;
-        for (const [sName, urls] of urlRegistry.entries()) {
-          const escaped = sName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-          output = output.replace(
-            new RegExp(`\\$\\{${escaped}\\.network_url\\}`, "g"),
-            urls.networkUrl
-          );
-          if (urls.publicUrl) {
-            output = output.replace(
-              new RegExp(`\\$\\{${escaped}\\.public_url\\}`, "g"),
-              urls.publicUrl
-            );
-          }
-        }
-
-        // Validate unresolved variables
-        const unresolvedMatch = output.match(/\$\{([^}]+?)\.(network_url|public_url)\}/);
-        if (unresolvedMatch) {
-          throw new ScriptError(
-            `[Local E2E Tester] Unresolved template variable: ${unresolvedMatch[0]}. Check build.json dependencies.`
-          );
-        }
-        return output;
-      };
-
-      // 3. Inject into the tester service
-      if (Array.isArray(yml.services.tester.environment)) {
-        const envObj: Record<string, any> = {};
-        for (const item of yml.services.tester.environment) {
-          if (typeof item === "string") {
-            const eqIdx = item.indexOf("=");
-            if (eqIdx !== -1) {
-              envObj[item.slice(0, eqIdx)] = item.slice(eqIdx + 1);
-            } else {
-              envObj[item] = process.env[item] ?? null;
-            }
-          }
-        }
-        yml.services.tester.environment = envObj;
-      } else if (
-        !yml.services.tester.environment ||
-        typeof yml.services.tester.environment !== "object"
-      ) {
-        yml.services.tester.environment = {};
-      }
-
-      for (const [k, v] of Object.entries(buildJson.tester.envOverrides)) {
-        yml.services.tester.environment[k] = interpolateEnv(v);
+  // 3. Interpolation Helper
+  const interpolateEnv = (val: string, context: string): string => {
+    let output = val;
+    for (const [sName, urls] of urlRegistry.entries()) {
+      const escaped = sName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      output = output.replace(
+        new RegExp(`\\$\\{${escaped}\\.network_url\\}`, "g"),
+        urls.networkUrl
+      );
+      if (urls.publicUrl) {
+        output = output.replace(
+          new RegExp(`\\$\\{${escaped}\\.public_url\\}`, "g"),
+          urls.publicUrl
+        );
       }
     }
+
+    const unresolvedMatch = output.match(/\$\{([^}]+?)\.(network_url|public_url)\}/);
+    if (unresolvedMatch) {
+      throw new ScriptError(
+        `[${context}] Unresolved template variable: ${unresolvedMatch[0]}. Check build.json dependencies.`
+      );
+    }
+    return output;
+  };
+
+  // Helper to normalize environment arrays to objects
+  const normalizeEnvironment = (serviceConfig: any) => {
+    if (Array.isArray(serviceConfig.environment)) {
+      const envObj: Record<string, any> = {};
+      for (const item of serviceConfig.environment) {
+        if (typeof item === "string") {
+          const eqIdx = item.indexOf("=");
+          if (eqIdx !== -1) {
+            envObj[item.slice(0, eqIdx)] = item.slice(eqIdx + 1);
+          } else {
+            envObj[item] = process.env[item] ?? null;
+          }
+        }
+      }
+      serviceConfig.environment = envObj;
+    } else if (!serviceConfig.environment || typeof serviceConfig.environment !== "object") {
+      serviceConfig.environment = {};
+    }
+  };
+
+  // --- APP ENV INJECTION ---
+  if (buildJson.envOverrides && yml.services && yml.services.app) {
+    normalizeEnvironment(yml.services.app);
+    for (const [k, v] of Object.entries(buildJson.envOverrides)) {
+      yml.services.app.environment[k] = interpolateEnv(v, "App EnvOverrides");
+    }
+  }
+
+  // --- TESTER ENV INJECTION ---
+  if (buildJson.tester?.envOverrides && yml.services && yml.services.tester) {
+    normalizeEnvironment(yml.services.tester);
+    for (const [k, v] of Object.entries(buildJson.tester.envOverrides)) {
+      yml.services.tester.environment[k] = interpolateEnv(v, "Tester EnvOverrides");
+    }
+  }
 
   attachName(yml, projectName);
 
