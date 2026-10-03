@@ -331,6 +331,75 @@ describe("Mesh orchestration and verification", () => {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
     });
+
+    it("injects un-mocked dependency port into mesh mock service", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mesh-mock-port-test-"));
+      try {
+        fs.cpSync(LARGE_PROJECT_DIR, tmpDir, { recursive: true });
+
+        const backendBuildPath = path.join(tmpDir, "services/backend/build.json");
+        const backendBuild = JSON.parse(fs.readFileSync(backendBuildPath, "utf-8"));
+        backendBuild.dependencies.filesystem.port = "9005:3000";
+        fs.writeFileSync(backendBuildPath, JSON.stringify(backendBuild, null, 2));
+
+        const { yaml } = compileMeshEnvironment("dev", tmpDir);
+        const parsed = parse(yaml);
+
+        const mockFs = parsed.services["backend-filesystem"];
+        expect(mockFs).toBeDefined();
+        expect(mockFs.ports).toBeDefined();
+        const hasPort9005 = mockFs.ports.some((p: any) =>
+          typeof p === "string"
+            ? p.includes("9005:3000")
+            : String(p.published) === "9005" && p.target === 3000
+        );
+        expect(hasPort9005).toBe(true);
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("detects static host port collisions between mesh services", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mesh-port-collision-test-"));
+      try {
+        fs.cpSync(LARGE_PROJECT_DIR, tmpDir, { recursive: true });
+
+        const meshJsonPath = path.join(tmpDir, "mesh.json");
+        const meshJson = JSON.parse(fs.readFileSync(meshJsonPath, "utf-8"));
+        meshJson.services["auth-api"].port = 8080;
+        meshJson.services.backend.port = 8080;
+        fs.writeFileSync(meshJsonPath, JSON.stringify(meshJson, null, 2));
+
+        expect(() => compileMeshEnvironment("dev", tmpDir)).toThrow(
+          '❌ Port Collision Detected: Host port 8080 is requested by both [mesh service "auth-api"] and [mesh service "backend"].'
+        );
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("detects static host port collisions between mesh service and un-mocked dependency", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mesh-dep-collision-test-"));
+      try {
+        fs.cpSync(LARGE_PROJECT_DIR, tmpDir, { recursive: true });
+
+        const meshJsonPath = path.join(tmpDir, "mesh.json");
+        const meshJson = JSON.parse(fs.readFileSync(meshJsonPath, "utf-8"));
+        meshJson.services.backend.port = 8080;
+        fs.writeFileSync(meshJsonPath, JSON.stringify(meshJson, null, 2));
+
+        const backendBuildPath = path.join(tmpDir, "services/backend/build.json");
+        const backendBuild = JSON.parse(fs.readFileSync(backendBuildPath, "utf-8"));
+        backendBuild.dependencies.filesystem.port = "8080:3000";
+        fs.writeFileSync(backendBuildPath, JSON.stringify(backendBuild, null, 2));
+
+        expect(() => compileMeshEnvironment("dev", tmpDir)).toThrow(
+          '❌ Port Collision Detected: Host port 8080 is requested by both [mesh service "backend"] and [local dependency "filesystem" of service "backend"].'
+        );
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("CLI mesh commands and handlers", () => {

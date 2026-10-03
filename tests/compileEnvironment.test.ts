@@ -304,4 +304,72 @@ describe("compileEnvironment integration", () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("injects dependency port mappings and supports dependency public_url templating", async () => {
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "builder-dep-port-"));
+    try {
+      fs.cpSync(EXAMPLE_BACKEND_DIR, tmpDir, { recursive: true });
+      const buildJsonPath = path.join(tmpDir, "build.json");
+      const buildJson = JSON.parse(fs.readFileSync(buildJsonPath, "utf-8"));
+      buildJson.dependencies = {
+        filesystem: {
+          path: ".docker/mocks/docker-compose.filesystem.yml",
+          service: "mock-filesystem",
+          port: "9000:3000",
+        },
+      };
+      buildJson.envOverrides = {
+        FS_PUBLIC: "${filesystem.public_url}",
+      };
+      fs.writeFileSync(buildJsonPath, JSON.stringify(buildJson, null, 2));
+
+      const yamlString = compileEnvironment("prod", tmpDir);
+      const parsed = parse(yamlString);
+
+      expect(parsed.services.filesystem.ports).toBeDefined();
+      const hasPort9000 = parsed.services.filesystem.ports.some((p: any) =>
+        typeof p === "string"
+          ? p.includes("9000:3000")
+          : String(p.published) === "9000" && p.target === 3000
+      );
+      expect(hasPort9000).toBe(true);
+      expect(parsed.services.app.environment.FS_PUBLIC).toBe("http://localhost:9000");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("handles numeric dependency port defaulting to :3000", async () => {
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "builder-num-port-"));
+    try {
+      fs.cpSync(EXAMPLE_BACKEND_DIR, tmpDir, { recursive: true });
+      const buildJsonPath = path.join(tmpDir, "build.json");
+      const buildJson = JSON.parse(fs.readFileSync(buildJsonPath, "utf-8"));
+      buildJson.dependencies = {
+        filesystem: {
+          path: ".docker/mocks/docker-compose.filesystem.yml",
+          service: "mock-filesystem",
+          port: 5432,
+        },
+      };
+      fs.writeFileSync(buildJsonPath, JSON.stringify(buildJson, null, 2));
+
+      const yamlString = compileEnvironment("prod", tmpDir);
+      const parsed = parse(yamlString);
+
+      expect(parsed.services.filesystem.ports).toBeDefined();
+      const hasPort5432 = parsed.services.filesystem.ports.some((p: any) =>
+        typeof p === "string"
+          ? p.includes("5432:3000")
+          : String(p.published) === "5432" && p.target === 3000
+      );
+      expect(hasPort5432).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });

@@ -22,6 +22,7 @@ export const extractBuildDeps = (
       z.object({
         path: z.string(),
         service: z.string().optional(),
+        port: z.union([z.number(), z.string()]).optional(),
       })
     ),
   });
@@ -43,7 +44,8 @@ export const extractBuildDeps = (
       return {
         path: path.resolve(projectDir, service.path),
         name: name,
-        serviceName: service.service as string,
+        serviceName: service.service,
+        port: service.port,
       };
     }
   );

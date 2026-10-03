@@ -14,6 +14,7 @@ export type BuildDependency = {
   path: string;
   name: string;
   serviceName?: string | undefined;
+  port?: number | string | undefined;
 };
 
 export type BuildOverride = {
@@ -33,7 +34,7 @@ export type BuildJson = {
   policy?: BuildPolicyConfig | undefined;
   policies?: BuildPolicyConfig | undefined;
   composeFiles?: string[] | undefined;
-  dependencies?: Record<string, { path: string; service?: string | undefined }> | undefined;
+  dependencies?: Record<string, { path: string; service?: string | undefined; port?: number | string | undefined }> | undefined;
   overrides?: Record<string, { path: string }> | undefined;
   services?: Record<string, any> | undefined;
   envOverrides?: Record<string, string> | undefined;

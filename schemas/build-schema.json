@@ -72,6 +72,13 @@
               "service": {
                 "type": "string",
                 "description": "Target service name in the mock compose file"
+              },
+              "port": {
+                "type": [
+                  "number",
+                  "string"
+                ],
+                "description": "Host port to map to this dependency locally"
               }
             },
             "required": [

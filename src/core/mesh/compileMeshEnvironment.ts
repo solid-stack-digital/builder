@@ -269,30 +269,57 @@ export function compileMeshEnvironment(
   // Map to track global dependency key to provider for collision detection
   const globalDepAliasToProvider = new Map<string, string>();
 
-  // --- PASS 1: Build URL Registry ---
+  // --- PASS 1: Build URL Registry & Static Port Collision Detection ---
   const INTERNAL_PORT = 3000;
   const serviceUrls = new Map<string, { networkUrl: string; publicUrl: string | null }>();
+  const allocatedPorts = new Map<string, string>();
+
+  function claimPort(portVal: string | number | undefined, ownerDesc: string) {
+    if (!portVal) return;
+    const portStr = String(portVal);
+    // Extract just the host port if formatted as "8080:3000"
+    const hostPort = portStr.includes(":") ? portStr.split(":")[0] : portStr;
+    
+    if (!hostPort) return;
+
+    if (allocatedPorts.has(hostPort)) {
+      throw new ScriptError(
+        `❌ Port Collision Detected: Host port ${hostPort} is requested by both [${allocatedPorts.get(hostPort)}] and [${ownerDesc}].`
+      );
+    }
+    allocatedPorts.set(hostPort, ownerDesc);
+  }
 
   for (const [serviceName, serviceConfig] of Object.entries(mesh.services)) {
     const serviceDir = path.resolve(meshDir, serviceConfig.path);
     const serviceBuildJson = getBuildJson(serviceDir);
+    const serviceDeps = extractBuildDeps(serviceBuildJson, serviceDir);
 
-    let publicPort: number | null = null;
+    let publicPort: number | string | null = null;
     if (serviceConfig.port !== undefined && serviceConfig.port !== null && serviceConfig.port !== "") {
-      const p = Number(serviceConfig.port);
-      if (!isNaN(p) && p > 0) {
-        publicPort = p;
-      }
+      publicPort = serviceConfig.port;
+      claimPort(publicPort, `mesh service "${serviceName}"`);
     } else if (serviceConfig.preservePort && serviceBuildJson.port) {
-      const p = Number(serviceBuildJson.port);
-      if (!isNaN(p) && p > 0) {
-        publicPort = p;
+      publicPort = serviceBuildJson.port;
+      claimPort(publicPort, `mesh service "${serviceName}" (via preservePort)`);
+    }
+
+    // Check dependency ports for collisions if they are not being mocked by a fellow mesh service
+    const provideMap = {
+      ...(serviceConfig.replaceMocks || {}),
+      ...(serviceConfig.provideDependency || {}),
+    };
+    for (const dep of serviceDeps) {
+      if (!provideMap[dep.name] && !(mesh.dependencies && mesh.dependencies[dep.name]) && dep.port) {
+        claimPort(dep.port, `local dependency "${dep.name}" of service "${serviceName}"`);
       }
     }
 
+    const hostPort = publicPort ? (String(publicPort).includes(":") ? String(publicPort).split(":")[0] : String(publicPort)) : null;
+
     serviceUrls.set(serviceName, {
       networkUrl: `http://${serviceName}:${INTERNAL_PORT}`,
-      publicUrl: publicPort ? `http://localhost:${publicPort}` : null,
+      publicUrl: hostPort ? `http://localhost:${hostPort}` : null,
     });
   }
 
@@ -642,6 +669,12 @@ export function compileMeshEnvironment(
         delete resolvedMock.container_name;
         normalizeDependsOn(resolvedMock);
         applyInternalMockDependsOnMapping(resolvedMock, sidecarMapping);
+
+        // ---> INJECT THE MOCK DEPENDENCY PORT
+        if (dep.port) {
+          const portMapping = String(dep.port).includes(":") ? String(dep.port) : `${dep.port}:3000`;
+          resolvedMock.ports = [...(resolvedMock.ports || []), portMapping];
+        }
 
         resolvedMock.networks = {
           [`${serviceName}_net`]: {

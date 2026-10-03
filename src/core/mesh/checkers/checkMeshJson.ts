@@ -18,21 +18,8 @@ export function checkMeshJson(mesh: MeshConfig): void {
   const services = result.data.services;
   const serviceKeys = new Set(Object.keys(services));
 
-  // Check for host port collisions between mesh services
-  const seenPorts = new Map<number, string>();
-  for (const [serviceName, serviceConfig] of Object.entries(services)) {
-    if (serviceConfig.port) {
-      const portNum = Number(serviceConfig.port);
-      if (!isNaN(portNum)) {
-        if (seenPorts.has(portNum)) {
-          throw new ScriptError(
-            `Host port collision in mesh.json: Port ${portNum} is declared by both "${seenPorts.get(portNum)}" and "${serviceName}".`
-          );
-        }
-        seenPorts.set(portNum, serviceName);
-      }
-    }
-  }
+  // NOTE: Static Port collision check removed from here. 
+  // It is now strictly enforced across services AND dependencies in compileMeshEnvironment.ts
 
   // Build dependency graph for cycle detection and validate providers exist
   const graph = new Map<string, Set<string>>();

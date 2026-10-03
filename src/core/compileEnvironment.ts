@@ -218,9 +218,15 @@ export const compileEnvironment = (
 
   // 2. Register Dependencies
   for (const dep of dependencies) {
+    const depPortStr = dep.port ? String(dep.port) : null;
+    const depHostPort = depPortStr
+      ? depPortStr.includes(":")
+        ? depPortStr.split(":")[0]
+        : depPortStr
+      : null;
     urlRegistry.set(dep.name, {
       networkUrl: `http://${dep.name}:${INTERNAL_PORT}`,
-      publicUrl: null,
+      publicUrl: depHostPort ? `http://localhost:${depHostPort}` : null,
     });
   }
 
@@ -304,6 +310,26 @@ export const compileEnvironment = (
     normalizeEnvironment(yml.services.tester);
     for (const [k, v] of Object.entries(buildJson.tester.envOverrides)) {
       yml.services.tester.environment[k] = interpolateEnv(v, "Tester EnvOverrides");
+    }
+  }
+
+  // --- INJECT LOCAL DEPENDENCY PORTS ---
+  if (yml.services) {
+    for (const dep of dependencies) {
+      if (dep.port) {
+        // Find target service key: try specified serviceName first, then dep.name
+        let targetSvc = dep.serviceName && yml.services[dep.serviceName] ? dep.serviceName : dep.name;
+        
+        // Fallback if structure is unexpected (e.g. single unnamed service in compose)
+        if (!yml.services[targetSvc]) {
+          targetSvc = Object.keys(yml.services).find(k => k !== "app" && k !== "tester") || targetSvc;
+        }
+
+        if (yml.services[targetSvc]) {
+          const portMapping = String(dep.port).includes(":") ? String(dep.port) : `${dep.port}:3000`;
+          yml.services[targetSvc].ports = [...(yml.services[targetSvc].ports || []), portMapping];
+        }
+      }
     }
   }
 

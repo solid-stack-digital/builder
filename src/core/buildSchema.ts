@@ -23,6 +23,10 @@ export const buildDependencySchema = z
       .string()
       .optional()
       .describe("Target service name in the mock compose file"),
+    port: z
+      .union([z.number(), z.string()])
+      .optional()
+      .describe("Host port to map to this dependency locally"),
   })
   .strict()
   .describe("Service dependency specification");
