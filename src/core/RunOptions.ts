@@ -6,5 +6,6 @@ export type RunOptions = {
   dryRun?: boolean | undefined;
   skipBanner?: boolean | undefined;
   silenceWarnings?: boolean | undefined;
+  full?: boolean | undefined;
 };
 

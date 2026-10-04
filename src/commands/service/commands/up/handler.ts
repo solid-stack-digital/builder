@@ -14,12 +14,14 @@ export async function handleServiceUp(
   const projectDir = resolveProjectDir(options.projectDir);
   const stage = (rawStage || "dev").toLowerCase();
 
+  const isFull = Boolean(options.full || options.integrated);
   const runOptions = {
     projectDir,
     debug: Boolean(options.debug),
     detach: Boolean(options.detach),
     dryRun: Boolean(options.dryRun),
     silenceWarnings: Boolean(options.silenceWarnings),
+    full: isFull,
   };
 
   if (stage === "dev") {

@@ -31,6 +31,26 @@ describe("compileEnvironment integration", () => {
     expect(parsed.services.app).toBeDefined();
   });
 
+  it("compiles dev environment with --full flag enabling mock dependencies and integrated infra mode", () => {
+    // Normal dev mode: no dependencies merged, isolated infra mode
+    const normalDev = parse(compileEnvironment("dev", EXAMPLE_BACKEND_DIR));
+    expect(normalDev.services.filesystem).toBeUndefined();
+    expect(normalDev.services.app.environment.INFRA_MODE).toBe("isolated");
+    expect(normalDev.services.app.depends_on).toBeUndefined();
+
+    // Full dev mode: dependencies merged, depends_on attached, integrated infra mode
+    const fullDev = parse(compileEnvironment("dev", EXAMPLE_BACKEND_DIR, { full: true }));
+    expect(fullDev.name).toBe("example-backend");
+    expect(fullDev.services.app).toBeDefined();
+    expect(fullDev.services.app.build.target).toBe("dev");
+    expect(fullDev.services.app.environment.ENVIRONMENT).toBe("dev");
+    expect(fullDev.services.app.environment.INFRA_MODE).toBe("integrated");
+    expect(fullDev.services.filesystem).toBeDefined();
+    expect(fullDev.services.app.depends_on.filesystem).toEqual({
+      condition: "service_healthy",
+    });
+  });
+
   it("compiles prod environment with mock dependencies", () => {
     const yamlString = compileEnvironment("prod", EXAMPLE_BACKEND_DIR);
     const parsed = parse(yamlString);

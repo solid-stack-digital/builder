@@ -46,6 +46,16 @@ builder service up dev
 - Merges `docker-compose.base.yml`, `docker-compose.dev.yml`, `.env.dev`, and any overrides defined in `build.json`
 - Mounts source code with hot-reloading enabled
 
+#### Full Development Mode (`builder service up dev --full`)
+
+Spins up the development environment with hot-reloading while connecting to all declared mock dependencies and setting `INFRA_MODE=integrated`:
+
+```bash
+builder service up dev --full
+# Or alias:
+builder service up dev --integrated
+```
+
 ### 2. Production Mode (`builder service up prod`)
 
 Spins up the production runtime with integrated local mocks:
@@ -97,6 +107,8 @@ builder service up test-e2e
 | `-C, --project-dir <path>` | Specify target service directory (defaults to current working directory) |
 | `--unit` | For `test`, run only unit test stage |
 | `--e2e` | For `test`, run only e2e test stage |
+| `--full` | For `dev`, spin up with mock dependencies and `INFRA_MODE=integrated` |
+| `--integrated` | Alias for `--full` |
 
 ---
 

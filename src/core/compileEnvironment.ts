@@ -17,10 +17,15 @@ import { renameServicesWithDependencies } from "../utils/ymlMods/renameServicesW
 import { explainComposeMergeFailure } from "./checkers/explainComposeMergeFailure.js";
 import { getDockerComposeTemplate } from "./templates.js";
 
+export interface CompileEnvironmentOptions {
+  silenceWarnings?: boolean | undefined;
+  full?: boolean | undefined;
+}
+
 export const compileEnvironment = (
   environment: Environment,
   projectDir: string = process.cwd(),
-  options: { silenceWarnings?: boolean | undefined } = {}
+  options: CompileEnvironmentOptions = {}
 ): string => {
   const absProjectDir = resolveProjectDir(projectDir);
   const buildJson = getBuildJson(absProjectDir);
@@ -78,6 +83,13 @@ export const compileEnvironment = (
       if (overrides.dev) {
         composeFlags.push("-f", overrides.dev.path);
         filesUsed.push(overrides.dev.path);
+      }
+
+      if (options.full && dependencies.length > 0) {
+        for (const dep of dependencies) {
+          composeFlags.push("-f", dep.path);
+          filesUsed.push(dep.path);
+        }
       }
 
       composeFlags.push("-f", standalonePath);
@@ -193,7 +205,11 @@ export const compileEnvironment = (
   const mergedYamlConfig = result.stdout;
   const yml = parse(mergedYamlConfig);
 
-  if (environment === "prod" || environment === "e2e") {
+  if (
+    environment === "prod" ||
+    environment === "e2e" ||
+    (environment === "dev" && options.full)
+  ) {
     renameServicesWithDependencies(yml, dependencies);
     addDependenciesToAppService(yml, dependencies);
   }
@@ -331,6 +347,12 @@ export const compileEnvironment = (
         }
       }
     }
+  }
+
+  // --- DEV FULL MODE INFRA OVERRIDE ---
+  if (environment === "dev" && options.full && yml.services?.app) {
+    normalizeEnvironment(yml.services.app);
+    yml.services.app.environment.INFRA_MODE = "integrated";
   }
 
   attachName(yml, projectName);

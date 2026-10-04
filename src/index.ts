@@ -1,6 +1,9 @@
 export * from "./types/index.js";
 export { createCli, runCli } from "./cli.js";
-export { compileEnvironment } from "./core/compileEnvironment.js";
+export {
+  compileEnvironment,
+  type CompileEnvironmentOptions,
+} from "./core/compileEnvironment.js";
 export { compileMeshEnvironment } from "./core/mesh/compileMeshEnvironment.js";
 export { teardownCompose } from "./core/teardownCompose.js";
 export { runCompose } from "./core/runCompose.js";

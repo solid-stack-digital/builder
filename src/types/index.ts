@@ -52,6 +52,8 @@ export interface ServiceUpOptions {
   dryRun?: boolean | undefined;
   skipChecks?: boolean | undefined;
   silenceWarnings?: boolean | undefined;
+  full?: boolean | undefined;
+  integrated?: boolean | undefined;
 }
 
 export interface ServiceDownOptions {

@@ -22,6 +22,14 @@ export const registerUpCommand = (cmd: Command): void => {
       "Silence non-critical warnings like URL templating hints"
     )
     .option(
+      "--full",
+      "Run dev environment with mock dependencies and integrated infra mode"
+    )
+    .option(
+      "--integrated",
+      "Alias for --full"
+    )
+    .option(
       "-C, --project-dir <dir>",
       "Service project directory (defaults to cwd)"
     )
@@ -29,6 +37,7 @@ export const registerUpCommand = (cmd: Command): void => {
       "after",
       `\nExamples:
   $ builder service up dev
+  $ builder service up dev --full
   $ builder service up prod
   $ builder service up test
   $ builder service up test-unit
@@ -43,6 +52,7 @@ export const registerUpCommand = (cmd: Command): void => {
           dryRun: options.dryRun,
           skipChecks: options.skipChecks,
           silenceWarnings: options.silenceWarnings,
+          full: Boolean(options.full || options.integrated),
         });
         if (exitCode !== 0) {
           process.exit(exitCode);

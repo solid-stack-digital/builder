@@ -52,6 +52,26 @@ describe("CLI parser and command handlers", () => {
     expect(exitCode).toBe(0);
   });
 
+  it("handles service up dev with --full flag in dry-run", async () => {
+    const exitCode = await handleServiceUp("dev", {
+      projectDir: EXAMPLE_BACKEND_DIR,
+      dryRun: true,
+      skipChecks: true,
+      full: true,
+    });
+    expect(exitCode).toBe(0);
+  });
+
+  it("handles service up dev with --integrated flag in dry-run", async () => {
+    const exitCode = await handleServiceUp("dev", {
+      projectDir: EXAMPLE_BACKEND_DIR,
+      dryRun: true,
+      skipChecks: true,
+      integrated: true,
+    });
+    expect(exitCode).toBe(0);
+  });
+
   it("rejects unknown stage", async () => {
     await expect(
       handleServiceUp("unknown-stage", {
