@@ -397,6 +397,7 @@ export function compileMeshEnvironment(
     let overrideVolumes: any[] = [];
     let overrideHealthcheck: any = undefined;
     let overrideCommand: any = undefined;
+    let overrideApp: any = undefined;
     const stageOverride = serviceOverrides[mode];
 
     if (stageOverride && existsSync(stageOverride.path)) {
@@ -404,7 +405,7 @@ export function compileMeshEnvironment(
         const overrideYaml = parse(readFileSync(stageOverride.path, "utf-8"));
         mergeTopLevelResources(overrideYaml);
 
-        const overrideApp =
+        overrideApp =
           overrideYaml?.services?.app ||
           overrideYaml?.services?.[serviceName];
 
@@ -457,10 +458,36 @@ export function compileMeshEnvironment(
     // 1. Force standard internal port
     environment.PORT = String(INTERNAL_PORT);
 
-    // 2. Interpolate envOverrides
+    // 2. Build args & interpolate envOverrides
+    const buildArgs: Record<string, any> = {};
+    if (overrideApp?.build?.args) {
+      if (Array.isArray(overrideApp.build.args)) {
+        for (const item of overrideApp.build.args) {
+          if (typeof item === "string") {
+            const eqIdx = item.indexOf("=");
+            if (eqIdx !== -1) {
+              buildArgs[item.slice(0, eqIdx)] = item.slice(eqIdx + 1);
+            } else {
+              buildArgs[item] = process.env[item] ?? null;
+            }
+          }
+        }
+      } else if (typeof overrideApp.build.args === "object") {
+        Object.assign(buildArgs, overrideApp.build.args);
+      }
+    }
+
+    if (serviceBuildJson.envOverrides) {
+      for (const [k, v] of Object.entries(serviceBuildJson.envOverrides)) {
+        buildArgs[k] = interpolateEnvTemplates(v, `Service build.json: ${serviceName}`);
+      }
+    }
+
     if (serviceConfig.envOverrides) {
       for (const [k, v] of Object.entries(serviceConfig.envOverrides)) {
-        environment[k] = interpolateEnvTemplates(v, `Service: ${serviceName}`);
+        const interpolated = interpolateEnvTemplates(v, `Service: ${serviceName}`);
+        environment[k] = interpolated;
+        buildArgs[k] = interpolated;
       }
     }
 
@@ -469,6 +496,7 @@ export function compileMeshEnvironment(
         context: relServiceDir,
         dockerfile: dockerfile,
         target: mode,
+        ...(Object.keys(buildArgs).length > 0 ? { args: buildArgs } : {}),
       },
       init: true,
       logging: {

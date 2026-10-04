@@ -207,6 +207,11 @@ describe("compileEnvironment integration", () => {
       expect(appEnv.MY_PUBLIC_URL).toBe("http://localhost:8080");
       expect(appEnv.INTERNAL_API).toBe("http://app:3000");
       expect(appEnv.FS_URL).toBe("http://filesystem:3000");
+
+      const buildArgs = parsed.services.app.build.args;
+      expect(buildArgs.MY_PUBLIC_URL).toBe("http://localhost:8080");
+      expect(buildArgs.INTERNAL_API).toBe("http://app:3000");
+      expect(buildArgs.FS_URL).toBe("http://filesystem:3000");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

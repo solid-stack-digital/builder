@@ -313,19 +313,56 @@ export const compileEnvironment = (
     }
   };
 
-  // --- APP ENV INJECTION ---
+  // Helper to normalize build args to objects
+  const normalizeBuildArgs = (serviceConfig: any) => {
+    if (typeof serviceConfig.build === "string") {
+      serviceConfig.build = {
+        context: serviceConfig.build,
+      };
+    }
+    if (serviceConfig.build && typeof serviceConfig.build === "object") {
+      if (Array.isArray(serviceConfig.build.args)) {
+        const argsObj: Record<string, any> = {};
+        for (const item of serviceConfig.build.args) {
+          if (typeof item === "string") {
+            const eqIdx = item.indexOf("=");
+            if (eqIdx !== -1) {
+              argsObj[item.slice(0, eqIdx)] = item.slice(eqIdx + 1);
+            } else {
+              argsObj[item] = process.env[item] ?? null;
+            }
+          }
+        }
+        serviceConfig.build.args = argsObj;
+      } else if (!serviceConfig.build.args || typeof serviceConfig.build.args !== "object") {
+        serviceConfig.build.args = {};
+      }
+    }
+  };
+
+  // --- APP ENV & BUILD ARGS INJECTION ---
   if (buildJson.envOverrides && yml.services && yml.services.app) {
     normalizeEnvironment(yml.services.app);
+    normalizeBuildArgs(yml.services.app);
     for (const [k, v] of Object.entries(buildJson.envOverrides)) {
-      yml.services.app.environment[k] = interpolateEnv(v, "App EnvOverrides");
+      const val = interpolateEnv(v, "App EnvOverrides");
+      yml.services.app.environment[k] = val;
+      if (yml.services.app.build?.args) {
+        yml.services.app.build.args[k] = val;
+      }
     }
   }
 
-  // --- TESTER ENV INJECTION ---
+  // --- TESTER ENV & BUILD ARGS INJECTION ---
   if (buildJson.tester?.envOverrides && yml.services && yml.services.tester) {
     normalizeEnvironment(yml.services.tester);
+    normalizeBuildArgs(yml.services.tester);
     for (const [k, v] of Object.entries(buildJson.tester.envOverrides)) {
-      yml.services.tester.environment[k] = interpolateEnv(v, "Tester EnvOverrides");
+      const val = interpolateEnv(v, "Tester EnvOverrides");
+      yml.services.tester.environment[k] = val;
+      if (yml.services.tester.build?.args) {
+        yml.services.tester.build.args[k] = val;
+      }
     }
   }
 
