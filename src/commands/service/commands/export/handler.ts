@@ -42,7 +42,7 @@ export async function handleExportEnv(rawStage?: string, options: ExportEnvOptio
   const files: string[] = [];
   try {
     for (const snapshot of snapshots) {
-      let filename = path.join(projectDir, `env.${snapshot.stage}`);
+      let filename = path.join(projectDir, `.env.${snapshot.stage}`);
       while (true) {
         let overwrite = false;
         if (existsSync(filename)) {
