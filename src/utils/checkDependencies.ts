@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import pc from "picocolors";
 import { ScriptError } from "../errors/ScriptError.js";
 
-export function checkDependencies(): void {
+export function checkComposeAvailability(): void {
   // 1. Check docker compose v2 plugin, PATH, and minimum version >= 2.24.0 (M2)
   const composeCheck = spawnSync(
     "docker",
@@ -28,6 +28,10 @@ export function checkDependencies(): void {
       `Error: Docker Compose version >= 2.24.0 is required (found ${rawVersion}). Please upgrade Docker Compose to support optional env_file syntax.`
     );
   }
+}
+
+export function checkDependencies(): void {
+  checkComposeAvailability();
 
   // 2. Verify docker daemon is reachable
   const daemonCheck = spawnSync("docker", ["info"], {

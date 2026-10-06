@@ -1,16 +1,21 @@
 import type { Command } from "commander";
 import { checkInfra } from "../../core/checkers/checkInfra.js";
 import { SERVICE_STAGES } from "../../types/index.js";
-import { checkDependencies } from "../../utils/checkDependencies.js";
+import { checkComposeAvailability, checkDependencies } from "../../utils/checkDependencies.js";
 import { resolveProjectDir } from "../../utils/paths.js";
 import { registerDownCommand } from "./commands/down/command.js";
 import { registerUpCommand } from "./commands/up/command.js";
+import { registerExportCommand } from "./commands/export/command.js";
 
 export const registerServiceCommand = (cmd: Command): void => {
   const service = cmd.command("service").description("Manage and run services");
 
   // attach hooks
   service.hook("preAction", async (_thisCommand, actionCommand) => {
+    if (actionCommand.name() === "env" && actionCommand.parent?.name() === "export") {
+      checkComposeAvailability();
+      return;
+    }
     // Validate dependencies (e.g. docker installed, daemon running)
     checkDependencies();
 
@@ -36,4 +41,5 @@ export const registerServiceCommand = (cmd: Command): void => {
 
   // attach down command
   registerDownCommand(service);
+  registerExportCommand(service);
 };

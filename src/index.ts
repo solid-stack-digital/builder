@@ -5,6 +5,7 @@ export {
   type CompileEnvironmentOptions,
 } from "./core/compileEnvironment.js";
 export { compileMeshEnvironment } from "./core/mesh/compileMeshEnvironment.js";
+export { compileApplicationEnv, serializeApplicationEnv } from "./core/compileApplicationEnv.js";
 export { teardownCompose } from "./core/teardownCompose.js";
 export { runCompose } from "./core/runCompose.js";
 export { buildJsonSchema } from "./core/buildSchema.js";

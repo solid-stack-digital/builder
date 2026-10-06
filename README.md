@@ -96,6 +96,28 @@ builder service up test-e2e
 
 ---
 
+### Export the application environment (`builder service export env [stage]`)
+
+```bash
+# Export all four stages into the service directory
+builder service export env
+
+# Export one stage only
+builder service export env dev
+builder service export env prod
+builder service export env test
+builder service export env e2e -C ./services/backend
+
+# Match full/integrated development mode
+builder service export env dev --full
+```
+
+The default output names are `env.dev`, `env.prod`, `env.test`, and `env.e2e` (without a leading dot). These snapshots do not replace the `.env.<stage>` input files automatically. If an output file exists, Builder asks whether to overwrite it. Declining prompts for a new filename relative to the service directory; an existing replacement filename also requires confirmation. Existing files require an interactive terminal.
+
+Exports use the same stage compilation as service startup, including Compose environment files, overrides, Builder URL templates, and `build.json.envOverrides`. All requested stages are compiled before any files are written. Only the application service's resolved runtime environment is exported, not build arguments, dependencies, or tester settings. E2E runs the application using the production configuration, so `env.e2e` reflects that app environment plus any E2E app overrides; it does not merge the tester's `.env.e2e` into the app.
+
+The command requires Docker Compose 2.24 or newer, but does not require a running Docker daemon or start/build containers. Image-only `ENV` defaults and values added by application startup code cannot be determined by configuration simulation and are outside the export. New files use owner-only permissions and contain the actual values. Values follow [Compose dotenv quoting rules](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/) to preserve literal dollars and multiline strings.
+
 ## 🛠️ Options
 
 | Flag | Description |
