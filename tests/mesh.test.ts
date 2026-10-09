@@ -72,6 +72,27 @@ describe("Mesh orchestration and verification", () => {
   });
 
   describe("compileMeshEnvironment", () => {
+    it("uses prod build with E2E execution and scopes override sidecars to E2E", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mesh-e2e-sidecar-"));
+      try {
+        fs.cpSync(LARGE_PROJECT_DIR, tmpDir, { recursive: true });
+        const override = path.join(tmpDir, "services/backend/.docker/overrides/docker-compose.e2e.override.yml");
+        fs.writeFileSync(override, `services:\n  app:\n    environment:\n      E2E_ONLY: yes\n    depends_on:\n      mail-sink:\n        condition: service_healthy\n  mail-sink:\n    image: node:22-alpine\n    ports:\n      - "32090:3000"\n    healthcheck:\n      test: ["CMD", "true"]\n`);
+        const e2e = parse(compileMeshEnvironment("prod", tmpDir, { includeTester: true, execModeOverride: "e2e", overrideStage: "e2e", includeOverrideSidecars: true }).yaml);
+        expect(e2e.services["backend-app"].build.target).toBe("prod");
+        expect(e2e.services["backend-app"].environment.EXEC_MODE).toBe("e2e");
+        expect(e2e.services["backend-app"].environment.E2E_ONLY).toBe("yes");
+        expect(e2e.services["backend-app"].depends_on["backend-e2e-mail-sink"]).toBeDefined();
+        expect(e2e.services["backend-e2e-mail-sink"].networks.backend_net.aliases).toContain("mail-sink");
+        expect(parse(compileMeshEnvironment("dev", tmpDir).yaml).services["backend-e2e-mail-sink"]).toBeUndefined();
+        expect(parse(compileMeshEnvironment("prod", tmpDir).yaml).services["backend-e2e-mail-sink"]).toBeUndefined();
+        const meshPath = path.join(tmpDir, "mesh.json");
+        const mesh = JSON.parse(fs.readFileSync(meshPath, "utf8"));
+        mesh.services.backend.port = 32090;
+        fs.writeFileSync(meshPath, JSON.stringify(mesh));
+        expect(() => compileMeshEnvironment("prod", tmpDir, { overrideStage: "e2e", includeOverrideSidecars: true })).toThrow(/Port Collision/);
+      } finally { fs.rmSync(tmpDir, { recursive: true, force: true }); }
+    });
     it("compiles DEV mesh environment with hot reload and dependency overrides", () => {
       const { yaml } = compileMeshEnvironment("dev", LARGE_PROJECT_DIR);
       const parsed = parse(yaml);
