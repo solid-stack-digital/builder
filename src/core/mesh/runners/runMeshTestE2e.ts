@@ -24,6 +24,9 @@ export async function runMeshTestE2e(options: MeshRunOptions = {}): Promise<numb
   const { yaml, testerServiceName } = compileMeshEnvironment("prod", meshDir, {
     includeTester: true,
     silenceWarnings: options.silenceWarnings,
+    execModeOverride: "e2e",
+    overrideStage: "e2e",
+    includeOverrideSidecars: true,
   });
 
   if (!testerServiceName) {

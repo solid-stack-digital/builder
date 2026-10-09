@@ -17,6 +17,9 @@ export interface CompileMeshOptions {
   includeTester?: boolean | undefined;
   validateWithDocker?: boolean | undefined;
   silenceWarnings?: boolean | undefined;
+  execModeOverride?: "dev" | "prod" | "test" | "e2e" | undefined;
+  overrideStage?: "dev" | "prod" | "test" | "e2e" | undefined;
+  includeOverrideSidecars?: boolean | undefined;
 }
 
 export interface CompileMeshResult {
@@ -390,7 +393,7 @@ export function compileMeshEnvironment(
     // Build base environment
     const environment: Record<string, any> = {
       INFRA_MODE: "integrated",
-      EXEC_MODE: mode,
+      EXEC_MODE: options.execModeOverride ?? mode,
     };
 
     // Check for override file (e.g. dev or prod override)
@@ -398,7 +401,8 @@ export function compileMeshEnvironment(
     let overrideHealthcheck: any = undefined;
     let overrideCommand: any = undefined;
     let overrideApp: any = undefined;
-    const stageOverride = serviceOverrides[mode];
+    let overrideSidecars: Record<string, any> = {};
+    const stageOverride = serviceOverrides[options.overrideStage ?? mode];
 
     if (stageOverride && existsSync(stageOverride.path)) {
       try {
@@ -408,8 +412,11 @@ export function compileMeshEnvironment(
         overrideApp =
           overrideYaml?.services?.app ||
           overrideYaml?.services?.[serviceName];
+        if (options.includeOverrideSidecars && overrideYaml?.services) {
+          overrideSidecars = Object.fromEntries(Object.entries(overrideYaml.services).filter(([name]) => name !== "app" && name !== "tester" && name !== serviceName));
+        }
 
-        if (!overrideApp && overrideYaml?.services && Object.keys(overrideYaml.services).length > 0) {
+        if (!overrideApp && !options.includeOverrideSidecars && overrideYaml?.services && Object.keys(overrideYaml.services).length > 0) {
           throw new ScriptError(
             `Override file "${stageOverride.path}" must define service "app" or "${serviceName}".`
           );
@@ -584,6 +591,23 @@ export function compileMeshEnvironment(
         aliases: ["app", serviceName, namespacedAppKey],
       },
     };
+
+    if (options.includeOverrideSidecars) {
+      const sidecarMapping = new Map(Object.keys(overrideSidecars).map((name) => [name, `${serviceName}-e2e-${name}`]));
+      for (const [name, definition] of Object.entries(overrideSidecars)) {
+        const sidecar = resolveServicePaths(definition, serviceDir, meshDir);
+        delete sidecar.container_name;
+        applyInternalMockDependsOnMapping(sidecar, sidecarMapping);
+        for (const port of sidecar.ports ?? []) claimPort(typeof port === "string" ? port : String(port.published), `E2E sidecar "${name}" of service "${serviceName}"`);
+        sidecar.networks = { [`${serviceName}_net`]: { aliases: [name] } };
+        registerService(sidecarMapping.get(name)!, sidecar, `E2E sidecar "${name}"`);
+      }
+      if (overrideApp?.depends_on) {
+        const mapped = { depends_on: JSON.parse(JSON.stringify(overrideApp.depends_on)) };
+        applyInternalMockDependsOnMapping(mapped, sidecarMapping);
+        Object.assign(serviceDef.depends_on, mapped.depends_on);
+      }
+    }
 
     // Resolve dependencies using validated extractBuildDeps
     const provideMap = {
