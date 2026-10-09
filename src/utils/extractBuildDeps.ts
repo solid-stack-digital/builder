@@ -1,5 +1,6 @@
 import path from "node:path";
 import { z } from "zod";
+import { buildDependencySchema } from "../core/buildSchema.js";
 import { ScriptError } from "../errors/ScriptError.js";
 import type { BuildDependency } from "../types/index.js";
 
@@ -17,14 +18,7 @@ export const extractBuildDeps = (
   }
 
   const schema = z.object({
-    dependencies: z.record(
-      z.string(),
-      z.object({
-        path: z.string(),
-        service: z.string().optional(),
-        port: z.union([z.number(), z.string()]).optional(),
-      })
-    ),
+    dependencies: z.record(z.string(), buildDependencySchema),
   });
 
   const result = schema.safeParse(buildJson);
@@ -46,6 +40,7 @@ export const extractBuildDeps = (
         name: name,
         serviceName: service.service,
         port: service.port,
+        ports: service.ports,
       };
     }
   );

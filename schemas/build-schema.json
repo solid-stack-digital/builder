@@ -79,6 +79,14 @@
                   "string"
                 ],
                 "description": "Host port to map to this dependency locally"
+              },
+              "ports": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^([1-9]\\d{0,4}):([1-9]\\d{0,4})$"
+                },
+                "description": "Additional explicit HOST_PORT:CONTAINER_PORT mappings for local dependency tooling"
               }
             },
             "required": [

@@ -5,6 +5,8 @@ import pc from "picocolors";
 import { parse, stringify } from "yaml";
 import { ScriptError } from "../errors/ScriptError.js";
 import type { Environment } from "../types/index.js";
+import { assertUniqueHostPortMappings } from "../utils/assertUniqueHostPortMappings.js";
+import { getDependencyPortMappings } from "../utils/dependencyPorts.js";
 import { extractBuildDeps } from "../utils/extractBuildDeps.js";
 import { extractOverrides } from "../utils/extractOverrides.js";
 import { getBuildJson } from "../utils/getBuildJson.js";
@@ -366,23 +368,21 @@ export const compileEnvironment = (
     }
   }
 
-  // --- INJECT LOCAL DEPENDENCY PORTS ---
-  if (yml.services) {
+  // Raw mock Compose ports are never authoritative. Only included local dependencies
+  // receive host mappings declared in build.json.
+  if (yml.services && (environment === "prod" || environment === "e2e" || (environment === "dev" && options.full))) {
     for (const dep of dependencies) {
-      if (dep.port) {
-        // Find target service key: try specified serviceName first, then dep.name
-        let targetSvc = dep.serviceName && yml.services[dep.serviceName] ? dep.serviceName : dep.name;
-        
-        // Fallback if structure is unexpected (e.g. single unnamed service in compose)
-        if (!yml.services[targetSvc]) {
-          targetSvc = Object.keys(yml.services).find(k => k !== "app" && k !== "tester") || targetSvc;
-        }
-
-        if (yml.services[targetSvc]) {
-          const portMapping = String(dep.port).includes(":") ? String(dep.port) : `${dep.port}:3000`;
-          yml.services[targetSvc].ports = [...(yml.services[targetSvc].ports || []), portMapping];
-        }
+      const mappings = getDependencyPortMappings(dep, `Dependency "${dep.name}"`);
+      let targetSvc = dep.serviceName && yml.services[dep.serviceName] ? dep.serviceName : dep.name;
+      if (!yml.services[targetSvc]) {
+        targetSvc = Object.keys(yml.services).find((key) => key !== "app" && key !== "tester") ?? targetSvc;
       }
+      const service = yml.services[targetSvc];
+      if (!service) {
+        throw new ScriptError(`Dependency "${dep.name}" target service could not be resolved for port injection.`);
+      }
+      delete service.ports;
+      if (mappings.length > 0) service.ports = mappings.map((mapping) => mapping.raw);
     }
   }
 
@@ -395,5 +395,6 @@ export const compileEnvironment = (
   attachName(yml, projectName);
 
   const finalYamlConfig = stringify(yml);
+  assertUniqueHostPortMappings(finalYamlConfig);
   return finalYamlConfig;
 };

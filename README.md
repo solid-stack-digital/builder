@@ -164,6 +164,39 @@ Each service configures its dependencies and overrides via `build.json` in its p
 }
 ```
 
+
+### Dependency host ports
+
+`dependencies.<name>.port` exposes the primary local interface. A number such as
+`9000` maps host port 9000 to container port 3000. An explicit value such as
+`"9000:8080"` maps those ports exactly.
+
+`dependencies.<name>.ports` exposes additional developer interfaces. Each entry
+must be an explicit `HOST_PORT:CONTAINER_PORT` mapping:
+
+```json
+{
+  "dependencies": {
+    "tooling": {
+      "path": "./tooling.compose.yml",
+      "service": "tooling",
+      "port": "4080:4000",
+      "ports": ["8080:8080", "9150:9150"]
+    }
+  }
+}
+```
+
+Auxiliary ports affect only host exposure; they do not change `.network_url` or
+`.public_url` template values. Builder uses only ports declared in `build.json`
+for local dependency host exposure, even if the mock Compose file declares ports.
+This keeps the application service contract predictable while allowing explicit
+interfaces for developer tooling. Static host port collisions fail compilation.
+
+In mesh compilation, runtime environment and build args use this precedence:
+Builder defaults, then service stage overrides, then service `build.json.envOverrides`,
+then mesh service `envOverrides`.
+
 ---
 
 ## 💻 Programmatic Usage

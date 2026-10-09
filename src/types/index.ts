@@ -14,7 +14,10 @@ export type BuildDependency = {
   path: string;
   name: string;
   serviceName?: string | undefined;
+  /** Primary host mapping: 9000 means 9000:3000. */
   port?: number | string | undefined;
+  /** Additional explicit HOST_PORT:CONTAINER_PORT mappings. */
+  ports?: string[] | undefined;
 };
 
 export type BuildOverride = {
@@ -34,7 +37,7 @@ export type BuildJson = {
   policy?: BuildPolicyConfig | undefined;
   policies?: BuildPolicyConfig | undefined;
   composeFiles?: string[] | undefined;
-  dependencies?: Record<string, { path: string; service?: string | undefined; port?: number | string | undefined }> | undefined;
+  dependencies?: Record<string, { path: string; service?: string | undefined; port?: number | string | undefined; ports?: string[] | undefined }> | undefined;
   overrides?: Record<string, { path: string }> | undefined;
   services?: Record<string, any> | undefined;
   envOverrides?: Record<string, string> | undefined;

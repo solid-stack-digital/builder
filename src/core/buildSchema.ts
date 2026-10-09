@@ -14,6 +14,13 @@ export const buildPolicyConfigSchema = z
   .strict()
   .describe("Policy configurations for infra/contract verification");
 
+export const auxiliaryPortMappingSchema = z
+  .string()
+  .regex(/^([1-9]\d{0,4}):([1-9]\d{0,4})$/, 'Must use "HOST_PORT:CONTAINER_PORT"')
+  .refine((value) => value.split(":").every((part) => Number(part) <= 65535), {
+    message: "Host and container ports must be between 1 and 65535",
+  });
+
 export const buildDependencySchema = z
   .object({
     path: z
@@ -27,6 +34,8 @@ export const buildDependencySchema = z
       .union([z.number(), z.string()])
       .optional()
       .describe("Host port to map to this dependency locally"),
+    ports: z.array(auxiliaryPortMappingSchema).optional()
+      .describe("Additional explicit HOST_PORT:CONTAINER_PORT mappings for local dependency tooling"),
   })
   .strict()
   .describe("Service dependency specification");

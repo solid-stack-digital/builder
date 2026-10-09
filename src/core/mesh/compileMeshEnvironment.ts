@@ -4,6 +4,8 @@ import path from "node:path";
 import pc from "picocolors";
 import { parse, stringify } from "yaml";
 import { ScriptError } from "../../errors/ScriptError.js";
+import { assertUniqueHostPortMappings } from "../../utils/assertUniqueHostPortMappings.js";
+import { getDependencyPortMappings } from "../../utils/dependencyPorts.js";
 import { extractBuildDeps } from "../../utils/extractBuildDeps.js";
 import { extractOverrides } from "../../utils/extractOverrides.js";
 import { getBuildJson } from "../../utils/getBuildJson.js";
@@ -310,8 +312,9 @@ export function compileMeshEnvironment(
       ...(serviceConfig.provideDependency || {}),
     };
     for (const dep of serviceDeps) {
-      if (!provideMap[dep.name] && !(mesh.dependencies && mesh.dependencies[dep.name]) && dep.port) {
-        claimPort(dep.port, `local dependency "${dep.name}" of service "${serviceName}"`);
+      if (provideMap[dep.name] || mesh.dependencies?.[dep.name]) continue;
+      for (const mapping of getDependencyPortMappings(dep, `Local dependency "${dep.name}" of service "${serviceName}"`)) {
+        claimPort(mapping.raw, `local dependency "${dep.name}" of service "${serviceName}"`);
       }
     }
 
@@ -479,7 +482,9 @@ export function compileMeshEnvironment(
 
     if (serviceBuildJson.envOverrides) {
       for (const [k, v] of Object.entries(serviceBuildJson.envOverrides)) {
-        buildArgs[k] = interpolateEnvTemplates(v, `Service build.json: ${serviceName}`);
+        const interpolated = interpolateEnvTemplates(v, `Service build.json: ${serviceName}`);
+        environment[k] = interpolated;
+        buildArgs[k] = interpolated;
       }
     }
 
@@ -698,10 +703,9 @@ export function compileMeshEnvironment(
         normalizeDependsOn(resolvedMock);
         applyInternalMockDependsOnMapping(resolvedMock, sidecarMapping);
 
-        // ---> INJECT THE MOCK DEPENDENCY PORT
-        if (dep.port) {
-          const portMapping = String(dep.port).includes(":") ? String(dep.port) : `${dep.port}:3000`;
-          resolvedMock.ports = [...(resolvedMock.ports || []), portMapping];
+        const portMappings = getDependencyPortMappings(dep, `Local dependency "${depKey}" of service "${serviceName}"`);
+        if (portMappings.length > 0) {
+          resolvedMock.ports = portMappings.map((mapping) => mapping.raw);
         }
 
         resolvedMock.networks = {
@@ -848,6 +852,7 @@ export function compileMeshEnvironment(
   }
 
   const generatedYaml = stringify(composeConfig);
+  assertUniqueHostPortMappings(generatedYaml);
 
   if (options.validateWithDocker === false) {
     return { yaml: generatedYaml, testerServiceName };
