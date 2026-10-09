@@ -1,6 +1,6 @@
 {
   "name": "@solid-stack/builder",
-  "version": "1.1.8",
+  "version": "1.2.0",
   "description": "CLI build tool and orchestrator for Solid Stack services.",
   "type": "module",
   "main": "./dist/index.js",
