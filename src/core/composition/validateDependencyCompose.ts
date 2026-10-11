@@ -1,3 +1,4 @@
+import { parseVolume, isHostFilesystemRoot } from "./composeVolumes.js";
 import { ConfigError } from "../../errors/ConfigError.js";
 import type { EffectiveBuildConfig } from "../config/types.js";
 import type { Environment } from "../../types/index.js";
@@ -11,13 +12,15 @@ export function validateDependencyCompose(dependencyKey:string,dependency:Effect
   if(svc.network_mode==="host")fail(`services.${name}.network_mode`,"host network mode is forbidden");
   if(svc.privileged===true)fail(`services.${name}.privileged`,`privileged services are forbidden`);
   if(svc.container_name!==undefined)fail(`services.${name}.container_name`,`fixed container_name is forbidden`);
-  for(const v of Array.isArray(svc.volumes)?svc.volumes:[]){const source=typeof v==="string"?v.split(":")[0]:v&&typeof v==="object"?(v as any).source:undefined;if(typeof source==="string"&&source.replaceAll("\\","/")==="/")fail(`services.${name}.volumes`,`host root bind mounts are forbidden`,v);}
+  for (const v of Array.isArray(svc.volumes) ? svc.volumes : []) { const mount = parseVolume(v); if (mount?.type === "bind" && mount.source && isHostFilesystemRoot(mount.source)) fail(`services.${name}.volumes`, "host root bind mounts are forbidden", v); }
   const internalRefs:Array<[string,string]> = [];
   if(Array.isArray(svc.depends_on)){for(const ref of svc.depends_on)if(typeof ref==="string")internalRefs.push(["depends_on",ref]);}
   else if(svc.depends_on&&typeof svc.depends_on==="object"){for(const ref of Object.keys(svc.depends_on))internalRefs.push(["depends_on",ref]);}
   if(Array.isArray(svc.links))for(const ref of svc.links)if(typeof ref==="string")internalRefs.push(["links",ref.split(":")[0]!]);
   if(typeof svc.network_mode==="string"&&svc.network_mode.startsWith("service:"))internalRefs.push(["network_mode",svc.network_mode.slice(8)]);
   if(Array.isArray(svc.volumes_from))for(const ref of svc.volumes_from)if(typeof ref==="string")internalRefs.push(["volumes_from",ref.split(":")[0]!]);
+  for (const key of ["ipc", "pid"] as const) if (typeof svc[key] === "string" && svc[key].startsWith("service:")) internalRefs.push([key, svc[key].slice(8)]);
+  if (svc.extends && typeof svc.extends === "object") { const ref = svc.extends as Record<string, unknown>; if (ref.file !== undefined) fail(`services.${name}.extends.file`, "external extends is unsupported for atomic dependency implementations"); if (typeof ref.service === "string") internalRefs.push(["extends.service", ref.service]); }
   for(const [property,target] of internalRefs)if(!services[target])fail(`services.${name}.${property}`,`internal service reference "${target}" does not exist in this dependency Compose bundle`,target);
  }
  if(!Object.keys(dependency.endpoints).length)return;

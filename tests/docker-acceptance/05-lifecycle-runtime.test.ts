@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { compileMeshComposition } from "../../src/core/mesh/v2/compileMeshComposition.js";
-import { cleanupFixtures, write } from "./fixture.js";
+import { cleanupFixtures, write } from "../conformance/fixture.js";
 import { builder, dependencyBundle, dockerCompose, dockerLog, down, emitCompose, meshCompose, runtimeMesh, runtimeService, serviceCompose } from "./runtimeFixture.js";
 
 afterEach(cleanupFixtures);

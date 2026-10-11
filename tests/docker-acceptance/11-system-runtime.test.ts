@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { cleanupFixtures } from "./fixture.js";
+import { cleanupFixtures } from "../conformance/fixture.js";
 import { builder, runtimeMesh } from "./runtimeFixture.js";
 
 type Run = { status: number | null; output: string; name: string; error?: Error | undefined };

@@ -1,3 +1,5 @@
+import { parse } from "yaml";
+import { anonymousVolumeServices } from "./composition/composeVolumes.js";
 import { spawn } from "node:child_process";
 import pc from "picocolors";
 import { resolveProjectDir } from "../utils/paths.js";
@@ -5,6 +7,7 @@ import { setTearingDown } from "./composeCleanup.js";
 
 export interface TeardownOptions {
   removeVolumes?: boolean;
+  anonymousVolumeServices?: string[];
   projectName?: string;
   silent?: boolean;
 }
@@ -86,11 +89,9 @@ export async function teardownCompose(
 
     const inputData = options.projectName ? undefined : yamlConfig;
 
-    // H4: Targeted anonymous volume cleanup before down when named volumes are preserved
     if (!removeVolumes) {
-      // Remove anonymous volumes attached to app containers without deleting named database volumes
-      const rmArgs = [...baseArgs, "rm", "-f", "-v", "app"];
-      await runSpawn("docker", rmArgs, absProjectDir, inputData, true, 15_000);
+      const services = yamlConfig.trim() ? anonymousVolumeServices(parse(yamlConfig)?.services ?? {}) : options.anonymousVolumeServices ?? [];
+      if (services.length) await runSpawn("docker", [...baseArgs, "rm", "-s", "-f", "-v", ...services], absProjectDir, inputData, true, 15_000);
     }
 
     const downArgs = [...baseArgs, "down"];

@@ -1,3 +1,4 @@
+import { anonymousVolumeServices } from "../../composition/composeVolumes.js";
 import pc from "picocolors";
 import { parse } from "yaml";
 import { checkHostPortCollisions, extractHostPorts } from "../../../utils/checkPortCollision.js";
@@ -37,6 +38,7 @@ export async function runMeshDev(options: MeshRunOptions = {}): Promise<number> 
   // Stateful tracking
   writeRunState(meshDir, {
     projectName,
+    anonymousVolumeServices: anonymousVolumeServices(parsed?.services ?? {}),
     stage: "dev",
     projectDir: meshDir,
   });

@@ -85,3 +85,13 @@ builder mesh down test -C ./system
 Application Dockerfiles require `dev`, `test`, `test-e2e`, and `prod` targets. `dev` and `prod` need Docker healthchecks, and `prod` needs an artifact `COPY --from=...`. Builder's packaged Conftest policy enforces these rules. Endpoint-bearing service Dockerfiles should probe the injected `PORT` dynamically.
 
 The full configuration and reference grammar are documented in [BUILD_JSON_DOCS.md](docs/BUILD_JSON_DOCS.md), [MESH_JSON_DOCS.md](docs/MESH_JSON_DOCS.md), and [SPECS_V2.md](docs/SPECS_V2.md). Published JSON Schemas are [build-schema.json](schemas/build-schema.json) and [mesh-schema.json](schemas/mesh-schema.json).
+
+## Development tests
+
+- `pnpm test` — parallel unit, compiler, checker-boundary, and runner tests; no Docker required.
+- `pnpm test:conformance` — all 384 catalog scenarios plus audit regressions. A traceability test requires each scenario ID exactly once in this suite.
+- `pnpm check` — TypeScript and fast conformance checks.
+- `pnpm test:docker` — serial Docker acceptance tests, including real readiness transitions, CLI pipelines, networking, cleanup, and the Rego policy matrix. Requires Docker Engine and Compose; cold image pulls and builds can take several minutes.
+- `pnpm check:full` — fast checks, the complete default suite, legacy-removal guard, build, and Docker acceptance. Use this for releases, nightly CI, or manual acceptance.
+
+Fast catalog tests inspect generated health gates and mock external process boundaries. Actual Docker behavior and Rego semantics remain covered in `tests/docker-acceptance`; the fast suite alone does not replace that acceptance gate. Normal test files run in parallel with up to four workers; Docker acceptance remains serial. Ordinary development aims for a sub-minute default suite without depending on Docker cache state.

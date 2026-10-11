@@ -53,6 +53,7 @@ export async function handleMeshDown(
   for (const proj of uniqueProjects) {
     await teardownCompose("", meshDir, {
       projectName: proj,
+      ...(runState?.projectName === proj && runState.anonymousVolumeServices ? {anonymousVolumeServices: runState.anonymousVolumeServices} : {}),
       removeVolumes: Boolean(options.volumes),
     });
   }

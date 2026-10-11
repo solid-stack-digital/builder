@@ -5,7 +5,7 @@ import { stringify } from "yaml";
 import type { ComposeDocument } from "../../src/core/composition/types.js";
 import { compileServiceComposition } from "../../src/core/composition/compileServiceComposition.js";
 import { compileMeshComposition } from "../../src/core/mesh/v2/compileMeshComposition.js";
-import { fixture, meshFixture, write } from "./fixture.js";
+import { fixture, meshFixture, write } from "../conformance/fixture.js";
 
 export const appScript = `import http from 'node:http';
 const port=Number(process.env.PORT||3000), delay=Number(process.env.READY_AFTER_MS||0);

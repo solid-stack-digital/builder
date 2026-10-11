@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 import { compileMeshComposition } from "../../src/core/mesh/v2/compileMeshComposition.js";
-import { cleanupFixtures } from "./fixture.js";
+import { cleanupFixtures } from "../conformance/fixture.js";
 import { dockerCompose, dockerLog, down, emitCompose, runtimeMesh } from "./runtimeFixture.js";
 
 afterEach(cleanupFixtures);

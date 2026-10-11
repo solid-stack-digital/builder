@@ -1,5 +1,6 @@
+vi.mock("../src/core/checkers/runStep.js",()=>({runStep:vi.fn()}));
 import path from "node:path";
-import {describe,expect,it} from "vitest";
+import {describe,expect,it,vi} from "vitest";
 import {getDeclaredYamlFiles} from "../src/core/checkers/getDeclaredYamlFiles.js";
 import {checkYamlFiles} from "../src/core/checkers/checkYamlFiles.js";
 import {checkInfra} from "../src/core/checkers/checkInfra.js";

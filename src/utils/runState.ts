@@ -11,6 +11,7 @@ export interface RunState {
   stage: string;
   projectDir: string;
   timestamp: string;
+  anonymousVolumeServices?: string[];
 }
 
 export function getRunStatePath(projectDir: string): string {

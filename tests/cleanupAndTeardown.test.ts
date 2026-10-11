@@ -231,3 +231,9 @@ describe("Teardown and Cleanup lifecycle verification", () => {
     });
   });
 });
+
+vi.mock('../src/core/mesh/compileMeshEnvironment.js', async importOriginal => {
+ const original = await importOriginal<typeof import('../src/core/mesh/compileMeshEnvironment.js')>();
+ return {...original, compileMeshEnvironment: (stage: 'dev'|'prod'|'e2e', root: string) => original.compileMeshEnvironment(stage,root,{validateWithDocker:false})};
+});
+vi.mock('../src/utils/checkPortCollision.js',()=>({checkHostPortCollisions:vi.fn(),extractHostPorts:vi.fn(()=>[])}));

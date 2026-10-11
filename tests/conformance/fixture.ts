@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { stringify } from "yaml";
@@ -27,6 +27,7 @@ export function fixture(build: Record<string, unknown> = { app: {} }, files: Rec
 export function write(root: string, relative: string, value: string | object): void {
   const file = path.join(root, relative);
   mkdirSync(path.dirname(file), { recursive: true });
+  if (path.basename(file) === "build.json" && !existsSync(path.join(path.dirname(file), "Dockerfile"))) writeFileSync(path.join(path.dirname(file), "Dockerfile"), readFileSync(path.resolve("tests/fixtures/v2/service-basic/Dockerfile")));
   writeFileSync(file, typeof value === "string" ? value : relative.endsWith(".json") ? JSON.stringify(value, null, 2) : stringify(value));
 }
 

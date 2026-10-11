@@ -1,3 +1,6 @@
+vi.mock("../src/core/teardownCompose.js",()=>({teardownCompose:vi.fn().mockResolvedValue(undefined)}));
+vi.mock("../src/utils/checkDependencies.js",()=>({checkDependencies:vi.fn(),checkComposeAvailability:vi.fn()}));
+vi.mock("../src/core/checkers/runStep.js",()=>({runStep:vi.fn()}));
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createCli, runCli } from "../src/cli.js";

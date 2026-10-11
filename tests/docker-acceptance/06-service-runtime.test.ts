@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { cleanupFixtures } from "./fixture.js";
+import { cleanupFixtures } from "../conformance/fixture.js";
 import { builder, runtimeService } from "./runtimeFixture.js";
 
 type Outcome = { status: number | null; output: string; error?: Error | undefined };

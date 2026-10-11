@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { runStep } from "../../src/core/checkers/runStep.js";
+vi.mock("../../src/core/checkers/runStep.js",()=>({runStep:vi.fn()}));
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { buildJsonSchema } from "../../src/core/buildSchema.js";
@@ -103,12 +105,14 @@ describe("catalog 11: cross-feature orchestration and regression", () => {
     const root = canonicalMesh(); write(root, "frontend/d.yml", { services: { owner: { ...healthy, ports: ["3000:3000"] } } });
     expect(() => compileMesh("prod", root)).toThrow(/ports/);
   });
-  it("SYS-018 rejects forbidden Dockerfile EXPOSE during mesh checks", () => {
+  it("SYS-018 propagates Dockerfile EXPOSE contract rejection through mesh checks", () => {
     const root = canonicalMesh(), valid = readFileSync(path.resolve("tests/fixtures/v2/service-basic/Dockerfile"), "utf8");
     write(root, "backend/Dockerfile", valid);
     expect(() => checkDockerfileContract(getBuildJson(`${root}/backend`), `${root}/backend`)).not.toThrow();
     write(root, "backend/Dockerfile", `${valid}\nEXPOSE 3000\n`);
+    vi.mocked(runStep).mockImplementation((_exe,_args,_root,ctx)=>{if(ctx.stepName === "Dockerfile Contract") throw new Error("Dockerfile contract: EXPOSE forbidden");});
     expect(() => checkMesh(root)).toThrow(/Dockerfile|EXPOSE|contract/i);
+    vi.mocked(runStep).mockReset();
   });
   it("SYS-019 uses healthy condition on every Builder lifecycle edge", () => {
     const c = compileMesh("e2e", canonicalMesh());

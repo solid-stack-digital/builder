@@ -29,10 +29,13 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "check": "pnpm typecheck && pnpm test && pnpm check:v2-no-legacy && pnpm build",
+    "check": "pnpm typecheck && pnpm test:conformance",
     "prepublishOnly": "pnpm check:v2-no-legacy && pnpm build && pnpm test && tsx scripts/prepublish-check.ts",
     "check:v2-no-legacy": "tsx scripts/check-no-v1-config-code.ts",
-    "builder": "tsx src/bin.ts"
+    "builder": "tsx src/bin.ts",
+    "test:conformance": "vitest run tests/conformance",
+    "test:docker": "vitest run --config vitest.docker.config.ts",
+    "check:full": "pnpm check && pnpm test && pnpm check:v2-no-legacy && pnpm build && pnpm test:docker"
   },
   "keywords": [
     "solid-stack",
