@@ -1,5 +1,6 @@
 import pc from "picocolors";
 import { parse } from "yaml";
+import { checkHostPortCollisions, extractHostPorts } from "../../utils/checkPortCollision.js";
 import { redactYamlSecrets } from "../../utils/redactSecrets.js";
 import { clearRunState, writeRunState } from "../../utils/runState.js";
 import { compileEnvironment } from "../compileEnvironment.js";
@@ -30,6 +31,8 @@ export const runTestUnit = async (options: RunOptions): Promise<number> => {
     console.log(pc.green("[DRY-RUN] Unit tests simulated. Compose was not started."));
     return 0;
   }
+
+  await checkHostPortCollisions(extractHostPorts(finalYamlConfig));
 
   // Stale-project cleanup before up (quietly)
   await teardownCompose(finalYamlConfig, options.projectDir, {

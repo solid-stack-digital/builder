@@ -1,0 +1,7 @@
+import type { Environment } from "../../types/index.js";
+import type { EffectiveBuildConfig, ResolvedEndpoint } from "../config/types.js";
+export interface ComposeService { [key:string]:unknown; build?:unknown; image?:string; command?:unknown; entrypoint?:unknown; environment?:Record<string,string>|string[]; env_file?:unknown; ports?:unknown[]; networks?:unknown; depends_on?:unknown; healthcheck?:unknown; volumes?:unknown[]; configs?:unknown; secrets?:unknown; links?:unknown[]; volumes_from?:unknown[]; network_mode?:string; privileged?:boolean; container_name?:string; }
+export interface ComposeDocument { name?:string; services:Record<string,ComposeService>; volumes?:Record<string,unknown>; networks?:Record<string,unknown>; configs?:Record<string,unknown>; secrets?:Record<string,unknown>; [key:string]:unknown; }
+export interface MaterializedDependency {key:string;composePath:string;compose:ComposeDocument;serviceNameMap:Map<string,string>;endpointOwnerMap:Map<string,string>;endpointOwners:Set<string>;endpoints:Record<string,ResolvedEndpoint>;}
+export interface ServiceExecutionProfile {configStage:Environment;appTarget:"dev"|"test"|"prod";runtimeStage:Environment;integrated:boolean;includeTester:boolean;testerTarget?:"test-e2e";}
+export interface CompiledServiceComposition {compose:ComposeDocument;effectiveBuild:EffectiveBuildConfig;endpoints:{app:Record<string,ResolvedEndpoint>;dependencies:Record<string,Record<string,ResolvedEndpoint>>};projectName:string;testerServiceName?:string;}

@@ -1,5 +1,5 @@
 import net from "node:net";
-import pc from "picocolors";
+import { ScriptError } from "../errors/ScriptError.js";
 import { parse } from "yaml";
 
 export function extractHostPorts(yamlConfig: string): number[] {
@@ -51,11 +51,7 @@ export async function checkHostPortCollisions(ports: number[]): Promise<void> {
     if (port > 0 && port < 65536) {
       const inUse = await isPortInUse(port);
       if (inUse) {
-        console.warn(
-          pc.yellow(
-            `\n⚠️ Host Port Conflict Warning: Port ${port} is already in use on the host (e.g. by another running stage or process). Docker Compose may fail to bind to this port.\n`
-          )
-        );
+        throw new ScriptError(`Host port ${port} is already in use. Builder does not remap fixed public ports.`);
       }
     }
   }

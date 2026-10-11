@@ -1,11 +1,12 @@
-services: 
-  tester:
-    build: 
-      context: .
-      target: test-e2e
-    network_mode: "host"
+services:
+  app:
+    build:
+      target: prod
     env_file:
       - path: .env.e2e
         required: false
-    environment: 
-      - API_URL=http://localhost:${PUBLIC_PORT:-3000}
+  tester:
+    build:
+      context: .
+      target: test-e2e
+    network_mode: host
