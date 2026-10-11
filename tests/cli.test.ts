@@ -62,14 +62,16 @@ describe("CLI parser and command handlers", () => {
     expect(exitCode).toBe(0);
   });
 
-  it("handles service up dev with --integrated flag in dry-run", async () => {
-    const exitCode = await handleServiceUp("dev", {
-      projectDir: EXAMPLE_BACKEND_DIR,
-      dryRun: true,
-      skipChecks: true,
-      integrated: true,
-    });
-    expect(exitCode).toBe(0);
+  it("rejects the removed integrated option at the parser", async () => {
+    const cli = createCli();
+    await expect(cli.parseAsync(["node","builder","service","up","dev","--integrated"])).rejects.toMatchObject({code:"commander.unknownOption"});
+  });
+
+  it("does not register the removed integrated option", () => {
+    const cli = createCli();
+    const service = cli.commands.find(c => c.name() === "service");
+    const up = service?.commands.find(c => c.name() === "up");
+    expect(up?.options.some(o => o.long === "--integrated")).toBe(false);
   });
 
   it("rejects unknown stage", async () => {

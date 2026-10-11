@@ -1,0 +1,9 @@
+services:
+  helper:
+    image: busybox:1.36
+    command: ["true"]
+  runner:
+    image: busybox:1.36
+    depends_on:
+      - helper
+    command: ["true"]

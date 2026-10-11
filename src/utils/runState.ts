@@ -4,6 +4,7 @@ import { getMeshJson } from "../core/mesh/getMeshJson.js";
 import { getBuildJson } from "./getBuildJson.js";
 import { resolveProjectDir } from "./paths.js";
 import { deriveProjectName } from "./projectName.js";
+import { resolveMeshStage } from "../core/config/resolveMeshStage.js";
 
 export interface RunState {
   projectName: string;
@@ -103,12 +104,11 @@ export function projectNamesForMeshStage(
 ): string[] {
   const absDir = resolveProjectDir(meshDir);
   let rawMeshName: string;
-  let services: Record<string, { path: string }> = {};
-
+  let serviceNames: string[] = [];
   try {
     const mesh = getMeshJson(absDir);
     rawMeshName = mesh.name || path.basename(absDir);
-    services = mesh.services || {};
+    serviceNames = Object.keys(resolveMeshStage(mesh,"test",path.join(absDir,"mesh.json")).services);
   } catch {
     rawMeshName = path.basename(absDir);
   }
@@ -124,19 +124,10 @@ export function projectNamesForMeshStage(
     return [deriveProjectName(rawMeshName, "e2e")];
   }
   if (s === "test-unit") {
-    return Object.values(services).map((svc) => {
-      const svcDir = path.resolve(absDir, svc.path);
-      return projectNamesForServiceStage(svcDir, "test-unit")[0]!;
-    });
+    return serviceNames.map(name => `${deriveProjectName(rawMeshName,"dev")}-${name}-test`);
   }
   if (s === "test") {
-    const list: string[] = [];
-    for (const svc of Object.values(services)) {
-      const svcDir = path.resolve(absDir, svc.path);
-      list.push(...projectNamesForServiceStage(svcDir, "test"));
-    }
-    list.push(deriveProjectName(rawMeshName, "e2e"));
-    return Array.from(new Set(list));
+    return [...serviceNames.map(name => `${deriveProjectName(rawMeshName,"dev")}-${name}-test`),deriveProjectName(rawMeshName,"e2e")];
   }
   return [deriveProjectName(rawMeshName, s)];
 }

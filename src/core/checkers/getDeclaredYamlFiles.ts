@@ -5,49 +5,24 @@ export interface DeclaredYamlFile {
   relativePath: string;
   absolutePath: string;
   source: string;
+  stage?: "dev" | "prod" | "test" | "e2e";
+  kind: "dependency-compose" | "override-compose";
 }
 
-export function getDeclaredYamlFiles(
-  buildJson: BuildJson,
-  projectDir: string
-): DeclaredYamlFile[] {
+export function getDeclaredYamlFiles(build: BuildJson, projectDir: string): DeclaredYamlFile[] {
   const files: DeclaredYamlFile[] = [];
   const seen = new Set<string>();
-
-  const addFile = (relPath: string, source: string) => {
-    const normalized = path.normalize(relPath);
-    if (seen.has(normalized)) return;
-    seen.add(normalized);
-    files.push({
-      relativePath: relPath,
-      absolutePath: path.resolve(projectDir, relPath),
-      source,
-    });
+  const add = (relativePath: string, source: string, kind: DeclaredYamlFile["kind"], stage?: DeclaredYamlFile["stage"]) => {
+    const absolutePath = path.resolve(projectDir, relativePath);
+    if (seen.has(absolutePath)) return;
+    seen.add(absolutePath);
+    files.push({ relativePath, absolutePath, source, kind, ...(stage ? {stage} : {}) });
   };
-
-  if (buildJson.dependencies && typeof buildJson.dependencies === "object") {
-    for (const [depName, dep] of Object.entries(buildJson.dependencies)) {
-      if (dep && typeof dep === "object" && typeof dep.path === "string") {
-        addFile(dep.path, `dependency "${depName}"`);
-      }
-    }
+  for (const [name, dep] of Object.entries(build.dependencies ?? {})) add(dep.compose, `dependencies.${name}.compose`, "dependency-compose");
+  for (const stage of ["dev", "prod", "test", "e2e"] as const) {
+    const overlay = build[stage];
+    if (overlay?.["override-compose"]) add(overlay["override-compose"], `${stage}.override-compose`, "override-compose", stage);
+    for (const [name, dep] of Object.entries(overlay?.dependencies ?? {})) if (dep.compose) add(dep.compose, `${stage}.dependencies.${name}.compose`, "dependency-compose", stage);
   }
-
-  if (buildJson.overrides && typeof buildJson.overrides === "object") {
-    for (const [stage, ovr] of Object.entries(buildJson.overrides)) {
-      if (ovr && typeof ovr === "object" && typeof ovr.path === "string") {
-        addFile(ovr.path, `override "${stage}"`);
-      }
-    }
-  }
-
-  if (Array.isArray(buildJson.composeFiles)) {
-    for (const item of buildJson.composeFiles) {
-      if (typeof item === "string") {
-        addFile(item, "composeFiles");
-      }
-    }
-  }
-
   return files;
 }

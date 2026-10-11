@@ -2,45 +2,67 @@
   "name": "fullstack",
   "services": {
     "filesystem": {
-      "path": "./services/filesystem"
+      "path": "./services/filesystem",
+      "publish": [
+        "app.endpoints.http"
+      ]
     },
     "mailer": {
-      "path": "./services/mailer"
+      "path": "./services/mailer",
+      "publish": [
+        "app.endpoints.http"
+      ]
     },
     "backend": {
       "path": "./services/backend",
-      "provideDependency": {
+      "dependencies": {
         "filesystem": "filesystem",
         "mailer": "mailer"
       },
-      "envOverrides": {
-        "FILESYSTEM_URL": "${filesystem.network_url}",
-        "MAILER_URL": "${mailer.network_url}"
-      }
+      "env": {
+        "FILESYSTEM_URL": "${filesystem.app.endpoints.http.network_url}",
+        "MAILER_URL": "${mailer.app.endpoints.http.network_url}"
+      },
+      "publish": [
+        "app.endpoints.http"
+      ]
     },
     "frontend": {
       "path": "./services/frontend",
-      "provideDependency": {
+      "dependencies": {
         "backend": "backend"
       },
-      "envOverrides": {
-        "BACKEND_URL": "${gateway.public_url}/api"
-      }
+      "env": {
+        "BACKEND_URL": "${backend.app.endpoints.http.network_url}"
+      },
+      "publish": [
+        "app.endpoints.http"
+      ]
     },
     "gateway": {
       "path": "./services/gateway",
-      "port": 3000,
-      "provideDependency": {
+      "dependencies": {
         "frontend": "frontend",
         "backend": "backend"
       },
-      "envOverrides": {
-        "FRONTEND_URL": "${frontend.network_url}",
-        "BACKEND_URL": "${backend.network_url}"
-      }
+      "env": {
+        "FRONTEND_URL": "${frontend.app.endpoints.http.network_url}",
+        "BACKEND_URL": "${backend.app.endpoints.http.network_url}"
+      },
+      "publish": [
+        "app.endpoints.http"
+      ]
     }
   },
   "tester": {
-    "path": "./e2e"
+    "compose": "./e2e/docker-compose.yml",
+    "service": "global-e2e",
+    "env": {
+      "FILESYSTEM_URL": "${filesystem.app.endpoints.http.public_url}",
+      "MAILER_URL": "${mailer.app.endpoints.http.public_url}",
+      "BACKEND_URL": "${backend.app.endpoints.http.public_url}",
+      "FRONTEND_URL": "${frontend.app.endpoints.http.public_url}",
+      "GATEWAY_URL": "${gateway.app.endpoints.http.public_url}"
+    }
   }
 }

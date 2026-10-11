@@ -1,0 +1,21 @@
+{
+  "name": "fixture-basic",
+  "app": {
+    "env": {
+      "SELF_URL": "${app.endpoints.http.network_url}"
+    },
+    "endpoints": {
+      "http": {
+        "port": 3000,
+        "publicPort": "AUTO",
+        "primary": true,
+        "scheme": "http"
+      }
+    }
+  },
+  "tester": {
+    "env": {
+      "API_URL": "${app.endpoints.http.public_url}"
+    }
+  }
+}

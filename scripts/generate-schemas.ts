@@ -11,7 +11,7 @@ if (!fs.existsSync(outputDir)) {
 
 // 1. Generate mesh.json schema
 const meshJsonSchema = zodToJsonSchema(meshSchema, {
-  name: "MeshConfig",
+  name: "MeshJsonV2",
   $refStrategy: "none",
 });
 
@@ -22,7 +22,7 @@ fs.writeFileSync(
 
 // 2. Generate build.json schema
 const buildSchemaOutput = zodToJsonSchema(buildJsonSchema, {
-  name: "BuildJson",
+  name: "BuildJsonV2",
   $refStrategy: "none",
 });
 

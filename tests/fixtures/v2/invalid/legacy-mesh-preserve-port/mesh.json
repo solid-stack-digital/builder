@@ -1,0 +1,8 @@
+{
+  "services": {
+    "api": {
+      "path": "./app",
+      "preservePort": true
+    }
+  }
+}

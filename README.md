@@ -1,228 +1,87 @@
-# @solid-stack/builder
+# Solid Stack Builder
 
-The official build system, test runner, and Docker orchestrator CLI for Solid Stack services.
+Builder compiles V2 `build.json` service projects and `mesh.json` service meshes into Docker Compose. Endpoint ports, dependency ownership, health gating, and stage overlays are declared in JSON; Builder generates the Compose publication and lifecycle wiring.
 
-## Installation
-
-### Global Installation (CLI tool)
-
-Install globally using `pnpm` (or `npm`):
-
-```bash
-pnpm add -g @solid-stack/builder
-```
-
-Once installed globally, the CLI tool is available directly as `builder`:
-
-```bash
-builder --version
-builder --help
-```
-
-### Local / Project Installation
-
-When developing within a project or monorepo, add `@solid-stack/builder` to your dependencies (or link to local source during development via `"@solid-stack/builder": "link:../../builder"`), and run commands via `pnpm`:
-
-```bash
-# Add script in package.json: "builder": "builder"
-pnpm builder service up dev
-# or via pnpm exec
-pnpm exec builder service up dev
-```
-
----
-
-## 🚀 CLI Commands
-
-### 1. Development Mode (`builder service up dev`)
-
-Spins up the isolated development environment with hot-reloading:
-
-```bash
-builder service up dev
-```
-
-- Performs Dockerfile linting (`hadolint`) and OPA policy contract validation (`conftest`)
-- Merges `docker-compose.base.yml`, `docker-compose.dev.yml`, `.env.dev`, and any overrides defined in `build.json`
-- Mounts source code with hot-reloading enabled
-
-#### Full Development Mode (`builder service up dev --full`)
-
-Spins up the development environment with hot-reloading while connecting to all declared mock dependencies and setting `INFRA_MODE=integrated`:
-
-```bash
-builder service up dev --full
-# Or alias:
-builder service up dev --integrated
-```
-
-### 2. Production Mode (`builder service up prod`)
-
-Spins up the production runtime with integrated local mocks:
-
-```bash
-builder service up prod
-```
-
-- Validates infrastructure and contract compliance
-- Merges production compose definitions with mock dependencies (e.g., wiremock, databases)
-- Sets up inter-service health checks (`service_healthy` conditions)
-
-### 3. Test Suites (`builder service up test`)
-
-Runs the full end-to-end test pipeline:
-
-```bash
-builder service up test
-```
-
-- Stage 1: Runs isolated unit tests (`pnpm test` in test container)
-- Stage 2: If unit tests pass, boots dependencies, app, and tester containers for integration/E2E assertions (`pnpm test:e2e`)
-- Automatically cleans up and tears down containers upon completion
-
-#### Targeting specific test stages
-
-```bash
-# Run only unit tests
-builder service up test --unit
-# Or shorthand:
-builder service up test-unit
-
-# Run only E2E integration tests
-builder service up test --e2e
-# Or shorthand:
-builder service up test-e2e
-```
-
----
-
-### Export the application environment (`builder service export env [stage]`)
-
-```bash
-# Export all four stages into the service directory
-builder service export env
-
-# Export one stage only
-builder service export env dev
-builder service export env prod
-builder service export env test
-builder service export env e2e -C ./services/backend
-
-# Match full/integrated development mode
-builder service export env dev --full
-```
-
-The default output names are `.env.dev`, `.env.prod`, `.env.test`, and `.env.e2e`. These are also the stage input files used by Builder, so existing files require explicit confirmation before replacement. If an output file exists, Builder asks whether to overwrite it. Declining prompts for a new filename relative to the service directory; an existing replacement filename also requires confirmation. Existing files require an interactive terminal.
-
-Exports use the same stage compilation as service startup, including Compose environment files, overrides, Builder URL templates, and `build.json.envOverrides`. All requested stages are compiled before any files are written. Only the application service's resolved runtime environment is exported, not build arguments, dependencies, or tester settings. E2E runs the application using the production configuration, so `.env.e2e` reflects that app environment plus any E2E app overrides; it does not merge the tester's `.env.e2e` into the app.
-
-The command requires Docker Compose 2.24 or newer, but does not require a running Docker daemon or start/build containers. Image-only `ENV` defaults and values added by application startup code cannot be determined by configuration simulation and are outside the export. New files use owner-only permissions and contain the actual values. Values follow [Compose dotenv quoting rules](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/) to preserve literal dollars and multiline strings.
-
-## 🛠️ Options
-
-| Flag | Description |
-|---|---|
-| `--dry-run` | Preview the merged Docker Compose YAML configuration without starting containers |
-| `--debug` | Print the final merged Docker Compose YAML before launching |
-| `--skip-check` | Skip hadolint and conftest infrastructure validation |
-| `-d, --detach` | Run Docker Compose in detached mode (background) |
-| `-C, --project-dir <path>` | Specify target service directory (defaults to current working directory) |
-| `--unit` | For `test`, run only unit test stage |
-| `--e2e` | For `test`, run only e2e test stage |
-| `--full` | For `dev`, spin up with mock dependencies and `INFRA_MODE=integrated` |
-| `--integrated` | Alias for `--full` |
-
----
-
-## ⚙️ Configuration (`build.json`)
-
-Each service configures its dependencies and overrides via `build.json` in its project root:
+## Service configuration
 
 ```json
 {
-  "name": "backend",
-  "dependencies": {
-    "filesystem": {
-      "path": ".docker/mocks/docker-compose.filesystem.yml",
-      "service": "mock-filesystem"
+  "name": "api",
+  "app": {
+    "env": { "DATABASE_HOST": "${dependencies.database.endpoints.tcp.network_host}" },
+    "endpoints": {
+      "http": { "port": 3000, "publicPort": "AUTO", "primary": true, "scheme": "http" }
     }
   },
-  "overrides": {
-    "dev": {
-      "path": ".docker/overrides/docker-compose.dev.override.yml"
-    },
-    "test": {
-      "path": ".docker/overrides/docker-compose.test.override.yml"
-    },
-    "prod": {
-      "path": ".docker/overrides/docker-compose.prod.override.yml"
-    },
-    "e2e": {
-      "path": ".docker/overrides/docker-compose.e2e.override.yml"
+  "dependencies": {
+    "database": {
+      "compose": "./compose/database.yml",
+      "endpoints": {
+        "tcp": { "service": "postgres", "port": 5432, "primary": true }
+      }
     }
+  },
+  "tester": {
+    "env": { "API_URL": "${app.endpoints.http.public_url}" }
   }
 }
 ```
 
+The `app` primary endpoint sets the container's `PORT`. Builder owns `PORT`, `EXEC_MODE`, and `INFRA_MODE`; do not define them in app environment files. Host access is declared with endpoint `publicPort`, either a fixed integer or `"AUTO"`. Dependency Compose files keep their own service definitions and healthchecks, but must not publish raw host ports. A dependency with no endpoints is inert.
 
-### Dependency host ports
+Stage overlays are named `dev`, `prod`, `test`, and `e2e`. Each can add or change app environment, endpoints, dependencies, and `override-compose`. E2E reads its own overlay and runs the app's `prod` Dockerfile target with `EXEC_MODE=e2e`.
 
-`dependencies.<name>.port` exposes the primary local interface. A number such as
-`9000` maps host port 9000 to container port 3000. An explicit value such as
-`"9000:8080"` maps those ports exactly.
+```bash
+builder check -C ./services/api
+builder service up dev -C ./services/api
+builder service up dev --full -C ./services/api
+builder service up prod -C ./services/api
+builder service up test-unit -C ./services/api
+builder service up test-e2e -C ./services/api
+builder service up test -C ./services/api
+builder service export env dev --full -C ./services/api
+builder service down dev -C ./services/api
+```
 
-`dependencies.<name>.ports` exposes additional developer interfaces. Each entry
-must be an explicit `HOST_PORT:CONTAINER_PORT` mapping:
+`dev` and `test-unit` are isolated by default. `dev --full` and `prod` include local endpoint dependencies. `test` runs unit tests followed by E2E and stops if the unit phase fails. `--dry-run` compiles and validates without starting containers; `--skip-checks` skips the Dockerfile lint and contract preflight where supported.
+
+## Mesh configuration
 
 ```json
 {
-  "dependencies": {
-    "tooling": {
-      "path": "./tooling.compose.yml",
-      "service": "tooling",
-      "port": "4080:4000",
-      "ports": ["8080:8080", "9150:9150"]
+  "name": "system",
+  "services": {
+    "database": { "path": "./services/database" },
+    "api": {
+      "path": "./services/api",
+      "dependencies": { "database": "database" },
+      "publish": ["app.endpoints.http"]
     }
+  },
+  "tester": {
+    "compose": "./e2e/docker-compose.yml",
+    "service": "runner",
+    "env": { "API_URL": "${api.app.endpoints.http.public_url}" }
   }
 }
 ```
 
-Auxiliary ports affect only host exposure; they do not change `.network_url` or
-`.public_url` template values. Builder uses only ports declared in `build.json`
-for local dependency host exposure, even if the mock Compose file declares ports.
-This keeps the application service contract predictable while allowing explicit
-interfaces for developer tooling. Static host port collisions fail compilation.
+Mesh service keys are authoritative identities. Bindings replace a service's logical dependency with a top-level provider. `publish` explicitly selects host-visible endpoints. Mesh `dev`, `prod`, `test`, and `e2e` overlays can add services and adjust bindings, environment, lifecycle, and publication. The root tester selects one exact Compose service; Builder places that runner on the host network and gates it on all top-level app healthchecks.
 
-In mesh compilation, runtime environment and build args use this precedence:
-Builder defaults, then service stage overrides, then service `build.json.envOverrides`,
-then mesh service `envOverrides`.
-
----
-
-## 💻 Programmatic Usage
-
-You can also import `@solid-stack/builder` inside Node.js or TypeScript code:
-
-```typescript
-import {
-  compileEnvironment,
-  getBuildJson,
-  checkInfra,
-  handleServiceUp,
-} from "@solid-stack/builder";
-
-// Compile Docker Compose YAML for a specific environment
-const devYaml = compileEnvironment("dev", "/path/to/service");
-
-// Boot an environment programmatically
-await handleServiceUp("dev", {
-  projectDir: "/path/to/service",
-  skipCheck: false,
-});
+```bash
+builder mesh check -C ./system
+builder mesh up dev -C ./system
+builder mesh up prod -C ./system
+builder mesh up test-unit -C ./system
+builder mesh up test-e2e -C ./system
+builder mesh up test -C ./system
+builder mesh down test -C ./system
 ```
 
----
+`mesh test` runs per-service isolated unit tests followed by global E2E. Global E2E requires root `tester`; ordinary `mesh check` can validate dev, prod, and test without one.
 
-## 📄 License
+## Contracts and reference
 
-UNLICENSED © Solid Stack Digital
+Application Dockerfiles require `dev`, `test`, `test-e2e`, and `prod` targets. `dev` and `prod` need Docker healthchecks, and `prod` needs an artifact `COPY --from=...`. Builder's packaged Conftest policy enforces these rules. Endpoint-bearing service Dockerfiles should probe the injected `PORT` dynamically.
+
+The full configuration and reference grammar are documented in [BUILD_JSON_DOCS.md](docs/BUILD_JSON_DOCS.md), [MESH_JSON_DOCS.md](docs/MESH_JSON_DOCS.md), and [SPECS_V2.md](docs/SPECS_V2.md). Published JSON Schemas are [build-schema.json](schemas/build-schema.json) and [mesh-schema.json](schemas/mesh-schema.json).

@@ -1,63 +1,36 @@
-import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import pc from "picocolors";
-import { ScriptError } from "../../../errors/ScriptError.js";
-import { isPathInside, resolveProjectDir } from "../../../utils/paths.js";
+import { ConfigError } from "../../../errors/ConfigError.js";
+import { resolveProjectDir } from "../../../utils/paths.js";
+import { resolveMeshStage } from "../../config/resolveMeshStage.js";
+import { compileServiceComposition } from "../../composition/compileServiceComposition.js";
 import { checkInfra } from "../../checkers/checkInfra.js";
+import { compileMeshComposition } from "../v2/compileMeshComposition.js";
+import { loadEffectiveMeshServices } from "../v2/loadMeshServices.js";
+import { resolveMeshEnvMap,resolveServiceBuildEnvThroughMesh,type MeshReferenceContext } from "../v2/meshReferences.js";
+import type { MeshEndpointRegistry } from "../v2/types.js";
 import type { MeshConfig } from "../types.js";
 
-export function checkMeshServices(
-  mesh: MeshConfig,
-  meshDir: string = process.cwd()
-): void {
-  const absMeshDir = resolveProjectDir(meshDir);
-  const serviceNames = Object.keys(mesh.services);
-
-  console.log(
-    pc.bold(
-      pc.cyan(
-        `\n🔍 Checking Mesh Services (${serviceNames.length} service${
-          serviceNames.length === 1 ? "" : "s"
-        })...`
-      )
-    )
-  );
-
-  for (const serviceName of serviceNames) {
-    const serviceConfig = mesh.services[serviceName];
-    if (!serviceConfig) {
-      throw new ScriptError(`Service "${serviceName}" configuration is missing.`);
+export function checkMeshServices(mesh: MeshConfig, meshDir: string): void {
+  const root = resolveProjectDir(meshDir), meshPath = path.join(root,"mesh.json");
+  const checked = new Set<string>();
+  for (const stage of ["dev","prod","test","e2e"] as const) {
+    const effective = resolveMeshStage(mesh,stage,meshPath);
+    const services = loadEffectiveMeshServices(root,effective,stage);
+    for (const [name,svc] of Object.entries(services)) {
+      if (!checked.has(svc.absolutePath)) { console.log(pc.cyan(`\n🔍 Checking mesh service ${name}...`)); checkInfra(svc.absolutePath); checked.add(svc.absolutePath); }
+      if (stage === "test") {
+        const fragment = compileServiceComposition("test",svc.absolutePath,{validationMode:true,meshMode:true,deferReferenceResolution:true});
+        const endpoints:MeshEndpointRegistry={app:{[name]:fragment.endpoints.app},dependencies:{[name]:fragment.endpoints.dependencies}};
+        const ctx:MeshReferenceContext={services:{[name]:svc},bindings:new Map(),endpoints,stage:"test",meshJsonPath:meshPath};
+        for (const key of ["EXEC_MODE","INFRA_MODE",...(Object.values(svc.effectiveBuild.app.endpoints).some(ep=>ep.primary)?["PORT"]:[])]) {
+          if (key in svc.meshEnv) throw new ConfigError({sourceFile:meshPath,configPath:`services.${name}.env.${key}`,stage:"test",composition:"mesh",reason:"Mesh service env cannot set Builder-owned environment"});
+        }
+        resolveServiceBuildEnvThroughMesh(name,fragment.builderAppEnvironment??{},ctx,`services.${name}.app.env`);
+        for (const [depName,depEnv] of Object.entries(fragment.dependencyEnvironments??{})) resolveServiceBuildEnvThroughMesh(name,depEnv,ctx,`services.${name}.dependencies.${depName}.env`);
+        resolveMeshEnvMap(svc.meshEnv,ctx,`services.${name}.env`);
+      }
     }
-    const serviceDir = path.resolve(absMeshDir, serviceConfig.path);
-
-    if (!isPathInside(absMeshDir, serviceDir)) {
-      throw new ScriptError(
-        `Security error: Service "${serviceName}" directory escapes the mesh directory: ${serviceDir}`
-      );
-    }
-
-    if (!existsSync(serviceDir)) {
-      throw new ScriptError(
-        `Service "${serviceName}" directory does not exist: ${serviceDir} (declared path: "${serviceConfig.path}")`
-      );
-    }
-
-    if (!statSync(serviceDir).isDirectory()) {
-      throw new ScriptError(
-        `Service "${serviceName}" path is not a directory: ${serviceDir}`
-      );
-    }
-
-    const buildJsonPath = path.resolve(serviceDir, "build.json");
-    if (!existsSync(buildJsonPath)) {
-      throw new ScriptError(
-        `Service "${serviceName}" is missing a valid build.json at: ${buildJsonPath}`
-      );
-    }
-
-    console.log(
-      pc.bold(pc.blue(`\n--- Validating Infrastructure for [${serviceName}] ---`))
-    );
-    checkInfra(serviceDir);
+    if (stage !== "test") compileMeshComposition(stage,root,{validationMode:true,allowMissingTester:true});
   }
 }

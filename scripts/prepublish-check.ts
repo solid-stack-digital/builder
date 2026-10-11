@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -41,7 +41,6 @@ const requiredTemplates = [
   "docker-compose.prod.yml",
   "docker-compose.test.yml",
   "docker-compose.e2e.yml",
-  "docker-compose.standalone.yml",
 ];
 
 const templatesDockerDir = path.resolve(rootDir, "templates", "docker");
@@ -53,10 +52,24 @@ for (const tmpl of requiredTemplates) {
   }
 }
 
-// 5. Inspect npm pack --dry-run
+for (const required of ["templates/policy/dockerfile/dockerfile.rego", "schemas/build-schema.json", "schemas/mesh-schema.json"]) {
+  if (!fs.existsSync(path.join(rootDir, required))) { console.error(`❌ Required package file missing: ${required}`); process.exit(1); }
+}
+
+// 5. Inspect the actual package file list.
 try {
-  console.log("📦 Checking npm pack --dry-run...");
-  execSync("pnpm pack --dry-run", { stdio: "inherit" });
+  console.log("📦 Checking pnpm pack --dry-run...");
+  const output = execFileSync("pnpm", ["pack", "--dry-run"], { cwd: rootDir, encoding: "utf8" });
+  const files = new Set(output.split(/\r?\n/).map(line => line.trim()));
+  const required = [
+    "dist/index.js", "dist/bin.js",
+    ...requiredTemplates.map(name => `templates/docker/${name}`),
+    "templates/policy/dockerfile/dockerfile.rego",
+    "schemas/build-schema.json", "schemas/mesh-schema.json",
+  ];
+  for (const file of required) {
+    if (!files.has(file)) { console.error(`❌ Package is missing ${file}`); process.exit(1); }
+  }
 } catch (err: unknown) {
   console.error("❌ 'pnpm pack --dry-run' failed:", err);
   process.exit(1);

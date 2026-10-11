@@ -1,22 +1,26 @@
 {
-  "services": { 
+  "services": {
     "auth-api": {
-      "path": "./services/auth-api", 
-      "provideDependency": {},
-      "envOverrides": {}
+      "path": "./services/auth-api"
     },
     "backend": {
       "path": "./services/backend",
-      "port": 3000,
-      "provideDependency": {
+      "dependencies": {
         "auth-api": "auth-api"
       },
-      "envOverrides": {
-        "AUTH_API_URL": "http://auth-api:3000"
-      }
-    } 
+      "env": {
+        "AUTH_API_URL": "${auth-api.app.endpoints.http.network_url}"
+      },
+      "publish": [
+        "app.endpoints.http"
+      ]
+    }
   },
   "tester": {
-    "path": "./e2e"
+    "compose": "./e2e/docker-compose.yml",
+    "service": "global-e2e",
+    "env": {
+      "BACKEND_URL": "${backend.app.endpoints.http.public_url}"
+    }
   }
 }

@@ -1,0 +1,64 @@
+package main
+
+import rego.v1
+
+# Conftest supplies Dockerfile instructions in source order.
+from_indices := {i | some i; input[i].Cmd == "from"}
+alias_at[i] := lower(input[i].Value[count(input[i].Value)-1]) if {
+  i in from_indices
+  value := input[i].Value
+  count(value) >= 3
+  lower(value[count(value)-2]) == "as"
+}
+stages := {a | a := alias_at[_]}
+stage_alias[n] := alias_at[i] if { some i; n := input[i].Stage; alias_at[i] }
+stage_at[i] := stage_alias[input[i].Stage] if { some i; _ := input[i] }
+parent[a] := lower(input[i].Value[0]) if {
+  some i
+  a := alias_at[i]
+  lower(input[i].Value[0]) in stages
+}
+edges := {a: neighbors | some i; a := alias_at[i]; neighbors := [p | p := parent[a]]}
+lineage[a] := graph.reachable(edges, {a}) | {a} if { some i; a := alias_at[i] }
+commands[a] := {i | some i; stage_at[i] in lineage[a]; input[i].Cmd == "cmd"} if { some j; a := alias_at[j] }
+healthchecks[a] := {i | some i; stage_at[i] in lineage[a]; input[i].Cmd == "healthcheck"; lower(concat(" ", input[i].Value)) != "none"} if { some j; a := alias_at[j] }
+artifact_copies[a] := {i | some i; stage_at[i] in lineage[a]; input[i].Cmd == "copy"; startswith(lower(input[i].Flags[_]), "--from=")} if { some j; a := alias_at[j] }
+
+deny contains msg if {
+  missing := {"dev", "test", "test-e2e", "prod"} - stages
+  count(missing) > 0
+  msg := sprintf("Missing required Dockerfile stages: %v", [missing])
+}
+deny contains "Hardcoded EXPOSE is forbidden; Builder owns endpoint publication" if { some i; input[i].Cmd == "expose" }
+deny contains "dev stage requires a default CMD" if { "dev" in stages; count(commands.dev) == 0 }
+deny contains "dev stage requires a valid HEALTHCHECK" if { "dev" in stages; count(healthchecks.dev) == 0 }
+deny contains "prod stage requires a valid HEALTHCHECK" if { "prod" in stages; count(healthchecks.prod) == 0 }
+deny contains "prod stage requires COPY --from= artifact isolation" if { "prod" in stages; count(artifact_copies.prod) == 0 }
+deny contains msg if {
+  some i
+  a := alias_at[i]
+  p := parent[a]
+  a in lineage[p]
+  msg := sprintf("Dockerfile stage inheritance cycle at %s", [a])
+}
+deny contains msg if {
+  some i
+  input[i].Cmd == "cmd"
+  command := lower(concat(" ", input[i].Value))
+  regex.match("(^|[ ;])nohup[ ;]|&[[:space:]]*$|pm2[[:space:]]+start.*--daemon|nginx(.*[[:space:]])?-g[[:space:]]*['\"]?daemon[[:space:]]+on", command)
+  msg := sprintf("Runtime CMD must remain in foreground (instruction %v)", [i])
+}
+deny contains msg if {
+  some i
+  input[i].Cmd == "healthcheck"
+  lower(concat(" ", input[i].Value)) == "none"
+  msg := sprintf("HEALTHCHECK NONE is forbidden (instruction %v)", [i])
+}
+deny contains msg if {
+  some i
+  input[i].Cmd == "cmd"
+  command := lower(concat(" ", input[i].Value))
+  regex.match("(^|[ ;])nginx([ ;]|$)", command)
+  not contains(command, "daemon off")
+  msg := sprintf("nginx CMD must use daemon off (instruction %v)", [i])
+}

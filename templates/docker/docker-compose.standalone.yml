@@ -1,5 +1,0 @@
-services:
-  app:
-    ports:
-      - "${PUBLIC_PORT:-3000}:${PORT:-3000}"
-

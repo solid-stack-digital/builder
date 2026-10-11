@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import pc from "picocolors";
 import { ScriptError } from "../../errors/ScriptError.js";
+import { ConfigError } from "../../errors/ConfigError.js";
 import type { BuildJson } from "../../types/index.js";
 import { isPathInside } from "../../utils/paths.js";
 import { HADOLINT_IMAGE } from "./constants.js";
@@ -18,15 +19,7 @@ export function checkDockerfile(buildJson: BuildJson, projectDir: string): void 
   }
 
   if (!existsSync(dockerfilePath)) {
-    if (buildJson.dockerfile) {
-      throw new ScriptError(
-        `Dockerfile declared in build.json not found at: ${dockerfilePath}`
-      );
-    }
-    console.log(
-      pc.yellow(`⚠️  No ${dockerfileRel} found in project directory. Skipping Dockerfile checks.`)
-    );
-    return;
+    throw new ConfigError({sourceFile:path.join(projectDir,"build.json"),configPath:"dockerfile",value:dockerfileRel,composition:"service",reason:`Application Dockerfile not found at ${dockerfilePath}`});
   }
 
   const content = readFileSync(dockerfilePath, "utf-8");

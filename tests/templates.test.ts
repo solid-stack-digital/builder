@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
-import { getDockerComposeTemplate, getTemplatesDir } from "../src/core/templates.js";
+import { getDockerComposeTemplate, getTemplatesDir, getDockerfilePolicyDir } from "../src/core/templates.js";
 
 describe("templates resolution", () => {
   it("resolves the templates directory", () => {
@@ -25,8 +25,13 @@ describe("templates resolution", () => {
     const e2e = getDockerComposeTemplate("docker-compose.e2e.yml");
     expect(fs.existsSync(e2e)).toBe(true);
 
-    const standalone = getDockerComposeTemplate("docker-compose.standalone.yml");
-    expect(fs.existsSync(standalone)).toBe(true);
+    expect(fs.existsSync(`${getDockerfilePolicyDir()}/dockerfile.rego`)).toBe(true);
+    for (const file of [base, dev, prod, test, e2e]) {
+      const content = fs.readFileSync(file,"utf8");
+      expect(content).not.toContain("PUBLIC_PORT");
+      expect(content).not.toMatch(/3000:3000/);
+    }
+    expect(fs.readFileSync(e2e,"utf8")).not.toContain("API_URL");
   });
 
   it("throws for non-existent template", () => {

@@ -63,3 +63,9 @@ export function getDockerComposeTemplate(filename: string): string {
   }
   return filePath;
 }
+
+export function getDockerfilePolicyDir(): string {
+  const policyDir = path.join(getTemplatesDir(), "policy", "dockerfile");
+  if (!fs.existsSync(path.join(policyDir, "dockerfile.rego"))) throw new ScriptError(`Builder Dockerfile policy not found: ${policyDir}`);
+  return policyDir;
+}

@@ -1,0 +1,16 @@
+{
+  "services": {
+    "api": {
+      "path": "./app",
+      "dependsOn": [
+        "other"
+      ]
+    },
+    "other": {
+      "path": "./app",
+      "dependsOn": [
+        "api"
+      ]
+    }
+  }
+}

@@ -28,6 +28,21 @@ describe("global mesh tester", () => {
     expect(c.compose.services["mesh-tester--playwright"]?.environment).toMatchObject({ URL: "http://127.0.0.1:8123" });
     expect((c.compose.services["mesh-tester--playwright"]?.depends_on as any).gateway.condition).toBe("service_healthy");
   });
+  it("rejects host networking on helper services", () => {
+    const root = createMesh(
+      { tester: { compose: "e2e.yml", service: "runner" }, services: { api: { path: "api" } } },
+      { api: { app: { endpoints: { http: { port: 3000, primary: true } } } } },
+      { "e2e.yml": `services:
+  helper:
+    image: busybox
+    network_mode: host
+  runner:
+    image: busybox
+    depends_on: [helper]
+` },
+    );
+    expect(() => compileMeshComposition("e2e", root, {validationMode:true})).toThrow(/Only the selected tester runner/);
+  });
   it("rejects network endpoint references in global tester env", () => {
     const root = createMesh(
       { tester: { compose: "e2e.yml", service: "runner", env: { URL: "${api.app.endpoints.http.network_url}" } }, services: { api: { path: "api" } } },

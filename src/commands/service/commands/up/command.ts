@@ -37,7 +37,10 @@ export const registerUpCommand = (cmd: Command): void => {
   $ builder service up prod
   $ builder service up test
   $ builder service up test-unit
-  $ builder service up test-e2e`
+  $ builder service up test-e2e
+
+JSON overlays: test-unit uses build.json test; test-e2e uses build.json e2e.
+The test command runs unit tests before E2E.`
     )
     .action(
       async (stage: string = "dev", options: Record<string, any> = {}) => {

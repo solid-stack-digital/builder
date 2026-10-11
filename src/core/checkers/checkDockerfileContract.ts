@@ -1,56 +1,19 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import pc from "picocolors";
-import { ScriptError } from "../../errors/ScriptError.js";
+import { ConfigError } from "../../errors/ConfigError.js";
 import type { BuildJson } from "../../types/index.js";
 import { isPathInside, resolveProjectDir } from "../../utils/paths.js";
+import { getDockerfilePolicyDir } from "../templates.js";
 import { CONFTEST_IMAGE } from "./constants.js";
 import { runStep } from "./runStep.js";
 
-export function checkDockerfileContract(
-  buildJson: BuildJson,
-  projectDir: string
-): void {
-  const absProjectDir = resolveProjectDir(projectDir);
-  const dockerfileRel =
-    (buildJson.dockerfile as string | undefined) || "Dockerfile";
-  const dockerfilePath = path.resolve(absProjectDir, dockerfileRel);
-
-  const policyRel =
-    buildJson.policy?.dockerfile ||
-    buildJson.policies?.dockerfile ||
-    "policy/dockerfile";
-  const policyDir = path.resolve(absProjectDir, policyRel);
-
-  if (!isPathInside(absProjectDir, dockerfilePath)) {
-    throw new ScriptError(
-      `Security error: Dockerfile path "${dockerfileRel}" escapes the project directory.`
-    );
-  }
-
-  if (!existsSync(dockerfilePath) || !existsSync(policyDir)) {
-    return;
-  }
-
-  console.log(pc.cyan(`\n🔍 Validating Dockerfile Contract (${policyRel})...`));
-  runStep(
-    "docker",
-    [
-      "run",
-      "--rm",
-      "--network",
-      "none",
-      "--mount",
-      `type=bind,src=${absProjectDir},dst=/project,readonly`,
-      "-w",
-      "/project",
-      CONFTEST_IMAGE,
-      "test",
-      dockerfileRel,
-      "-p",
-      `${policyRel}/`,
-    ],
-    absProjectDir,
-    { stepName: "Dockerfile Contract", targetFile: dockerfileRel }
-  );
+export function checkDockerfileContract(build: BuildJson, projectDir: string): void {
+  const root = resolveProjectDir(projectDir);
+  const relative = build.dockerfile ?? "Dockerfile";
+  const dockerfile = path.resolve(root, relative);
+  if (!isPathInside(root, dockerfile) || !existsSync(dockerfile)) throw new ConfigError({sourceFile:path.join(root,"build.json"),configPath:"dockerfile",value:relative,composition:"service",reason:"Application Dockerfile missing or outside project"});
+  const policyDir = getDockerfilePolicyDir();
+  console.log(pc.cyan(`\n🔍 Validating Builder Dockerfile contract (${relative})...`));
+  runStep("docker", ["run","--rm","--network","none","--mount",`type=bind,src=${root},dst=/project,readonly`,"--mount",`type=bind,src=${policyDir},dst=/builder-policy,readonly`,"-w","/project",CONFTEST_IMAGE,"test",relative,"-p","/builder-policy"],root,{stepName:"Dockerfile Contract",targetFile:relative});
 }

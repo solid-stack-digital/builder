@@ -10,7 +10,7 @@ export function normalizeDependsOn(service: any): void {
     const obj: Record<string, { condition: string }> = {};
     for (const dep of service.depends_on) {
       if (typeof dep === "string") {
-        obj[dep] = { condition: "service_started" };
+        obj[dep] = { condition: "service_healthy" };
       }
     }
     service.depends_on = obj;

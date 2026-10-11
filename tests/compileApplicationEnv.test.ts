@@ -10,12 +10,11 @@ describe("application environment compilation", () => {
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "builder-application-env-"));
     fs.writeFileSync(path.join(dir, "build.json"), JSON.stringify({
-      name: "env-test", port: 8080,
-      overrides: { dev: { path: "dev.yml" } },
-      envOverrides: { APP_URL: "${app.public_url}/api", PRIORITY: "build-json" },
-      tester: { envOverrides: { TESTER_ONLY: "yes" } },
+      name: "env-test", app: { endpoints: { http: { port: 8080, publicPort: 8080, primary: true, scheme: "http" } }, env: { APP_URL: "${app.endpoints.http.public_url}/api", PRIORITY: "build-json" } },
+      dev: { "override-compose": "dev.yml" },
+      tester: { env: { TESTER_ONLY: "yes" } },
     }));
-    fs.writeFileSync(path.join(dir, "dev.yml"), 'services:\n  app:\n    environment:\n      FROM_DEFAULT: ${FROM_DEFAULT}\n      PRIORITY: compose\n');
+    fs.writeFileSync(path.join(dir, "dev.yml"), 'services:\n  app:\n    environment:\n      FROM_DEFAULT: base\n      PRIORITY: compose\n');
     fs.writeFileSync(path.join(dir, ".env"), "FROM_DEFAULT=base\nINTERPOLATION_ONLY=hidden\n");
     for (const stage of ["dev", "prod", "test", "e2e"]) {
       fs.writeFileSync(path.join(dir, `.env.${stage}`), `STAGE_FILE=${stage}\nPRIORITY=env-file\nSECRET='literal$money'\n`);
@@ -27,7 +26,7 @@ describe("application environment compilation", () => {
     const environment = compileApplicationEnv("dev", dir);
     expect(environment).toMatchObject({
       EXEC_MODE: "dev", INFRA_MODE: "isolated", STAGE_FILE: "dev",
-      FROM_DEFAULT: "base", PRIORITY: "build-json", APP_URL: "http://localhost:8080/api",
+      FROM_DEFAULT: "base", PRIORITY: "compose", APP_URL: "http://127.0.0.1:8080/api",
       SECRET: "literal$money",
     });
     expect(environment.INTERPOLATION_ONLY).toBeUndefined();
@@ -36,7 +35,7 @@ describe("application environment compilation", () => {
 
   it("exports the app's prod environment during E2E and does not mix in tester settings", () => {
     const environment = compileApplicationEnv("e2e", dir);
-    expect(environment).toMatchObject({ EXEC_MODE: "prod", INFRA_MODE: "integrated", STAGE_FILE: "prod" });
+    expect(environment).toMatchObject({ EXEC_MODE: "e2e", INFRA_MODE: "integrated", STAGE_FILE: "e2e" });
     expect(environment.TESTER_ONLY).toBeUndefined();
   });
 

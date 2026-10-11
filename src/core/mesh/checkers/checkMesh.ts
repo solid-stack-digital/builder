@@ -20,7 +20,7 @@ export function checkMesh(
 
   console.log(
     pc.bold(
-      pc.green("\n🎉 All mesh infrastructure, services, and contract checks passed!\n")
+      pc.green("\n🎉 All V2 mesh infrastructure, services, and contract checks passed!\n")
     )
   );
 }
