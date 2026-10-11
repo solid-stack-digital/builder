@@ -11,5 +11,7 @@ export { runCompose } from "./core/runCompose.js";
 export { buildJsonSchema } from "./core/buildSchema.js";
 export { meshSchema } from "./core/mesh/meshSchema.js";
 export { ScriptError } from "./errors/ScriptError.js";
+export { ConfigError } from "./errors/ConfigError.js";
+export { PortConflictError } from "./errors/PortConflictError.js";
 export { NotFoundError } from "./errors/NotFoundError.js";
 export { version } from "./version.js";
