@@ -2,7 +2,7 @@
 
 This document is the normative field-by-field reference for Builder V2 `build.json`.
 
-For cross-file architecture, lifecycle, endpoint resolution, publication, namespacing, and migration rules, see `SPECS_V2.md`.
+For the full execution model and cross-file architecture, see `SPECS_V2.md`.
 
 ---
 
@@ -61,18 +61,28 @@ type BuildStage = {
     endpoints?: Record<string, Partial<AppEndpoint>>;
   };
 
-  dependencies?: Record<string, DependencyStageConfig>;
+  dependencies?: Record<string, DependencyStageOverlay>;
 };
 
-type DependencyStageConfig = {
+type DependencyStageOverlay = {
+  // Allowed only when this stage introduces a dependency
+  // that does not already exist in inherited configuration.
   compose?: string;
+
   env?: Record<string, string>;
   endpoints?: Record<string, Partial<DependencyEndpoint>>;
   dependsOn?: string[];
 };
 ```
 
-For a dependency added for the first time inside a stage, the effective stage result must still satisfy the full `DependencyConfig` contract. For example, a stage-added materialized dependency needs `compose`, and every newly added endpoint needs `service` and `port`.
+Effective stage inheritance:
+
+```text
+dev  = base -> dev
+prod = base -> prod
+test = base -> test
+e2e  = base -> prod -> e2e
+```
 
 ---
 
@@ -92,7 +102,7 @@ No.
 
 ### Purpose
 
-Points editors and tooling to the Builder JSON Schema.
+Points editors/tooling to the Builder JSON Schema.
 
 ### Example
 
@@ -106,12 +116,6 @@ Points editors and tooling to the Builder JSON Schema.
 ### Side effects
 
 None at runtime.
-
-Builder does not derive environment, ports, dependency behavior, or stages from `$schema`.
-
-### Validation
-
-Must be a string if present.
 
 ---
 
@@ -129,7 +133,7 @@ No.
 
 ### Purpose
 
-Provides a stable human-readable project/service identity for standalone Builder execution.
+Provides a stable standalone project/service identity.
 
 ### Example
 
@@ -142,41 +146,11 @@ Provides a stable human-readable project/service identity for standalone Builder
 
 ### Side effects
 
-When provided, Builder uses it as the base standalone project identity for generated Compose project names and diagnostics.
+Builder uses it as the base standalone Compose project identity and in diagnostics.
 
-Typical stage project names are derived from it:
+If omitted, Builder may derive the base identity from the service directory name.
 
-```text
-dev  -> users-api
-prod -> users-api-prod
-test -> users-api-test
-e2e  -> users-api-e2e
-```
-
-If omitted, Builder retains the current contract of deriving the base project identity from the service directory basename.
-
-In mesh mode, the `mesh.json` service key is the authoritative mesh identity; `build.json.name` does not rename the mesh service.
-
-### Use case
-
-Give a service a deterministic standalone identity even if the folder name changes.
-
-### Example
-
-```json
-{
-  "name": "billing-api",
-  "app": {
-    "endpoints": {
-      "http": {
-        "port": 3000,
-        "primary": true,
-        "scheme": "http"
-      }
-    }
-  }
-}
-```
+In mesh mode, the `mesh.json` service key is the authoritative mesh identity.
 
 ---
 
@@ -202,7 +176,7 @@ relative to the service directory.
 
 ### Purpose
 
-Selects the application Dockerfile used by Builder.
+Selects the application Dockerfile.
 
 ### Example
 
@@ -215,7 +189,7 @@ Selects the application Dockerfile used by Builder.
 
 ### Side effects
 
-Builder uses this Dockerfile for all application targets:
+The Dockerfile must provide these target aliases:
 
 ```text
 dev
@@ -224,24 +198,26 @@ test-e2e
 prod
 ```
 
-The path must stay inside the service project boundary.
+Runtime contract:
 
-The Dockerfile must satisfy the V2 application Dockerfile contract:
+| Target | Purpose |
+|---|---|
+| `dev` | development application |
+| `test` | finite unit/isolated test runner |
+| `test-e2e` | finite service E2E tester |
+| `prod` | production-equivalent application |
 
-- required targets: `dev`, `test`, `test-e2e`, `prod`;
-- `dev` has a foreground default `CMD`;
-- `test` is a finite test runner;
-- `test-e2e` is a finite E2E runner;
-- `prod` is the production runtime;
+Additional requirements:
+
+- `dev` has a foreground default command;
+- `prod` has a foreground runtime;
+- `dev` must define/inherit a valid `HEALTHCHECK`;
+- `prod` must define/inherit a valid `HEALTHCHECK`;
 - hardcoded Dockerfile `EXPOSE` is forbidden;
-- `dev` must define/inherit `HEALTHCHECK`;
-- `prod` must define/inherit `HEALTHCHECK`;
-- `prod` retains artifact-isolation expectations such as `COPY --from=...`;
-- app runtime processes must not daemonize/background themselves.
+- production artifact-isolation requirements remain in force;
+- Builder does not synthesize missing healthchecks.
 
-### Use case
-
-Keep the application Dockerfile under a `.docker` directory.
+The path must remain inside the service project.
 
 ---
 
@@ -264,7 +240,7 @@ Yes.
 
 ### Purpose
 
-Defines configuration owned by the application itself.
+Defines application-owned runtime configuration and endpoints.
 
 ### Example
 
@@ -288,11 +264,11 @@ Defines configuration owned by the application itself.
 
 ### Side effects
 
-`app` is compiled into the single Builder-managed application service.
+Builder compiles this into the application container.
 
-There is no `app.dependsOn`. The app automatically depends on all materialized dependencies in integrated compositions.
+There is no `app.port`.
 
-There is no `app.port` shortcut. Ports exist only under named endpoints.
+There is no `app.dependsOn`; app lifecycle toward materialized local dependencies is automatic.
 
 ---
 
@@ -318,7 +294,6 @@ Defines runtime environment consumed by the application.
 {
   "app": {
     "env": {
-      "LOG_LEVEL": "info",
       "BACKEND_URL": "${dependencies.backend.endpoints.http.network_url}",
       "REDIS_HOST": "${dependencies.redis.endpoints.redis.network_host}"
     }
@@ -326,15 +301,14 @@ Defines runtime environment consumed by the application.
 }
 ```
 
-### Valid values
+### Validation
 
-Every value must be a string.
+Every value must already be a string.
 
 Valid:
 
 ```json
 {
-  "PORT_NAME": "api",
   "RETRIES": "3",
   "FEATURE_ENABLED": "true"
 }
@@ -349,9 +323,11 @@ Invalid:
 }
 ```
 
-Builder does not coerce non-string values.
+Builder does not coerce values.
 
-### Supported Builder references
+### References
+
+Supported Builder references:
 
 ```text
 ${app.endpoints.<endpoint>.<property>}
@@ -373,40 +349,53 @@ Example:
 
 ### Side effects
 
-Values are added to the app runtime environment.
+The values become app runtime environment.
 
 They do **not** automatically become Docker build arguments.
 
-If the service is part of a mesh, mesh service `env` may override the same key later according to precedence.
+Environment references do not create lifecycle edges.
 
-An endpoint reference does not create a lifecycle edge.
+### Ordinary-stage precedence
 
-Example:
+Low to high:
 
-```json
-"BACKEND_URL": "${dependencies.backend.endpoints.http.network_url}"
+```text
+.env.<stage>
+-> base app.env
+-> active-stage app.env
+-> active-stage override-compose app environment
+-> Builder internal base environment
+-> Builder internal active-stage environment
 ```
 
-does not itself mean “wait for backend.” Local dependency lifecycle is automatic because it is a dependency; mesh service lifecycle is controlled by substitution and/or mesh `dependsOn`.
+### E2E precedence
 
-### Precedence
+Service E2E structured config inherits:
 
-For app runtime env, low to high:
+```text
+base -> prod -> e2e
+```
 
-1. `.env.<stage>`;
-2. base `app.env`;
-3. active-stage `app.env`;
-4. active-stage `override-compose` app environment;
-5. mesh base service `env`;
-6. mesh active-stage service `env`;
-7. Builder internal base env;
-8. Builder internal active-stage env.
+Application env precedence is therefore:
 
-If a user layer attempts to define a Builder-owned internal key, Builder fails.
+```text
+.env.e2e
+-> base app.env
+-> prod app.env
+-> prod override-compose app environment
+-> e2e app.env
+-> e2e override-compose app environment
+-> Builder internal base environment
+-> Builder internal E2E environment
+```
 
-### Use case
+`.env.prod` is **not** merged into `.env.e2e`.
 
-Configure the app without requiring it to know where its dependency implementation came from.
+The production structured stage is inherited; the env-file source is still E2E-specific.
+
+### Builder-owned keys
+
+If a user-controlled layer attempts to set a Builder-owned runtime key such as `EXEC_MODE`, `INFRA_MODE`, or Builder-owned `PORT`, Builder fails rather than silently accepting the conflict.
 
 ---
 
@@ -424,7 +413,7 @@ No.
 
 ### Purpose
 
-Declares named network endpoints exposed by the app container.
+Declares named network endpoints exposed by the application container.
 
 ### Example
 
@@ -447,52 +436,36 @@ Declares named network endpoints exposed by the app container.
 }
 ```
 
-### Endpoint key rules
-
-Endpoint keys use:
+### Endpoint key grammar
 
 ```text
 ^[a-z][a-z0-9-]*$
 ```
 
-Examples:
-
-```text
-http
-grpc
-metrics
-admin-http
-```
-
 ### Side effects
 
-Each endpoint becomes available through Builder endpoint references.
+Every endpoint gains Builder endpoint properties.
 
-In standalone execution:
+Standalone:
 
-- if `publicPort` is absent, endpoint remains host-private;
-- if `publicPort` is numeric, Builder publishes it on that fixed host port;
-- if `publicPort` is `"AUTO"`, Builder allocates and publishes a stable available host port.
+- no `publicPort` => host-private;
+- numeric `publicPort` => published on that fixed host port;
+- `"AUTO"` => Builder allocates a stable available host port.
 
-In mesh execution, `publicPort` alone does not expose the endpoint. The mesh service must also include:
+Mesh:
 
-```text
-app.endpoints.<name>
-```
-
-in `publish`.
+- `publicPort` only makes the endpoint publishable;
+- the mesh must also list `app.endpoints.<name>` in `publish`.
 
 ### Primary invariant
 
-If `app.endpoints` is non-empty, exactly one effective endpoint must have:
+If the effective endpoint collection is non-empty, exactly one endpoint must have:
 
 ```json
 "primary": true
 ```
 
-The primary app endpoint determines Builder’s application `PORT`.
-
-If `app.endpoints` is omitted or empty, Builder does not inject a primary endpoint `PORT`; the app healthcheck must use an application-appropriate readiness strategy.
+Its `port` becomes Builder-owned application `PORT`.
 
 ---
 
@@ -532,11 +505,11 @@ Container/network port.
 
 ### Side effects
 
-`network_port` resolves to this value.
+Resolves as `network_port`.
 
-If the endpoint is primary, Builder uses this value as the app’s Builder-owned `PORT`.
+If primary, becomes Builder-owned application `PORT`.
 
-The field does not publish a host port.
+Does not itself publish a host port.
 
 ---
 
@@ -552,9 +525,9 @@ number | "AUTO" | undefined
 
 No.
 
-### Purpose
+### Meaning
 
-Declares host-publication capability and desired host-port behavior.
+Host-publication capability and host-port policy.
 
 ### Fixed example
 
@@ -582,21 +555,16 @@ Declares host-publication capability and desired host-port behavior.
 
 Standalone:
 
-- numeric => Builder binds that host port;
-- `"AUTO"` => Builder allocates a stable available port;
-- omitted => no host publication.
+- number => fixed host binding;
+- `"AUTO"` => stable Builder allocation;
+- omitted => not host-published.
 
 Mesh:
 
-- numeric or `"AUTO"` only makes the endpoint eligible;
-- the mesh service must also publish `app.endpoints.<name>`;
-- non-published endpoints do not reserve or allocate host ports.
+- number/`"AUTO"` => endpoint is eligible for `publish`;
+- omitted => `mesh.publish` targeting it is an error.
 
-A fixed collision fails. Builder never silently remaps it.
-
-### Use case
-
-Expose the service to a browser, external client, local developer, or black-box E2E tester.
+Fixed collisions fail. Builder never silently remaps a fixed port.
 
 ---
 
@@ -608,10 +576,6 @@ Expose the service to a browser, external client, local developer, or black-box 
 boolean | undefined
 ```
 
-### Required
-
-No.
-
 ### Default
 
 `false`.
@@ -620,23 +584,13 @@ No.
 
 Marks the canonical app endpoint.
 
-### Example
-
-```json
-"http": {
-  "port": 3000,
-  "primary": true,
-  "scheme": "http"
-}
-```
-
 ### Side effects
 
-Exactly one primary is required when the endpoint collection is non-empty.
+Exactly one primary is required for a non-empty effective app endpoint collection.
 
-The primary endpoint’s `port` becomes the Builder-owned app `PORT`.
+The primary endpoint's `port` becomes Builder-owned `PORT`.
 
-`primary` does not automatically make an endpoint public.
+Does not imply host publication.
 
 ---
 
@@ -648,32 +602,27 @@ The primary endpoint’s `port` becomes the Builder-owned app `PORT`.
 string | undefined
 ```
 
-### Required
-
-No.
-
 ### Validation
 
 ```text
 ^[A-Za-z][A-Za-z0-9+.-]*$
 ```
 
-### Examples
+### Purpose
+
+Enables URL construction.
+
+Examples:
 
 ```text
 http
 https
 ws
-wss
 grpc
 redis
 postgresql
 smtp
 ```
-
-### Purpose
-
-Enables URL construction.
 
 ### Side effects
 
@@ -685,15 +634,6 @@ public_url
 ```
 
 Host/port/address properties remain usable.
-
-### Example
-
-```json
-"grpc": {
-  "port": 50051,
-  "scheme": "grpc"
-}
-```
 
 ---
 
@@ -713,7 +653,7 @@ No.
 
 ### Purpose
 
-Declares logical infrastructure dependencies and their local/default Compose implementations.
+Declares logical dependency slots and their service-owned local/default Compose implementations.
 
 ### Example
 
@@ -735,33 +675,35 @@ Declares logical infrastructure dependencies and their local/default Compose imp
 }
 ```
 
-### Dependency key rules
-
-Keys use:
+### Dependency key grammar
 
 ```text
 ^[a-z][a-z0-9-]*$
 ```
 
-### Important semantic rule
+### Important semantics
 
-A dependency is not one Docker service.
-
-It is:
+A dependency is:
 
 ```text
 logical slot
-  + Compose implementation bundle
-  + endpoint declarations
++ one Compose implementation bundle
++ zero or more endpoint declarations
 ```
 
-There is no dependency-level `service` field.
+There is no dependency-level `service`.
 
-### Materialization side effect
+Builder does not classify dependencies as `third-party` or `fellow-service`.
 
-A dependency with no effective endpoints is not materialized.
+If no mesh provider is supplied, the local implementation is used when integrated.
 
-A dependency with effective endpoints is materialized only when the active execution uses integrated infrastructure.
+If a mesh provider is supplied, the local implementation is atomically suppressed.
+
+### Materialization
+
+A dependency with no effective endpoints is inert and is not materialized.
+
+A dependency with effective endpoints is materialized only in integrated execution.
 
 ---
 
@@ -775,11 +717,13 @@ string
 
 ### Required
 
-Yes for a base dependency or stage-added dependency.
+Yes for a base dependency.
+
+Also required when a stage introduces a new dependency not already present in inherited configuration.
 
 ### Purpose
 
-Points to the dependency implementation’s Docker Compose YAML.
+Points to the dependency's Docker Compose implementation.
 
 ### Example
 
@@ -791,41 +735,57 @@ Points to the dependency implementation’s Docker Compose YAML.
 
 ### Side effects
 
-When materialized, Builder loads the Compose file as one atomic dependency implementation.
+When materialized:
 
-All services/resources in the dependency Compose implementation may be materialized.
+- the Compose implementation is loaded atomically;
+- all implementation services/resources may participate;
+- Builder namespaces dependency-owned objects;
+- internal references are rewritten consistently.
 
-Builder namespaces the implementation to avoid collisions.
+When substituted by a mesh provider, the entire local implementation is suppressed.
 
-When the dependency is substituted by a mesh provider, the entire local Compose implementation is suppressed.
+### Stage immutability
 
-### Compose file restrictions
+A base/inherited dependency's `compose` field cannot be replaced by a later stage.
 
-Dependency Compose may contain multiple services.
+This is invalid:
 
-It must not use:
-
-```yaml
-services:
-  something:
-    ports:
-      - "8080:8080"
+```json
+{
+  "dependencies": {
+    "redis": {
+      "compose": ".docker/dependencies/redis.compose.yml"
+    }
+  },
+  "e2e": {
+    "dependencies": {
+      "redis": {
+        "compose": ".docker/dependencies/different-redis.compose.yml"
+      }
+    }
+  }
+}
 ```
 
-Host `ports` are forbidden.
+A stage may define `compose` only for a dependency that does not yet exist in inherited configuration.
 
-It also may not use unsupported global/container escape hatches such as:
+### Compose restrictions
 
-- `network_mode: host`;
-- `privileged: true`;
-- globally fixed `container_name`;
-- host-root filesystem bind mounts.
+Dependency Compose may contain multiple services and internal resources.
 
-Use endpoint `publicPort` for host exposure.
+It must not:
 
-### Path rules
+- publish `services.*.ports`;
+- use `network_mode: host`;
+- use `privileged: true`;
+- hardcode globally conflicting `container_name`;
+- mount the host root filesystem.
 
-The path is relative to the service directory and must not escape that project boundary.
+Host publication belongs to Builder endpoint configuration.
+
+### Path safety
+
+Path is relative to the service project and may not escape it.
 
 ---
 
@@ -858,29 +818,13 @@ Applies Builder-controlled runtime environment to the dependency implementation.
 
 ### Side effects
 
-The map is applied to every service in the dependency’s atomic Compose implementation.
+The map applies to every service in that dependency's atomic Compose implementation.
 
-Stage dependency `env` merges by key over base dependency `env`.
+Stage overlays merge by key.
 
-Values may use Builder endpoint references.
+Values may use Builder references.
 
-Example:
-
-```json
-"realtime": {
-  "env": {
-    "REDIS_HOST": "${dependencies.redis.endpoints.redis.network_host}"
-  }
-}
-```
-
-An env reference does not create a dependency `dependsOn`.
-
-If ordering is required, declare `dependsOn` explicitly.
-
-### Use case
-
-Apply one module-wide project ID, emulator setting, or shared connection configuration to every container belonging to a dependency implementation.
+Environment references do not create `dependsOn`.
 
 ---
 
@@ -898,7 +842,7 @@ No.
 
 ### Purpose
 
-Defines the logical network surface of the dependency.
+Defines the dependency's logical network surface.
 
 ### Example
 
@@ -929,19 +873,19 @@ Defines the logical network surface of the dependency.
 
 ### Side effects
 
-If the effective collection is absent or empty, the dependency is inert and is not materialized.
+No effective endpoints => dependency is inert.
 
-Every endpoint must identify an actual service in the dependency Compose file.
+Every endpoint owner service must exist in the dependency Compose file.
 
-Every distinct Compose service referenced by at least one endpoint must define a valid Compose healthcheck.
+Every distinct endpoint owner service must define a valid Compose healthcheck.
 
-When materialized, the app automatically health-depends on every distinct endpoint-owning service.
+When materialized, the app automatically health-depends on all distinct endpoint-owning services.
 
 ### Primary invariant
 
-If the endpoint collection is non-empty, exactly one effective endpoint must have `primary: true`.
+Exactly one effective endpoint must have `primary: true` when the collection is non-empty.
 
-Dependency primary is canonical endpoint metadata only. It does not select a lifecycle service.
+Dependency primary does not select a principal service.
 
 ---
 
@@ -957,11 +901,11 @@ string
 
 ### Required
 
-Yes for a newly declared dependency endpoint.
+Yes for every newly declared dependency endpoint.
 
 ### Purpose
 
-Names the exact Docker Compose service that owns the endpoint.
+Names the exact Compose service that owns this endpoint.
 
 ### Example
 
@@ -976,36 +920,17 @@ Names the exact Docker Compose service that owns the endpoint.
 
 ### Side effects
 
-Builder validates that the named service exists in the dependency Compose file.
+Builder uses the service for:
 
-Builder uses that service to determine:
+- internal network/DNS resolution;
+- health readiness;
+- app lifecycle edges;
+- dependency-to-dependency lifecycle;
+- host binding when published.
 
-- internal network host/DNS resolution;
-- endpoint readiness;
-- app lifecycle dependencies;
-- dependency-to-dependency lifecycle relationships;
-- host port binding when published.
+The named service must exist and must have a valid healthcheck.
 
-The referenced Compose service must have a healthcheck.
-
-### Failure example
-
-Endpoint:
-
-```json
-"ui": {
-  "service": "firebase-ui",
-  "port": 4000
-}
-```
-
-but Compose has no `firebase-ui` service.
-
-Result: fail-fast configuration error.
-
-### Important
-
-Builder never falls back to “the first Compose service” and never infers from the dependency name.
+Builder never guesses the service, even for single-service Compose files.
 
 ---
 
@@ -1027,39 +952,33 @@ Container/network port on the endpoint-owning Compose service.
 
 ### Side effects
 
-Used for:
+Used by `network_port`, address/URL construction, and host binding if published.
 
-```text
-network_port
-network_address
-network_url
-```
-
-and for host mapping when the endpoint is effectively published.
-
-It does not itself create host publication.
+Does not itself publish the endpoint.
 
 ---
 
 ## 6.3 `dependencies.<dep>.endpoints.<name>.publicPort`
 
-Same type and general semantics as app endpoint `publicPort`.
+Same type and publication semantics as app endpoint `publicPort`.
 
-### Standalone side effect
+### Standalone
 
-If the dependency is materialized, the endpoint is published to the host.
+If the dependency is materialized, the endpoint is host-published.
 
-### Mesh side effect
+### Mesh
 
-The endpoint is only eligible for mesh publication. The consuming mesh service must explicitly include:
+The endpoint is only eligible for publication.
+
+The consuming mesh service must explicitly list:
 
 ```text
 dependencies.<dep>.endpoints.<name>
 ```
 
-in its `publish` array.
+in `publish`.
 
-If the dependency is substituted by a top-level mesh service, this local endpoint cannot be published through the consumer. Publish the provider app endpoint instead.
+If the dependency is substituted, the local endpoint is absent and cannot be published through the consumer.
 
 ---
 
@@ -1079,34 +998,13 @@ boolean | undefined
 
 Exactly one primary is required for a non-empty effective dependency endpoint collection.
 
-It does not choose a principal Compose service.
-
-It does not change which services are required to be healthy.
+It does not select a principal Compose service and does not change readiness.
 
 ---
 
 ## 6.5 `dependencies.<dep>.endpoints.<name>.scheme`
 
-Same rules as app endpoint `scheme`.
-
-Required only when a URL property is actually requested.
-
-Example:
-
-```json
-"redis": {
-  "service": "redis",
-  "port": 6379,
-  "primary": true,
-  "scheme": "redis"
-}
-```
-
-allows:
-
-```text
-${dependencies.redis.endpoints.redis.network_url}
-```
+Same validation and URL semantics as app endpoint `scheme`.
 
 ---
 
@@ -1124,11 +1022,9 @@ No.
 
 ### Purpose
 
-Defines lifecycle ordering between dependency modules.
+Defines dependency-module lifecycle ordering.
 
 ### Syntax
-
-Every entry uses:
 
 ```text
 dependencies.<dependency-name>
@@ -1156,9 +1052,9 @@ dependencies.<dependency-name>
 
 ### Side effects
 
-When `realtime` is materialized, Builder does not allow its endpoint-owning services to become the active dependency surface before the referenced dependency readiness services are healthy.
+The dependent dependency's endpoint-owning services are health-gated on the target dependency's readiness services.
 
-All Builder-generated edges use:
+Builder-generated edges use:
 
 ```yaml
 condition: service_healthy
@@ -1168,49 +1064,18 @@ No `service_started` fallback exists.
 
 ### Validation
 
-Errors:
+Fails on:
 
 - unknown dependency;
-- target has no effective endpoints and therefore is not materialized;
+- inert/unmaterialized target;
 - self-dependency;
-- dependency cycle.
+- cycle.
 
-### Stage merge behavior
+### Stage merge
 
-`dependsOn` is an exception to normal array replacement.
+`dependsOn` union-merges.
 
-Base:
-
-```json
-"dependsOn": [
-  "dependencies.redis"
-]
-```
-
-E2E:
-
-```json
-"dependsOn": [
-  "dependencies.mailpit"
-]
-```
-
-Effective E2E:
-
-```json
-[
-  "dependencies.redis",
-  "dependencies.mailpit"
-]
-```
-
-Exact duplicates are removed.
-
-### Non-side effects
-
-`dependsOn` does not create env values.
-
-An env reference does not create `dependsOn`.
+Inherited entries come first; stage additions follow; exact duplicates are removed.
 
 ---
 
@@ -1232,7 +1097,7 @@ No.
 
 ### Purpose
 
-Configures the service-level E2E test runner from the application Dockerfile’s `test-e2e` target.
+Configures the service-level E2E tester from the Dockerfile `test-e2e` target.
 
 ### Example
 
@@ -1248,19 +1113,24 @@ Configures the service-level E2E test runner from the application Dockerfile’s
 
 ### Side effects
 
-During `builder service up test-e2e`:
+Service E2E execution is:
 
-- app target = `prod`;
-- app runtime stage = `e2e`;
-- local integrated dependencies are materialized;
-- tester target = `test-e2e`;
-- tester runs with host networking;
-- tester waits for app health;
-- tester exit code becomes the E2E result.
+```text
+app:
+  target=prod
+  EXEC_MODE=prod
+  INFRA_MODE=integrated
+  env file=.env.e2e
+  structured config=base -> prod -> e2e
 
-`tester` is not materialized in dev, prod, or unit-test execution.
+tester:
+  target=test-e2e
+  EXEC_MODE=e2e
+  no INFRA_MODE
+  env file=.env.e2e-tester
+```
 
-There is no tester path or tester Dockerfile field here; service-level E2E uses the same application Dockerfile contract.
+The tester runs as a host-networked black-box client and determines the service E2E result.
 
 ---
 
@@ -1278,24 +1148,35 @@ No.
 
 ### Purpose
 
-Runtime environment for the service-level black-box E2E runner.
+Adds runtime env for the service-level E2E tester.
 
 ### Example
 
 ```json
 "tester": {
   "env": {
-    "APP_URL": "${app.endpoints.http.public_url}",
-    "MAIL_UI": "${dependencies.mailpit.endpoints.http.public_url}"
+    "APP_URL": "${app.endpoints.http.public_url}"
   }
 }
 ```
 
-### Critical restriction
+### Precedence
 
-The service-level tester runs with host networking.
+Low to high:
 
-Therefore Builder rejects endpoint references using:
+```text
+.env.e2e-tester
+-> build.json tester.env
+-> Builder internal tester environment
+```
+
+Builder-owned tester values are authoritative.
+
+### Endpoint restriction
+
+Tester is host-networked.
+
+These endpoint properties are forbidden in tester env:
 
 ```text
 network_host
@@ -1303,8 +1184,6 @@ network_port
 network_address
 network_url
 ```
-
-inside `tester.env`.
 
 Use:
 
@@ -1315,17 +1194,17 @@ public_address
 public_url
 ```
 
-### Side effects
+A referenced public endpoint must actually be published in standalone E2E.
 
-Any referenced public endpoint must actually be published in standalone E2E.
+### `INFRA_MODE`
 
-If it is not publishable/published, compilation fails before tests run.
+Builder does not inject `INFRA_MODE` into the tester.
 
 ---
 
 # 9. Stage fields
 
-Builder supports exactly these root stage overlays:
+Builder supports:
 
 ```text
 dev
@@ -1334,33 +1213,41 @@ test
 e2e
 ```
 
-Each has the same shape.
+Each stage is a structured overlay.
 
 ---
 
 ## 9.1 `dev`
 
-### Type
-
-`BuildStage`
-
 ### Purpose
 
-Overrides service configuration for development runtime.
+Development-stage overlay.
 
-### Side effects
-
-Used by both:
+### Effective config
 
 ```text
-builder service up dev
-builder service up dev --full
+base -> dev
 ```
 
-Difference between them is infrastructure materialization:
+### Runtime
 
-- ordinary dev => isolated;
-- `--full` => integrated.
+Standalone normal dev:
+
+```text
+target=dev
+EXEC_MODE=dev
+INFRA_MODE=isolated
+.env.dev
+```
+
+Standalone dev `--full`:
+
+```text
+target=dev
+EXEC_MODE=dev
+INFRA_MODE=integrated
+.env.dev
+```
 
 ### Example
 
@@ -1379,88 +1266,275 @@ Difference between them is infrastructure materialization:
 
 ## 9.2 `prod`
 
-### Type
-
-`BuildStage`
-
 ### Purpose
 
-Production-stage service configuration.
+Production-stage overlay.
 
-### Example
+### Effective config
 
-```json
-"prod": {
-  "override-compose": ".docker/overrides/docker-compose.prod.override.yml",
-  "app": {
-    "env": {
-      "LOG_LEVEL": "info"
-    }
-  }
-}
+```text
+base -> prod
 ```
 
-### Side effects
+### Runtime
 
-Uses Dockerfile `prod`.
+```text
+target=prod
+EXEC_MODE=prod
+INFRA_MODE=integrated
+.env.prod
+```
 
-Uses integrated infrastructure.
+### E2E side effect
 
-Does not automatically apply during E2E.
+`prod` is inherited by E2E structured configuration:
+
+```text
+base -> prod -> e2e
+```
+
+The E2E env file is still `.env.e2e`, not `.env.prod`.
 
 ---
 
 ## 9.3 `test`
 
-### Type
-
-`BuildStage`
-
 ### Purpose
 
-Configuration for the isolated/unit test stage.
+Unit/isolated test-stage overlay.
 
-### Example
+### Effective config
 
-```json
-"test": {
-  "app": {
-    "env": {
-      "TEST_TIMEOUT": "10000"
-    }
-  }
-}
+```text
+base -> test
 ```
 
-### Side effects
+### Runtime
 
-Used by the `test` Dockerfile target.
+```text
+target=test
+EXEC_MODE=test
+INFRA_MODE=isolated
+.env.test
+```
 
-Local dependencies are not materialized.
-
-`INFRA_MODE` is isolated.
+Local dependency containers are not materialized.
 
 ---
 
 ## 9.4 `e2e`
 
+### Purpose
+
+Applies controlled service-E2E overrides on top of the production-shaped structured configuration.
+
+### Effective config
+
+```text
+base -> prod -> e2e
+```
+
+### App runtime
+
+```text
+target=prod
+EXEC_MODE=prod
+INFRA_MODE=integrated
+.env.e2e
+```
+
+### Tester runtime
+
+```text
+target=test-e2e
+EXEC_MODE=e2e
+no INFRA_MODE
+.env.e2e-tester
+```
+
+### Allowed E2E changes
+
+May include:
+
+- additional dependencies;
+- endpoint metadata overrides;
+- dependency env overrides;
+- E2E-specific app env;
+- E2E override Compose;
+- inspection/support infrastructure such as Mailpit.
+
+Application code still behaves as production code.
+
+---
+
+# 10. Stage child fields
+
+## 10.1 `<stage>.override-compose`
+
 ### Type
 
-`BuildStage`
+```ts
+string
+```
+
+### Required
+
+No.
 
 ### Purpose
 
-Configuration for integrated service-level E2E runtime.
+Points to a stage-specific app Compose override.
+
+### Example
+
+```json
+"dev": {
+  "override-compose": ".docker/overrides/docker-compose.dev.override.yml"
+}
+```
+
+### Typical uses
+
+- development bind mounts;
+- command overrides;
+- Docker build args;
+- stage-specific app environment;
+- permitted app runtime details.
+
+### Restrictions
+
+It may not:
+
+- add arbitrary additional services;
+- publish host ports;
+- define app `depends_on`;
+- redefine endpoints;
+- override Builder-owned env;
+- replace the Builder-selected target;
+- weaken/remove required healthchecks.
+
+Use stage `dependencies` for stage-only infrastructure.
+
+### E2E order
+
+For service E2E:
+
+```text
+prod override-compose
+-> e2e override-compose
+```
+
+---
+
+## 10.2 `<stage>.app`
+
+### Type
+
+```ts
+{
+  env?: Record<string, string>;
+  endpoints?: Record<string, Partial<AppEndpoint>>;
+}
+```
+
+### Purpose
+
+Overlays inherited app config.
+
+### Merge
+
+Maps deep-merge.
+
+Scalars replace inherited scalar values.
+
+Omitted fields inherit.
+
+For E2E, inherited state already includes `prod`.
+
+---
+
+## 10.3 `<stage>.app.env`
+
+Same type/reference rules as base `app.env`.
+
+Merges keywise.
+
+For E2E:
+
+```text
+base app.env
+-> prod app.env
+-> e2e app.env
+```
+
+with corresponding override Compose layers applied in stage order.
+
+---
+
+## 10.4 `<stage>.app.endpoints`
+
+### Type
+
+```ts
+Record<string, Partial<AppEndpoint>>
+```
+
+### Purpose
+
+Modifies inherited endpoints or adds stage-only endpoints.
 
 ### Example
 
 ```json
 "e2e": {
   "app": {
-    "env": {
-      "SMTP_HOST": "${dependencies.mailpit.endpoints.smtp.network_host}"
+    "endpoints": {
+      "debug": {
+        "port": 9229,
+        "publicPort": "AUTO",
+        "scheme": "http"
+      }
     }
-  },
+  }
+}
+```
+
+The final effective collection must still satisfy the exactly-one-primary invariant.
+
+A base reference to a stage-only endpoint fails in stages where the endpoint does not exist.
+
+---
+
+## 10.5 `<stage>.dependencies`
+
+### Type
+
+```ts
+Record<string, DependencyStageOverlay>
+```
+
+### Purpose
+
+Overlays inherited dependencies or adds stage-only dependencies.
+
+### Example: override inherited dependency env
+
+```json
+"e2e": {
+  "dependencies": {
+    "firebase": {
+      "env": {
+        "GCLOUD_PROJECT": "orders-e2e"
+      }
+    }
+  }
+}
+```
+
+### Example: add E2E-only dependency
+
+```json
+"e2e": {
   "dependencies": {
     "mailpit": {
       "compose": ".docker/dependencies/mailpit.compose.yml",
@@ -1483,290 +1557,9 @@ Configuration for integrated service-level E2E runtime.
 }
 ```
 
-### Side effects
+Stage-added dependencies exist only in effective stages that inherit them.
 
-App image target is `prod`.
-
-Runtime stage is still `e2e`.
-
-E2E does not inherit `prod` config.
-
-E2E local dependencies are materialized.
-
----
-
-# 10. Stage child fields
-
-## 10.1 `<stage>.override-compose`
-
-### Type
-
-```ts
-string
-```
-
-### Required
-
-No.
-
-### Purpose
-
-Points to an active-stage app Compose override file.
-
-### Example
-
-```json
-"dev": {
-  "override-compose": ".docker/overrides/docker-compose.dev.override.yml"
-}
-```
-
-### Typical use cases
-
-- development bind mounts;
-- command override;
-- build args;
-- stage-specific app environment;
-- permitted app runtime Compose details.
-
-Example file:
-
-```yaml
-services:
-  app:
-    volumes:
-      - .:/app
-      - /app/node_modules
-    build:
-      args:
-        NEXT_PUBLIC_MODE: development
-```
-
-### Side effects
-
-Its app environment layer overrides `build.json` stage `app.env`.
-
-In mesh mode, mesh env layers can override it later.
-
-### Restrictions
-
-The override file is not a generic service-definition escape hatch.
-
-It may not:
-
-- add arbitrary extra services;
-- publish host ports;
-- create app `depends_on`;
-- replace Builder endpoint definitions;
-- override Builder-owned environment keys;
-- replace the Builder-selected target;
-- remove/weaken required healthchecks.
-
-Use stage `dependencies` for stage-only infrastructure.
-
----
-
-## 10.2 `<stage>.app`
-
-### Type
-
-```ts
-{
-  env?: Record<string, string>;
-  endpoints?: Record<string, Partial<AppEndpoint>>;
-}
-```
-
-### Required
-
-No.
-
-### Purpose
-
-Overlays the base app config.
-
-### Merge behavior
-
-Maps deep-merge.
-
-Omitted fields inherit base.
-
-Scalar fields replace base scalar values.
-
-### Example
-
-Base:
-
-```json
-"app": {
-  "endpoints": {
-    "http": {
-      "port": 3000,
-      "publicPort": "AUTO",
-      "primary": true,
-      "scheme": "http"
-    }
-  }
-}
-```
-
-Dev overlay:
-
-```json
-"dev": {
-  "app": {
-    "endpoints": {
-      "http": {
-        "publicPort": 3000
-      }
-    }
-  }
-}
-```
-
-Effective dev endpoint retains `port`, `primary`, and `scheme`, but uses fixed host port `3000`.
-
-### Validation
-
-The final effective stage configuration must satisfy all endpoint invariants.
-
----
-
-## 10.3 `<stage>.app.env`
-
-Same type and reference rules as base `app.env`.
-
-### Merge behavior
-
-Keywise merge.
-
-Stage values win over base values.
-
-Example:
-
-Base:
-
-```json
-"env": {
-  "LOG_LEVEL": "info",
-  "FEATURE": "on"
-}
-```
-
-Dev:
-
-```json
-"env": {
-  "LOG_LEVEL": "debug"
-}
-```
-
-Effective dev:
-
-```json
-{
-  "LOG_LEVEL": "debug",
-  "FEATURE": "on"
-}
-```
-
----
-
-## 10.4 `<stage>.app.endpoints`
-
-### Type
-
-```ts
-Record<string, Partial<AppEndpoint>>
-```
-
-### Purpose
-
-Modify existing endpoints or add stage-only endpoints.
-
-### Side effects
-
-A stage-added public endpoint exists only in that effective stage.
-
-A base env reference to a stage-only endpoint fails in stages where that endpoint does not exist.
-
-### Example
-
-```json
-"e2e": {
-  "app": {
-    "endpoints": {
-      "debug": {
-        "port": 9229,
-        "publicPort": "AUTO",
-        "scheme": "http"
-      }
-    }
-  }
-}
-```
-
-The final effective endpoint collection must still have exactly one primary.
-
----
-
-## 10.5 `<stage>.dependencies`
-
-### Type
-
-```ts
-Record<string, DependencyStageConfig>
-```
-
-### Required
-
-No.
-
-### Purpose
-
-Overlays existing dependencies or adds stage-only dependencies.
-
-### Example: overlay existing dependency env
-
-```json
-"dev": {
-  "dependencies": {
-    "firebase": {
-      "env": {
-        "GCLOUD_PROJECT": "demo-dev"
-      }
-    }
-  }
-}
-```
-
-### Example: add E2E-only dependency
-
-```json
-"e2e": {
-  "dependencies": {
-    "mailpit": {
-      "compose": ".docker/dependencies/mailpit.compose.yml",
-      "endpoints": {
-        "smtp": {
-          "service": "mailpit",
-          "port": 1025,
-          "primary": true,
-          "scheme": "smtp"
-        }
-      }
-    }
-  }
-}
-```
-
-### Side effects
-
-Stage-added dependencies only exist in that stage.
-
-Validation occurs after overlay merge.
-
-If a base env reference requires a dependency that only exists in E2E, non-E2E stages fail. Put such references in the corresponding stage overlay instead.
+For E2E, dependencies added under `prod` are inherited before the `e2e` overlay.
 
 ---
 
@@ -1778,21 +1571,29 @@ If a base env reference requires a dependency that only exists in E2E, non-E2E s
 string
 ```
 
-### Required
+### Allowed usage
 
-Only when the effective dependency would otherwise have no `compose`.
+Only when the stage introduces a dependency that does not already exist in inherited configuration.
 
-### Merge behavior
+### Example
 
-Scalar replacement.
+```json
+"e2e": {
+  "dependencies": {
+    "mailpit": {
+      "compose": ".docker/dependencies/mailpit.compose.yml"
+    }
+  }
+}
+```
 
-If specified for an existing dependency, the active stage uses the stage Compose file.
+### Forbidden usage
+
+A stage may not replace the Compose implementation of an inherited dependency.
 
 ### Side effect
 
-Because the dependency Compose file is atomic, replacing `compose` replaces the local implementation bundle for that stage.
-
-This does not introduce Dockerfile-like modes inside the dependency Compose file; it selects the stage’s effective dependency implementation.
+This preserves one local/default Compose implementation per logical dependency while still allowing stage-only dependency modules.
 
 ---
 
@@ -1800,9 +1601,7 @@ This does not introduce Dockerfile-like modes inside the dependency Compose file
 
 Same shape as base dependency `env`.
 
-Merges keywise.
-
-Applied to all services in the effective dependency Compose implementation.
+Merges keywise over inherited dependency env.
 
 ---
 
@@ -1816,31 +1615,11 @@ Record<string, Partial<DependencyEndpoint>>
 
 ### Purpose
 
-Modify an endpoint or add a stage-only dependency endpoint.
+Modify inherited endpoint metadata or add stage-only endpoints.
 
-### Example
+New endpoint must resolve required fields `service` and `port`.
 
-```json
-"dev": {
-  "dependencies": {
-    "firebase": {
-      "endpoints": {
-        "ui": {
-          "publicPort": 4000
-        }
-      }
-    }
-  }
-}
-```
-
-### Validation
-
-New endpoint => must resolve `service` and `port`.
-
-Modified endpoint => missing fields inherit base.
-
-Every effective endpoint owner service must exist and have a healthcheck.
+Every effective endpoint owner must exist and have a healthcheck.
 
 ---
 
@@ -1848,38 +1627,11 @@ Every effective endpoint owner service must exist and have a healthcheck.
 
 Same syntax as base dependency `dependsOn`.
 
-### Special merge
-
-Union-merge instead of replacement.
-
-Base:
-
-```json
-[
-  "dependencies.redis"
-]
-```
-
-Stage:
-
-```json
-[
-  "dependencies.mailpit"
-]
-```
-
-Effective:
-
-```json
-[
-  "dependencies.redis",
-  "dependencies.mailpit"
-]
-```
+Union-merges with inherited values.
 
 ---
 
-# 11. Endpoint property reference table
+# 11. Endpoint property table
 
 Given:
 
@@ -1892,11 +1644,9 @@ Given:
 }
 ```
 
-possible properties are:
-
-| Property | Example value | Requires scheme | Requires effective publication |
+| Property | Example | Requires scheme | Requires publication |
 |---|---|---:|---:|
-| `network_host` | `app` or generated internal DNS | No | No |
+| `network_host` | `app` / internal DNS | No | No |
 | `network_port` | `3000` | No | No |
 | `network_address` | `app:3000` | No | No |
 | `network_url` | `http://app:3000` | Yes | No |
@@ -1905,7 +1655,7 @@ possible properties are:
 | `public_address` | `127.0.0.1:8080` | No | Yes |
 | `public_url` | `http://127.0.0.1:8080` | Yes | Yes |
 
-Dependency internal host values are generated from the endpoint-owning Compose service after Builder namespacing. Do not hardcode generated names; use references.
+Dependency internal hosts are generated after namespacing. Never hardcode generated Compose names.
 
 ---
 
@@ -1946,13 +1696,7 @@ Dependency internal host values are generated from the endpoint-owning Compose s
         "firestore": {
           "service": "firebase-emulator",
           "port": 8080,
-          "publicPort": "AUTO",
           "primary": true,
-          "scheme": "http"
-        },
-        "auth": {
-          "service": "firebase-emulator",
-          "port": 9099,
           "scheme": "http"
         },
         "ui": {
@@ -1974,21 +1718,6 @@ Dependency internal host values are generated from the endpoint-owning Compose s
           "scheme": "redis"
         }
       }
-    },
-
-    "worker-api": {
-      "compose": ".docker/dependencies/worker.compose.yml",
-      "dependsOn": [
-        "dependencies.redis"
-      ],
-      "endpoints": {
-        "http": {
-          "service": "worker-api",
-          "port": 7000,
-          "primary": true,
-          "scheme": "http"
-        }
-      }
     }
   },
 
@@ -2003,18 +1732,6 @@ Dependency internal host values are generated from the endpoint-owning Compose s
     "app": {
       "env": {
         "LOG_LEVEL": "debug"
-      }
-    },
-    "dependencies": {
-      "firebase": {
-        "env": {
-          "GCLOUD_PROJECT": "orders-dev"
-        },
-        "endpoints": {
-          "ui": {
-            "publicPort": 4000
-          }
-        }
       }
     }
   },
@@ -2045,6 +1762,12 @@ Dependency internal host values are generated from the endpoint-owning Compose s
       }
     },
     "dependencies": {
+      "firebase": {
+        "env": {
+          "GCLOUD_PROJECT": "orders-e2e"
+        }
+      },
+
       "mailpit": {
         "compose": ".docker/dependencies/mailpit.compose.yml",
         "endpoints": {
@@ -2061,170 +1784,69 @@ Dependency internal host values are generated from the endpoint-owning Compose s
             "scheme": "http"
           }
         }
-      },
-      "worker-api": {
-        "dependsOn": [
-          "dependencies.mailpit"
-        ]
       }
     }
   }
 }
 ```
 
+Effective E2E application behavior:
+
+```text
+structured config = base -> prod -> e2e
+target            = prod
+EXEC_MODE         = prod
+INFRA_MODE        = integrated
+env file          = .env.e2e
+```
+
+Effective service E2E tester behavior:
+
+```text
+target            = test-e2e
+EXEC_MODE         = e2e
+INFRA_MODE        = not set
+env file          = .env.e2e-tester
+```
+
 ---
 
-# 13. Removed fields and replacements
+# 13. Removed fields
 
-Builder V2 rejects these V1/V1.2 fields.
-
-| Removed field | Replacement |
+| Removed V1/V1.2 field | V2 replacement |
 |---|---|
 | root `port` | `app.endpoints.<name>.publicPort` |
 | `envOverrides` | `app.env` |
-| `overrides` | root stage objects + `<stage>.override-compose` |
-| `composeFiles` | no generic merge list; use dependencies/stage override |
-| `services` | no generic service injection; use dependencies |
-| `policy`, `policies` | Builder-owned built-in validation |
+| `overrides` | stage object + `<stage>.override-compose` |
+| `composeFiles` | explicit dependencies / stage override |
+| root `services` | dependencies / mesh composition |
+| `policy`, `policies` | Builder-owned validation |
 | dependency `path` | dependency `compose` |
-| dependency `service` | endpoint-level required `service` |
-| dependency `port` | named endpoint `port` / `publicPort` |
+| dependency `service` | endpoint-level `service` |
+| dependency `port` | endpoint `port` / `publicPort` |
 | dependency `ports` | named endpoints |
 | `injects` | consumer-owned `env` |
-| `sidecars` | ordinary dependencies, including stage-only dependencies |
+| `sidecars` | ordinary dependencies, including E2E-only dependencies |
 
-Builder performs no automatic V1-to-V2 translation.
-
----
-
-# 14. Common patterns
-
-## Internal-only dependency
-
-```json
-"redis": {
-  "compose": ".docker/dependencies/redis.compose.yml",
-  "endpoints": {
-    "redis": {
-      "service": "redis",
-      "port": 6379,
-      "primary": true,
-      "scheme": "redis"
-    }
-  }
-}
-```
-
-No `publicPort`, so Redis is not host-published.
+Builder performs no automatic legacy translation.
 
 ---
 
-## Debug UI available to the host
-
-```json
-"firebase": {
-  "compose": ".docker/dependencies/firebase.compose.yml",
-  "endpoints": {
-    "firestore": {
-      "service": "firebase-emulator",
-      "port": 8080,
-      "primary": true,
-      "scheme": "http"
-    },
-    "ui": {
-      "service": "firebase-ui",
-      "port": 4000,
-      "publicPort": "AUTO",
-      "scheme": "http"
-    }
-  }
-}
-```
-
-The app can use Firestore internally while the developer can open the UI on its allocated host port.
-
----
-
-## E2E substitute using real adapter
-
-```json
-"e2e": {
-  "app": {
-    "env": {
-      "SMTP_HOST": "${dependencies.mailpit.endpoints.smtp.network_host}",
-      "SMTP_PORT": "${dependencies.mailpit.endpoints.smtp.network_port}"
-    }
-  },
-  "dependencies": {
-    "mailpit": {
-      "compose": ".docker/dependencies/mailpit.compose.yml",
-      "endpoints": {
-        "smtp": {
-          "service": "mailpit",
-          "port": 1025,
-          "primary": true,
-          "scheme": "smtp"
-        }
-      }
-    }
-  }
-}
-```
-
-The application still uses the real SMTP/Nodemailer integrated adapter. Only endpoint configuration changes.
-
----
-
-## Service E2E tester
-
-```json
-"tester": {
-  "env": {
-    "API_URL": "${app.endpoints.http.public_url}"
-  }
-}
-```
-
-Correct because the tester is host-networked.
-
-This is invalid:
-
-```json
-"tester": {
-  "env": {
-    "API_URL": "${app.endpoints.http.network_url}"
-  }
-}
-```
-
-Builder rejects it.
-
----
-
-# 15. Summary
+# 14. Summary
 
 `build.json` answers:
 
 ```text
-What is this service?
-What runtime env does its app consume?
-What named endpoints does its app expose?
-What logical infrastructure dependencies can it use?
-How are local/default dependencies implemented?
+What is this independently runnable service?
+What app environment does it consume?
+What endpoints does the app expose?
+What logical dependencies exist?
+How is each local/default dependency implemented?
 Which Compose service owns each dependency endpoint?
-What must be healthy before the app/dependency starts?
-What changes by dev/prod/test/e2e stage?
-What public host exposure is possible in standalone execution?
-What environment does the service-level E2E tester receive?
+What must be healthy before the app/dependency proceeds?
+What changes in dev/prod/test/e2e?
+What can be host-published?
+What environment does the service E2E tester receive?
 ```
 
-It does not answer:
-
-```text
-Which other top-level service should replace this dependency?
-Which mesh endpoints should actually be host-published?
-How are multiple independently runnable services composed?
-What is the global E2E tester?
-```
-
-Those are `mesh.json` responsibilities.
+It does not decide which mesh service fulfills a logical slot or which endpoints a mesh actually publishes. Those are `mesh.json` responsibilities.
