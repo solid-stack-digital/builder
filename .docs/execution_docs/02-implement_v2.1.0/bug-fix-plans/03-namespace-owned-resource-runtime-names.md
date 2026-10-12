@@ -1,6 +1,6 @@
 # 03 — Namespace physical resource names, not only Compose keys
 
-**ID:** V210-003. **Priority:** High. **Status:** reproduced for volumes, networks, configs, and secrets. **Fix not applied.**
+**ID:** V210-003. **Priority:** High. **Status:** implemented and verified on 2026-10-12. The original red test and implementation plan are preserved below.
 
 ## Bug and trigger
 
@@ -143,3 +143,13 @@ These snippets assume `namespaceResourceDefinition` is imported from the propose
 Run the gate, `tests/v2/dependencyCompose.test.ts`, `tests/v2/meshTester.test.ts`, dependency/substitution conformance suites, and plan 00's final checks. An optional Docker acceptance test can use two disposable dependency volumes, write different marker files, and assert separation.
 
 Correcting an existing explicit owned name changes which runtime resource the project uses. Existing data does not automatically migrate. Do not delete or rename old Docker volumes in this code change. Document the behavior change for users who deliberately supplied global names; use `external: true` for explicitly shared external resources. The fix must never relabel an owned resource as external simply to preserve the accidental sharing.
+
+## Implementation record — 2026-10-12
+
+The four V210-003 regressions failed before the source change: separate volume, network, config, and secret definitions retained one identical explicit physical `name`. All four passed after the change.
+
+`namespaceResourceDefinition.ts` removes `name` from Builder-owned resource definitions so Compose derives a project-scoped physical name from the generated key. It preserves other resource options and source file paths. For `external: true`, it preserves an explicit external name or records the original source key as `name` before Builder renames the Compose key. Dependency bundles and global tester helpers share this behavior through `namespaceDependencyCompose`; app stage overrides call the same helper.
+
+The permanent `tests/conformance/v210-resource-runtime-names.test.ts` checks the original four failures, the rewritten service references, external identity and input preservation, resource options and files, independent standalone projects, separate mesh services, substitution, E2E app override resources, and tester helper resources. Related dependency, substitution, and tester suites also passed.
+
+Validation: 217 focused and related tests passed; 514 conformance tests passed; 750 tests passed in the full suite; TypeScript and removed-V1-token checks passed. No live Docker acceptance run was performed. The behavior and data migration limit for formerly fixed owned volumes are documented in `docs/reference/dependency-compose-contract.md` and `docs/reference/override-compose-contract.md`. Existing Docker volumes were neither renamed nor deleted. Plans 04–07 remain separate work.

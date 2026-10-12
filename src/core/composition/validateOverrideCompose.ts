@@ -4,6 +4,7 @@ import { canonicalPath } from "../../utils/paths.js";
 import { parseVolume, namespaceVolume } from "./composeVolumes.js";
 import { ConfigError } from "../../errors/ConfigError.js";
 import { normalizeComposeEnvironment } from "./composeEnvironment.js";
+import { namespaceResourceDefinition } from "./namespaceResourceDefinition.js";
 import type { ComposeDocument, ComposeService } from "./types.js";
 export interface PreparedAppOverride {app:ComposeService;resources:Pick<ComposeDocument,"volumes"|"networks"|"configs"|"secrets">;}
 export interface AppOverrideValidationContext {
@@ -68,7 +69,7 @@ export function validateAndPrepareAppOverride(document:ComposeDocument,context:A
    if (!refs.has(name)) fail(`${kind}.${name}`, "override resource must be consumed by app");
    const prefix=context.resourceNamespace && context.resourceNamespace!=="app" ? `svc--${context.resourceNamespace}--app-override` : "app-override";
    const target = allocator.allocate(JSON.stringify(["service",context.resourceNamespace??"app","override",context.stage,kind,name]),`${prefix}--${context.stage}--${kind.slice(0, -1)}--${name}`);
-   names.set(name, target); mapped[target] = definition;
+   names.set(name, target); mapped[target] = namespaceResourceDefinition(name, definition);
   }
   if (names.size) resources[kind] = mapped;
   if (Array.isArray(value)) (app as any)[kind] = value.map(ref => kind === "volumes" ? namespaceVolume(ref, names) : typeof ref === "string" ? names.get(ref) ?? ref : ref && typeof ref === "object" && typeof (ref as any).source === "string" ? { ...ref, source: names.get((ref as any).source) ?? (ref as any).source } : ref);
