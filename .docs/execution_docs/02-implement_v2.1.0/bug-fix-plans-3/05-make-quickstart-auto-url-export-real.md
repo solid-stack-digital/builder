@@ -82,3 +82,14 @@ environment values; it does not emit a separate endpoint registry.
 2. Check the first quickstart JSON block with `JSON.parse`, compile the example with `compileApplicationEnv("dev", ...)`, and assert `PUBLIC_URL` matches the resolved `http://127.0.0.1:<number>` format. Its numeric port may vary; never hardcode it in the test or docs.
 3. Run `pnpm exec vitest run tests/conformance/v213-audit.test.ts tests/exportEnv.test.ts` and `pnpm typecheck`.
 4. Inspect the final prose so it accurately states the file-writing behavior and existing-file prompt. Leave the runtime export implementation and schema untouched.
+
+## Implementation record — 2026-10-13
+
+The service quickstart configured `publicPort: "AUTO"` and instructed readers to read the resolved host URL from an export, but omitted the necessary `app.env` reference.
+
+1. Updated `docs/getting-started/service-quickstart.md` to declare `"PUBLIC_URL": "${app.endpoints.http.public_url}"` in `app.env` within the sample `build.json`.
+2. Updated the quickstart text to instruct users to run `builder service export env dev`, read `PUBLIC_URL` from `.env.dev.resolved`, and clarified that `PORT` represents the container port rather than the allocated host port.
+3. Updated `docs/recipes/automatic-host-ports.md` explaining that exporting the allocated URL requires an explicit `public_url` reference in `build.json.app.env`.
+
+Validation: All V213-D05 quickstart and control tests in `tests/conformance/v213-audit.test.ts` passed.
+

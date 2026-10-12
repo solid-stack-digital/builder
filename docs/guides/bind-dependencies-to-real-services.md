@@ -5,8 +5,8 @@ Suppose frontend's build config declares `dependencies.backend` and a local mock
 ```json
 {
   "services": {
-    "frontend": { "path": "../frontend", "dependencies": { "backend": "backend" } },
-    "backend": { "path": "../backend" }
+    "frontend": { "path": "./services/frontend", "dependencies": { "backend": "backend" } },
+    "backend": { "path": "./services/backend" }
   }
 }
 ```

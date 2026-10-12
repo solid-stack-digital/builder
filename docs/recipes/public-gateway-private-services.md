@@ -5,9 +5,9 @@ Give only the gateway an endpoint `publicPort` in its service build config. Then
 ```json
 {
   "services": {
-    "frontend": { "path": "../frontend", "publish": [] },
-    "backend": { "path": "../backend", "publish": [] },
-    "gateway": { "path": "../gateway", "dependsOn": ["frontend", "backend"], "publish": ["app.endpoints.http"] }
+    "frontend": { "path": "./services/frontend", "publish": [] },
+    "backend": { "path": "./services/backend", "publish": [] },
+    "gateway": { "path": "./services/gateway", "dependsOn": ["frontend", "backend"], "publish": ["app.endpoints.http"] }
   }
 }
 ```

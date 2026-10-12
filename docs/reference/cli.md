@@ -58,7 +58,7 @@ Stage is omitted to export all `dev`, `prod`, `test`, `e2e`, or choose exactly o
 | `--full` | Compile dev export with local dependencies integrated. |
 | `--silence-warnings` | Suppress non-critical URL-templating warnings. |
 
-Default files are `.env.dev`, `.env.prod`, `.env.test`, `.env.e2e`. If a target exists, an interactive prompt asks to overwrite; declining lets you choose another relative filename. Non-interactive overwrite requires selecting a different name. Exports can contain secrets; keep them out of version control.
+Default files are `.env.dev.resolved`, `.env.prod.resolved`, `.env.test.resolved`, `.env.e2e.resolved`. Output snapshots are kept distinct from runtime `.env.<stage>` inputs so Builder-owned keys (`EXEC_MODE`, `INFRA_MODE`, `PORT`) do not poison future runs. If a target exists, an interactive prompt asks to overwrite; declining lets you choose another relative filename. Non-interactive overwrite requires selecting a different name. Exports can contain secrets; keep them out of version control.
 
 ## Mesh commands
 

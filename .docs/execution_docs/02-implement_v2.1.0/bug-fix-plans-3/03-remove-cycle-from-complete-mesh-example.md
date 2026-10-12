@@ -55,3 +55,13 @@ Add one sentence after the example: “Gateway waits for frontend and backend; f
 2. Resolve the parsed example for `dev`, `prod`, and `e2e` using `resolveMeshStage`. The test stage can also be checked, but the canonical global test pipeline is separate and must not be described as an integrated mesh-test topology.
 3. After plan 02, confirm the example's service paths satisfy the mesh-root path rule. Do not change source lifecycle validation or suppress the error to make the documentation pass.
 4. Run `pnpm test:conformance`; the existing lifecycle cycle tests should stay green.
+
+## Implementation record — 2026-10-13
+
+The complete mesh example in `docs/reference/mesh-json.md` previously included `frontend.dependsOn: ["gateway"]` while `gateway.dependsOn` declared `["frontend", "backend"]`, causing `resolveMeshStage` to fail with a cycle detection error (`frontend -> gateway -> frontend`).
+
+1. Removed `"dependsOn": ["gateway"]` from `frontend` in `docs/reference/mesh-json.md`.
+2. Added clarification explaining that gateway waits for frontend and backend while frontend's dependency binding supplies its own provider readiness, ensuring an acyclic topology.
+
+Validation: All V213-D03 regression and control tests (including multi-stage resolution across dev, prod, and e2e) passed.
+

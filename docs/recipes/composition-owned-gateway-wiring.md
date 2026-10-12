@@ -5,10 +5,10 @@ Composition-specific URLs belong in mesh service `env`:
 ```json
 {
   "services": {
-    "frontend": { "path": "../frontend" },
-    "backend": { "path": "../backend" },
+    "frontend": { "path": "./services/frontend" },
+    "backend": { "path": "./services/backend" },
     "gateway": {
-      "path": "../gateway",
+      "path": "./services/gateway",
       "env": {
         "FRONTEND_URL": "${frontend.app.endpoints.http.network_url}",
         "BACKEND_URL": "${backend.app.endpoints.http.network_url}"

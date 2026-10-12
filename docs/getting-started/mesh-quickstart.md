@@ -1,14 +1,28 @@
 # Compose a two-service mesh
 
-Assume independent `frontend` and `backend` service projects. Frontend's `build.json` declares a logical dependency named `backend` with an endpoint `http`; it may use a local mock Compose implementation when run alone.
+Assume independent `frontend` and `backend` service projects nested under the mesh project directory:
+
+```text
+mesh-project/
+  mesh.json
+  services/
+    frontend/
+      build.json
+      Dockerfile
+    backend/
+      build.json
+      Dockerfile
+```
+
+These are independently runnable service projects whose directories are nested under the mesh project. Frontend's `build.json` declares a logical dependency named `backend` with an endpoint `http`; it may use a local mock Compose implementation when run alone.
 
 Create a mesh project `mesh.json`:
 
 ```json
 {
   "services": {
-    "frontend": { "path": "../frontend", "dependencies": { "backend": "backend" } },
-    "backend": { "path": "../backend", "publish": [] }
+    "frontend": { "path": "./services/frontend", "dependencies": { "backend": "backend" } },
+    "backend": { "path": "./services/backend", "publish": [] }
   }
 }
 ```

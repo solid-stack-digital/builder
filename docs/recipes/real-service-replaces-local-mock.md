@@ -5,8 +5,8 @@ Frontend declares logical dependency `backend` and references `${dependencies.ba
 ```json
 {
   "services": {
-    "frontend": { "path": "../frontend", "dependencies": { "backend": "backend" } },
-    "backend": { "path": "../backend" }
+    "frontend": { "path": "./services/frontend", "dependencies": { "backend": "backend" } },
+    "backend": { "path": "./services/backend" }
   }
 }
 ```

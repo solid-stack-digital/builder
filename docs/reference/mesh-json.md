@@ -68,6 +68,18 @@ No deletion syntax exists. Every active binding, reference, dependency path, rea
 
 ## Complete example
 
+The example assumes independently runnable service projects nested under the mesh project directory (`./services/<name>`):
+
+```text
+mesh-project/
+  mesh.json
+  services/
+    frontend/
+    backend/
+    gateway/
+    fake-payments/
+```
+
 ```json
 {
   "$schema": "../schemas/mesh-schema.json",
@@ -75,15 +87,14 @@ No deletion syntax exists. Every active binding, reference, dependency path, rea
   "tester": { "compose": "e2e/tester.yml", "service": "runner", "env": { "GATEWAY_URL": "${gateway.app.endpoints.http.public_url}" } },
   "services": {
     "frontend": {
-      "path": "../frontend",
+      "path": "./services/frontend",
       "env": { "BACKEND_URL": "${frontend.dependencies.backend.endpoints.http.network_url}" },
       "dependencies": { "backend": "backend" },
-      "dependsOn": ["gateway"],
       "publish": []
     },
-    "backend": { "path": "../backend", "publish": [] },
+    "backend": { "path": "./services/backend", "publish": [] },
     "gateway": {
-      "path": "../gateway",
+      "path": "./services/gateway",
       "env": { "FRONTEND_URL": "${frontend.app.endpoints.http.network_url}", "BACKEND_URL": "${backend.app.endpoints.http.network_url}" },
       "dependsOn": ["frontend", "backend"],
       "publish": ["app.endpoints.http"]
@@ -94,12 +105,14 @@ No deletion syntax exists. Every active binding, reference, dependency path, rea
   "test": { "services": { "frontend": { "env": { "TEST_MODE": "true" } } } },
   "e2e": {
     "services": {
-      "fake-payments": { "path": "../fake-payments", "publish": ["app.endpoints.http"] },
+      "fake-payments": { "path": "./services/fake-payments", "publish": ["app.endpoints.http"] },
       "frontend": { "dependencies": { "payments-api": "fake-payments" } }
     }
   }
 }
 ```
+
+Gateway waits for frontend and backend; frontend's backend binding supplies its own provider readiness. Neither service waits for gateway.
 
 The example assumes the corresponding service projects declare the listed logical dependencies/endpoints. The E2E-only provider must have a valid path and a publishable `http` endpoint; frontend must declare `payments-api` in its effective build configuration. The provider's `publish` overlay is added only in E2E.
 

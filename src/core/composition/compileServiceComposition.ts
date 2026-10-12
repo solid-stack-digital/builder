@@ -1,6 +1,7 @@
 import { GeneratedComposeNameAllocator } from "./generatedNames.js";
 import { normalizeNetworks } from "./composeNetworks.js";
 import { resolveApplicationDockerfile } from "../config/pathSafety.js";
+import { selectAppEnvironmentEntries } from "./selectAppEnvironmentEntries.js";
 import fs from "node:fs";
 import path from "node:path";
 import { parse } from "yaml";
@@ -53,9 +54,27 @@ export function compileServiceComposition(stage:Environment,projectDir:string,op
  const allocation=allocateHostPorts(root,stage,intents,Boolean(options.validationMode),{sourceFile:buildPath,composition:"service"});for(const [name,ep] of Object.entries(appEndpoints))if(allocation.has(ep.logicalPath)){ep.publicHost=PUBLIC_HOST;ep.publicPort=allocation.get(ep.logicalPath)!;ep.effectivelyPublished=true;}for(const [key,eps] of Object.entries(depEndpoints))for(const [name,ep] of Object.entries(eps))if(allocation.has(ep.logicalPath)){ep.publicHost=PUBLIC_HOST;ep.publicPort=allocation.get(ep.logicalPath)!;ep.effectivelyPublished=true;}
  const registry=(ref:ParsedBuilderReference,context:ReferenceDiagnosticContext):string=>{if(ref.target==="app"){const ep=appEndpoints[ref.endpoint];if(!ep)throw new ConfigError({...context,referencedObject:ref.raw,reason:"Unknown app endpoint reference"});return resolveEndpointProperty(ep,ref.property,{...context,referencedObject:ref.raw});}const ep=depEndpoints[ref.dependency!]?.[ref.endpoint];if(!ep)throw new ConfigError({...context,referencedObject:ref.raw,reason:"Unknown dependency endpoint reference"});return resolveEndpointProperty(ep,ref.property,{...context,referencedObject:ref.raw});};
  for(const [key,dep] of Object.entries(effective.dependencies)){const depEnv=options.deferReferenceResolution?dep.env:resolveEnv(dep.env,registry,{sourceFile:buildPath,configPath:`dependencies.${key}.env`,stage,composition:"service"});for(const svc of Object.values(materialized[key]?.compose.services??{}))mergeComposeEnvironment(svc,depEnv);}
- const appEnvironmentLayers: import("./types.js").AppEnvironmentLayer[]=[];for(const layer of effective.layers){if(Object.keys(layer.appEnv).length){const configPath=layer.stage==="base"?"app.env":`${layer.stage}.app.env`;assertNoBuilderOwnedEnvKeys(layer.appEnv,[EXEC_MODE_KEY,INFRA_MODE_KEY,...(getPrimaryEndpoint(effective.app.endpoints)?[PORT_KEY]:[])],{sourceFile:buildPath,configPath,stage,composition:"service"});appEnvironmentLayers.push({kind:"build-json",stage:layer.stage,configPath,values:{...layer.appEnv}});}}const resolveAppLayers=()=>{const values:ComposeEnvironmentMap={};for(const layer of appEnvironmentLayers){if(layer.kind==="build-json"){const context={sourceFile:buildPath,configPath:layer.configPath,stage,composition:"service" as const};Object.assign(values,resolveEnv(layer.values,registry,context));}else Object.assign(values,layer.values);}return values;};
+ const appEnvironmentLayers: import("./types.js").AppEnvironmentLayer[]=[];for(const layer of effective.layers){if(Object.keys(layer.appEnv).length){const configPath=layer.stage==="base"?"app.env":`${layer.stage}.app.env`;assertNoBuilderOwnedEnvKeys(layer.appEnv,[EXEC_MODE_KEY,INFRA_MODE_KEY,...(getPrimaryEndpoint(effective.app.endpoints)?[PORT_KEY]:[])],{sourceFile:buildPath,configPath,stage,composition:"service"});appEnvironmentLayers.push({kind:"build-json",stage:layer.stage,configPath,values:{...layer.appEnv}});}}
+ const resolveAppLayers = (): ComposeEnvironmentMap => {
+  const result: ComposeEnvironmentMap = {};
+  const laterKeys = new Set(Object.keys(options.externalAppEnv ?? {}));
+  for (const [key, layer] of selectAppEnvironmentEntries(appEnvironmentLayers, laterKeys)) {
+    if (layer.kind === "build-json") {
+      const context = {
+        sourceFile: buildPath,
+        configPath: layer.configPath,
+        stage,
+        composition: "service" as const,
+      };
+      result[key] = resolveEnv({ [key]: layer.values[key]! }, registry, context)[key]!;
+    } else {
+      result[key] = layer.values[key]!; // null is meaningful to Compose
+    }
+  }
+  return result;
+ };
  const runtimeDotenv=path.join(root,`.env.${profile.envStage}`);assertDotenvDoesNotDefineKeys(runtimeDotenv,[EXEC_MODE_KEY,INFRA_MODE_KEY,...(getPrimaryEndpoint(effective.app.endpoints)?[PORT_KEY]:[])],{configPath:`.env.${profile.envStage}`,stage,composition:"service"});const internal={EXEC_MODE:profile.execMode,INFRA_MODE:profile.infraMode,...(getPrimaryEndpoint(effective.app.endpoints)?{PORT:String(getPrimaryEndpoint(effective.app.endpoints)![1].port)}:{})};
- const appBuild=app.build&&typeof app.build==="object"?app.build as Record<string,unknown>:{context:"."};const outputDir=options.composeOutputDir?path.resolve(options.composeOutputDir):root;const serviceContext=path.relative(outputDir,root).replace(/\\/g,"/")||".";appBuild.context=options.meshMode?serviceContext:".";if(raw.dockerfile)appBuild.dockerfile=raw.dockerfile;else delete appBuild.dockerfile;appBuild.target=profile.appTarget;app.build=appBuild;app.env_file=[{path:options.meshMode?path.posix.join(serviceContext,`.env.${profile.envStage}`):`.env.${profile.envStage}`,required:false}];app.environment={...(options.deferReferenceResolution?{}:resolveAppLayers()),...(options.externalAppEnv?Object.fromEntries(Object.entries(options.externalAppEnv).map(([k,v])=>[k,v.replace(/\$/g,"$$$$")])):{}),...internal};if(stage==="dev")app.volumes=[`${options.meshMode&&serviceContext!=="."?`./${serviceContext}`:"."}:/app`,"/app/node_modules"];
+ const appBuild=app.build&&typeof app.build==="object"?app.build as Record<string,unknown>:{context:"."};const outputDir=options.composeOutputDir?path.resolve(options.composeOutputDir):root;const serviceContext=path.relative(outputDir,root).replace(/\\/g,"/")||".";appBuild.context=options.meshMode?serviceContext:".";if(raw.dockerfile)appBuild.dockerfile=raw.dockerfile;else delete appBuild.dockerfile;appBuild.target=profile.appTarget;app.build=appBuild;app.env_file=[{path:options.meshMode?path.posix.join(serviceContext,`.env.${profile.envStage}`):`.env.${profile.envStage}`,required:false}];app.environment={...(options.externalAppEnv?Object.fromEntries(Object.entries(options.externalAppEnv).map(([k,v])=>[k,v.replace(/\$/g,"$$$$")])):{}),...internal};if(stage==="dev")app.volumes=[`${options.meshMode&&serviceContext!=="."?`./${serviceContext}`:"."}:/app`,"/app/node_modules"];
  for(const [name,ep] of Object.entries(appEndpoints))if(!options.meshMode&&ep.effectivelyPublished)addPorts(app,[[ep,ep.publicPort!]],buildPath,stage);
  for(const [key,dependency] of Object.entries(materialized)){for(const [epName,owner] of dependency.endpointOwnerMap.entries()){const endpoint=depEndpoints[key]![epName]!;if(!options.meshMode&&endpoint.effectivelyPublished)addPorts(compose.services[owner]!,[[endpoint,endpoint.publicPort!]],dependency.composePath,stage);}
   // Make endpoint owners reachable on the default network when dependency declares custom networks.

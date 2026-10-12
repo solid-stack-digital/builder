@@ -154,3 +154,26 @@ Keep the mesh env's own resolution/validation call; a bad reference in its winni
 5. Run `pnpm exec vitest run tests/conformance/v213-audit.test.ts tests/conformance/09-mesh-env.test.ts tests/v2/compileApplicationEnv.test.ts`, then `pnpm typecheck` and the full suite.
 
 After the final test passes, retain the regression file in `tests/conformance/`. Do not make a schema change for this behavior; it is effective-layer evaluation, not JSON shape.
+
+## Implementation record — 2026-10-13
+
+The V213-001 regression failed prior to source changes because `compileServiceComposition` and `resolveMeshAppEnvironment` resolved each application environment layer in sequence rather than resolving only the winning layer per environment key according to V2 precedence. Consequently, invalid or dangling references in lower layers (such as base `app.env`) failed compilation even when explicitly overridden by stage values, override Compose environment, or mesh service environment.
+
+1. Added `src/core/composition/selectAppEnvironmentEntries.ts` which iterates active layers in precedence order and eliminates keys defined in `laterKeys` (e.g. external app env or mesh env).
+2. Updated `src/core/composition/compileServiceComposition.ts` to use `selectAppEnvironmentEntries` when executing `resolveAppLayers()`, deferring resolution until all override Compose layers have been incorporated.
+3. Updated `src/core/mesh/v2/resolveMeshAppEnvironment.ts` and its three callers (`compileMeshComposition.ts`, `checkMeshServices.ts`, and `runMeshTestUnit.ts`) to pass higher-precedence `meshEnv` keys into `resolveMeshAppEnvironmentLayers` as `laterKeys`.
+
+The test suite in `tests/conformance/v213-audit.test.ts` covers:
+- Standalone base reference overwritten by stage env.
+- Prod app reference overwritten in e2e stage.
+- Build reference replaced by active override Compose env.
+- Overwritten base app reference in mesh.
+- Build reference replaced by mesh service env.
+- Control: unresolved reference in effective winning layer still rejected.
+- Control: full precedence chain override and independent key preservation.
+- Control: unresolved reference in winning mesh value rejected with source path.
+- Control: Builder-owned key rejection even when overwritten.
+- Control: override Compose `null` entry masking a lower reference.
+
+Validation: All V213-001 tests and related mesh/compile env suites passed.
+

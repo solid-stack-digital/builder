@@ -5,8 +5,8 @@ A binding maps a consumer's logical dependency slot to an existing top-level mes
 ```json
 {
   "services": {
-    "frontend": { "path": "../frontend", "dependencies": { "backend": "backend" } },
-    "backend": { "path": "../backend" }
+    "frontend": { "path": "./services/frontend", "dependencies": { "backend": "backend" } },
+    "backend": { "path": "./services/backend" }
   }
 }
 ```

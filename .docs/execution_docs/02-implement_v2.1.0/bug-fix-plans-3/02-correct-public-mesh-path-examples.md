@@ -95,3 +95,13 @@ Explain that these are independently runnable service projects whose directories
 2. Run `rg -n '"path": "\.\./' docs` and verify no mesh service example remains. Inspect any match manually rather than changing unrelated Markdown links.
 3. Parse the quickstart and complete-reference JSON snippets and confirm they are valid JSON with the new paths. For an integration control, create a disposable mesh root containing `services/frontend` and `services/backend` fixture projects, then compile `mesh dev` with those paths; it must not raise a path-escape error.
 4. Run the documentation checks and `pnpm test:conformance`. Report any remaining prerequisites (provider endpoint names, Dockerfile, local dependency implementation) as explicit assumptions in the example rather than changing Builder behavior.
+
+## Implementation record — 2026-10-13
+
+Public documentation examples previously used sibling paths like `"path": "../frontend"` that violated Builder's path-safety rules (`resolveInsideProject`).
+
+1. Replaced all escaping `"path": "../..."` service paths with nested paths `"path": "./services/..."` across ten documentation pages (`docs/concepts/dependency-substitution.md`, `docs/getting-started/mesh-quickstart.md`, `docs/guides/bind-dependencies-to-real-services.md`, `docs/guides/configure-global-mesh-e2e.md`, `docs/guides/publish-mesh-endpoints.md`, `docs/recipes/composition-owned-gateway-wiring.md`, `docs/recipes/public-gateway-private-services.md`, `docs/recipes/real-service-replaces-local-mock.md`, `docs/recipes/stage-only-e2e-provider.md`, and `docs/reference/mesh-json.md`).
+2. Added directory layout notes to `docs/getting-started/mesh-quickstart.md` and `docs/reference/mesh-json.md` showing independent service projects nested under the mesh project directory.
+
+Validation: V213-D02 documentation regression and control assertions passed; zero escaping path references remain in `docs/`.
+

@@ -4,17 +4,17 @@ Audit date: 2026-10-12–13 (Asia/Manila). Audited commit: `f4098f5073e224d1e054
 
 ## Results and implementation order
 
-The core V2 model and the previous ten reported fixes have regression coverage, but this pass reproduced two new implementation bugs and three public-documentation mismatches. The `docs/` pages were checked against the normative `.docs/EXECUTION_MODEL.md` and `.docs/specs_v2/*` documents, then against current compiler behavior where a page promised an observable result.
+The core V2 model and the previous ten reported fixes have regression coverage. All two implementation bugs and three public-documentation mismatches identified in this third iteration have been resolved and verified with regression tests in `tests/conformance/v213-audit.test.ts`.
 
-| Plan | Type / priority | Confirmed behavior | Red assertions |
-|---|---|---|---:|
-| [01 — Effective app env references](01-resolve-only-effective-app-env-references.md) | Code / medium | A reference in a lower app env layer is resolved even after a stage, override Compose, or mesh env value replaces that key | 5 |
-| [02 — Escaping mesh example paths](02-correct-public-mesh-path-examples.md) | Docs / high | Ten public pages show `../service` mesh paths that Builder's path-safety rule rejects | 1 |
-| [03 — Cyclic complete mesh example](03-remove-cycle-from-complete-mesh-example.md) | Docs / high | The “Complete example” has `frontend -> gateway -> frontend` readiness cycle | 1 |
-| [04 — Export poisons runtime dotenv](04-keep-resolved-env-export-separate-from-runtime-dotenv.md) | Code and docs / high | Default resolved export writes Builder-owned keys into `.env.dev`, which the next compile rejects | 1 |
-| [05 — Missing quickstart AUTO URL export](05-make-quickstart-auto-url-export-real.md) | Docs / medium | The quickstart promises a resolved host URL in exported app env without declaring the reference that would put it there | 1 |
+| Plan | Type / priority | Confirmed behavior | Status | Red assertions |
+|---|---|---|---|---:|
+| [01 — Effective app env references](01-resolve-only-effective-app-env-references.md) | Code / medium | A reference in a lower app env layer is resolved even after a stage, override Compose, or mesh env value replaces that key | Implemented & Verified | 5 |
+| [02 — Escaping mesh example paths](02-correct-public-mesh-path-examples.md) | Docs / high | Ten public pages show `../service` mesh paths that Builder's path-safety rule rejects | Implemented & Verified | 1 |
+| [03 — Cyclic complete mesh example](03-remove-cycle-from-complete-mesh-example.md) | Docs / high | The “Complete example” has `frontend -> gateway -> frontend` readiness cycle | Implemented & Verified | 1 |
+| [04 — Export poisons runtime dotenv](04-keep-resolved-env-export-separate-from-runtime-dotenv.md) | Code and docs / high | Default resolved export writes Builder-owned keys into `.env.dev`, which the next compile rejects | Implemented & Verified | 1 |
+| [05 — Missing quickstart AUTO URL export](05-make-quickstart-auto-url-export-real.md) | Docs / medium | The quickstart promises a resolved host URL in exported app env without declaring the reference that would put it there | Implemented & Verified | 1 |
 
-Implement in order 01, 02, 03, 04, 05. Plans 02 and 03 both edit `docs/reference/mesh-json.md`; apply plan 02's path changes and then plan 03's edge removal. Plan 05 depends on plan 04's corrected export destination. Plans 01 and 04 touch source; plans 02, 03, and 05 change public documentation only. Prior plans remain in `bug-fix-plans-2` under their own numbering; do not append these findings there.
+All plans were implemented in order (01, 02, 03, 04, 05). All red assertions now pass together with control suites.
 
 ## Normative sources
 

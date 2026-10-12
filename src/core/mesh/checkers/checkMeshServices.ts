@@ -43,7 +43,7 @@ export function checkMeshServices(
         for (const key of ["EXEC_MODE","INFRA_MODE",...(Object.values(svc.effectiveBuild.app.endpoints).some(ep=>ep.primary)?["PORT"]:[])]) {
           if (key in svc.meshEnv) throw new ConfigError({sourceFile:meshPath,configPath:`services.${name}.env.${key}`,stage:"test",composition:"mesh",reason:"Mesh service env cannot set Builder-owned environment"});
         }
-        resolveMeshAppEnvironmentLayers(name,fragment.appEnvironmentLayers,ctx);
+        resolveMeshAppEnvironmentLayers(name,fragment.appEnvironmentLayers,ctx,new Set(Object.keys(svc.meshEnv)));
         for (const [depName,depEnv] of Object.entries(fragment.dependencyEnvironments??{})) resolveServiceBuildEnvThroughMesh(name,depEnv,ctx,`services.${name}.dependencies.${depName}.env`);
         resolveMeshEnvMap(svc.meshEnv,ctx,`services.${name}.env`);
       }

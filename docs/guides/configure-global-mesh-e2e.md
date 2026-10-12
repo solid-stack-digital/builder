@@ -9,7 +9,7 @@ Root `mesh.json.tester` selects a Compose implementation and its exact runner se
     "service": "runner",
     "env": { "BASE_URL": "${gateway.app.endpoints.http.public_url}" }
   },
-  "services": { "gateway": { "path": "../gateway", "publish": ["app.endpoints.http"] } }
+  "services": { "gateway": { "path": "./services/gateway", "publish": ["app.endpoints.http"] } }
 }
 ```
 

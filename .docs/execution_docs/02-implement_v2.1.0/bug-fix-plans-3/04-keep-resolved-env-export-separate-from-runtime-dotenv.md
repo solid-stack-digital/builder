@@ -76,3 +76,15 @@ Update `docs/reference/cli.md` and `docs/guides/export-resolved-environment.md` 
 5. Run `pnpm exec vitest run tests/conformance/v213-audit.test.ts tests/exportEnv.test.ts tests/compileApplicationEnv.test.ts`, `pnpm typecheck`, and the full suite. If an existing test asserts the old default filename, update it to the new documented output only after the red gate confirms the bug.
 
 Users who previously exported to `.env.<stage>` may already have a poisoned runtime input. Document that they should move that snapshot aside or delete the Builder-owned lines before running the fixed command; do not silently rewrite their existing file during a read-only compile.
+
+## Implementation record — 2026-10-13
+
+`builder service export env` previously wrote output directly to `.env.<stage>`, which the service compiler subsequently loaded as a runtime input and rejected due to Builder-owned keys (`EXEC_MODE`, `INFRA_MODE`, and `PORT`).
+
+1. Updated default export filenames in `src/commands/service/commands/export/handler.ts` to `.env.${snapshot.stage}.resolved`.
+2. Added `assertSafeDestination` to reject any attempt (including via prompt input or symlink alias) to write a resolved snapshot to a runtime `.env.<stage>` input file.
+3. Updated public documentation in `docs/guides/export-resolved-environment.md` and `docs/reference/cli.md` detailing the `.resolved` output filenames and explaining the separation between input dotenv and output snapshot.
+4. Updated existing unit tests in `tests/exportEnv.test.ts` to reflect `.env.<stage>.resolved`.
+
+Validation: All V213-004 tests in `tests/conformance/v213-audit.test.ts` (including table-driven multi-stage checks and prompt decline checks) and `tests/exportEnv.test.ts` passed.
+

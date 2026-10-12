@@ -5,7 +5,7 @@ import pc from "picocolors";
 import { compileApplicationEnv, serializeApplicationEnv } from "../../../../core/compileApplicationEnv.js";
 import { ScriptError } from "../../../../errors/ScriptError.js";
 import type { Environment } from "../../../../types/index.js";
-import { resolveProjectDir } from "../../../../utils/paths.js";
+import { canonicalPath, resolveProjectDir } from "../../../../utils/paths.js";
 
 const STAGES: Environment[] = ["dev", "prod", "test", "e2e"];
 
@@ -23,6 +23,16 @@ export async function handleExportEnv(rawStage?: string, options: ExportEnvOptio
     throw new ScriptError(`Unknown environment stage: "${rawStage}". Supported stages: ${STAGES.join(", ")}`);
   }
   const projectDir = resolveProjectDir(options.projectDir);
+  const runtimeInputs = new Set(
+    STAGES.map(s => canonicalPath(path.join(projectDir, `.env.${s}`))),
+  );
+  const assertSafeDestination = (candidate: string): void => {
+    if (runtimeInputs.has(canonicalPath(candidate))) {
+      throw new ScriptError(
+        `Resolved env export cannot overwrite a runtime .env.<stage> input: ${candidate}`,
+      );
+    }
+  };
   const stages = stage === undefined ? STAGES : [stage as Environment];
   // Compile every snapshot before writing, so a chosen filename cannot change
   // the inputs used when compiling a later stage.
@@ -42,7 +52,7 @@ export async function handleExportEnv(rawStage?: string, options: ExportEnvOptio
   const files: string[] = [];
   try {
     for (const snapshot of snapshots) {
-      let filename = path.join(projectDir, `.env.${snapshot.stage}`);
+      let filename = path.join(projectDir, `.env.${snapshot.stage}.resolved`);
       while (true) {
         let overwrite = false;
         if (existsSync(filename)) {
@@ -52,9 +62,11 @@ export async function handleExportEnv(rawStage?: string, options: ExportEnvOptio
             const name = (await ask(`New filename for ${snapshot.stage} (relative to the service directory): `)).trim();
             if (!name) continue;
             filename = path.resolve(projectDir, name);
+            assertSafeDestination(filename);
             continue;
           }
         }
+        assertSafeDestination(filename);
         mkdirSync(path.dirname(filename), { recursive: true });
         try {
           writeFileSync(filename, snapshot.content, { encoding: "utf-8", flag: overwrite ? "w" : "wx", mode: 0o600 });
