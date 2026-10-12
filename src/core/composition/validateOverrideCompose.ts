@@ -1,14 +1,52 @@
+import path from "node:path";
+import { canonicalPath } from "../../utils/paths.js";
 import { parseVolume, namespaceVolume } from "./composeVolumes.js";
 import { ConfigError } from "../../errors/ConfigError.js";
 import { normalizeComposeEnvironment } from "./composeEnvironment.js";
 import type { ComposeDocument, ComposeService } from "./types.js";
 export interface PreparedAppOverride {app:ComposeService;resources:Pick<ComposeDocument,"volumes"|"networks"|"configs"|"secrets">;}
-export function validateAndPrepareAppOverride(document:ComposeDocument,context:{file:string;stage:string;expectedBuildContext?:string}):PreparedAppOverride{
+export interface AppOverrideValidationContext {
+  file: string;
+  stage: string;
+  /** Builder context in the final Compose coordinate system. */
+  expectedBuildContext: string;
+  /** Output directory against which both contexts are interpreted. */
+  buildContextBaseDir: string;
+}
+
+function canonicalBuildContext(value: string, baseDir: string): string {
+  return canonicalPath(path.resolve(baseDir, value));
+}
+
+function isSameBuildContext(actual: string, expected: string, baseDir: string): boolean {
+  return canonicalBuildContext(actual, baseDir) === canonicalBuildContext(expected, baseDir);
+}
+
+export function validateAndPrepareAppOverride(document:ComposeDocument,context:AppOverrideValidationContext):PreparedAppOverride{
  const fail=(path:string,reason:string,value?:unknown):never=>{throw new ConfigError({sourceFile:context.file,configPath:path,stage:context.stage,composition:"service",...(value===undefined?{}:{value}),reason})};
  const keys=Object.keys(document.services??{});if(keys.length!==1||keys[0]!=="app")fail("services","override must define exactly one service named app");const app=structuredClone(document.services.app!);
  for(const k of ["ports","depends_on","network_mode","container_name","privileged"] as const)if(app[k]!==undefined)fail(`services.app.${k}`,"override cannot own endpoint or lifecycle behavior");
  if(app.healthcheck&&typeof app.healthcheck==="object"){const health=app.healthcheck as Record<string,unknown>;for(const key of Object.keys(health))if(!["interval","timeout","retries","start_period","start_interval"].includes(key))fail(`services.app.healthcheck.${key}`,"override may set only healthcheck timing fields");}
- if(app.build&&typeof app.build==="object"){const b=app.build as any;for(const k of ["target","dockerfile"] as const)if(b[k]!==undefined)fail(`services.app.build.${k}`,"override cannot change Builder-owned build configuration");if(b.context!==undefined&&b.context!=="."&&b.context!==context.expectedBuildContext)fail("services.app.build.context","override cannot change app build context");}
+
+ if (typeof app.build === "string") {
+  fail("services.app.build", "override cannot replace Builder-owned app build context; use object-form build.args for build arguments", app.build);
+ }
+ if (app.build && typeof app.build === "object") {
+  const build = app.build as Record<string, unknown>;
+  for (const key of ["target", "dockerfile"] as const) {
+   if (build[key] !== undefined) {
+    fail(`services.app.build.${key}`, "override cannot change Builder-owned build configuration");
+   }
+  }
+  if (build.context !== undefined) {
+   if (typeof build.context !== "string") {
+    fail("services.app.build.context", "override app build context must be a string", build.context);
+   }
+   if (!isSameBuildContext(build.context as string, context.expectedBuildContext, context.buildContextBaseDir)) {
+    fail("services.app.build.context", "override cannot change app build context", build.context);
+   }
+  }
+ }
  const env=normalizeComposeEnvironment(app.environment,"services.app.environment");for(const k of ["EXEC_MODE","INFRA_MODE"])if(k in env)fail(`services.app.environment.${k}`,"override cannot set Builder-owned environment");app.environment=env;
  const resourceKeys=["volumes","networks","configs","secrets"] as const;const resources:PreparedAppOverride["resources"]={};
  for (const kind of resourceKeys) {

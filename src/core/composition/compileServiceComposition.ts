@@ -17,7 +17,7 @@ import { resolveProjectDir } from "../../utils/paths.js";
 import { deriveProjectName } from "../../utils/projectName.js";
 import { getDockerComposeTemplate } from "../templates.js";
 import { loadComposeDocument } from "./loadCompose.js";
-import { rebaseComposePaths } from "./composePaths.js";
+import { rebaseComposePaths, rebaseAppOverridePaths } from "./composePaths.js";
 import { normalizeComposeEnvironment, mergeComposeEnvironment } from "./composeEnvironment.js";
 import { namespaceDependencyCompose } from "./namespaceDependencyCompose.js";
 import { validateDependencyCompose } from "./validateDependencyCompose.js";
@@ -57,7 +57,36 @@ export function compileServiceComposition(stage:Environment,projectDir:string,op
   for(const owner of dependency.endpointOwners){const svc=compose.services[owner]!;if(!options.meshMode&&svc.networks!==undefined){const nets=svc.networks;if(Array.isArray(nets)){if(!nets.includes("default"))nets.push("default");}else if(nets&&typeof nets==="object")(nets as any).default=null;}}
   for(const [epName,ep] of Object.entries(depEndpoints[key]!))dependency.endpoints[epName]=ep;
  }
- if(effective.overrideCompose){const overridePath=resolveInsideProject(root,effective.overrideCompose,{sourceFile:buildPath,configPath:"override-compose",stage});const odoc=rebaseComposePaths(loadComposeDocument(overridePath,{sourceFile:buildPath,configPath:"override-compose",stage,composition:"service"}),overridePath,options.composeOutputDir??root);const prepared=validateAndPrepareAppOverride(odoc,{file:overridePath,stage,expectedBuildContext:options.meshMode?(path.relative(options.composeOutputDir??root,root).replace(/\\/g,"/")||"."):"."});for(const section of ["volumes","networks","configs","secrets"] as const)if(prepared.resources[section])mergeDocument(compose,{services:{},[section]:prepared.resources[section]} as ComposeDocument,"app override");const rawOverrideEnv=normalizeComposeEnvironment(prepared.app.environment,"override-compose.services.app.environment");const overrideEnv=options.deferReferenceResolution?rawOverrideEnv:resolveEnv(rawOverrideEnv,registry,"override-compose.services.app.environment");if(getPrimaryEndpoint(effective.app.endpoints)&&"PORT" in overrideEnv)throw new ConfigError({sourceFile:overridePath,configPath:"services.app.environment.PORT",stage,composition:"service",reason:"Override cannot set Builder-owned PORT"});buildAppEnvironment={...appEnv,...overrideEnv};const merged={...app,...prepared.app};merged.environment={...appEnv,...overrideEnv,...(options.externalAppEnv?Object.fromEntries(Object.entries(options.externalAppEnv).map(([k,v])=>[k,v.replace(/\$/g,"$$$$")])):{}),...internal};const overrideBuild=prepared.app.build&&typeof prepared.app.build==="object"?prepared.app.build as Record<string,unknown>:{};if(overrideBuild.args!==undefined)appBuild.args=overrideBuild.args;merged.build=appBuild;merged.env_file=app.env_file;merged.depends_on=app.depends_on;merged.networks={...(!options.meshMode?{default:null}:{}),...normalizeNetworks(app.networks),...normalizeNetworks(prepared.app.networks)};compose.services.app=merged;app=merged;}
+ if (effective.overrideCompose) {
+  const overridePath = resolveInsideProject(root, effective.overrideCompose, {
+   sourceFile: buildPath, configPath: "override-compose", stage,
+  });
+  const loadedOverride = loadComposeDocument(overridePath, {
+   sourceFile: buildPath, configPath: "override-compose", stage, composition: "service",
+  });
+  const overrideDocument = rebaseAppOverridePaths(loadedOverride, root, outputDir);
+  const prepared = validateAndPrepareAppOverride(overrideDocument, {
+   file: overridePath,
+   stage,
+   expectedBuildContext: String(appBuild.context),
+   buildContextBaseDir: outputDir,
+  });
+  for(const section of ["volumes","networks","configs","secrets"] as const)if(prepared.resources[section])mergeDocument(compose,{services:{},[section]:prepared.resources[section]} as ComposeDocument,"app override");
+  const rawOverrideEnv=normalizeComposeEnvironment(prepared.app.environment,"override-compose.services.app.environment");
+  const overrideEnv=options.deferReferenceResolution?rawOverrideEnv:resolveEnv(rawOverrideEnv,registry,"override-compose.services.app.environment");
+  if(getPrimaryEndpoint(effective.app.endpoints)&&"PORT" in overrideEnv)throw new ConfigError({sourceFile:overridePath,configPath:"services.app.environment.PORT",stage,composition:"service",reason:"Override cannot set Builder-owned PORT"});
+  buildAppEnvironment={...appEnv,...overrideEnv};
+  const merged={...app,...prepared.app};
+  merged.environment={...appEnv,...overrideEnv,...(options.externalAppEnv?Object.fromEntries(Object.entries(options.externalAppEnv).map(([k,v])=>[k,v.replace(/\$/g,"$$$$")])):{}),...internal};
+  const overrideBuild=prepared.app.build&&typeof prepared.app.build==="object"?prepared.app.build as Record<string,unknown>:{};
+  if(overrideBuild.args!==undefined)appBuild.args=overrideBuild.args;
+  merged.build=appBuild;
+  merged.env_file=app.env_file;
+  merged.depends_on=app.depends_on;
+  merged.networks={...(!options.meshMode?{default:null}:{}),...normalizeNetworks(app.networks),...normalizeNetworks(prepared.app.networks)};
+  compose.services.app=merged;
+  app=merged;
+ }
  if(options.meshMode&&options.appServiceName&&options.appServiceName!=="app"){delete compose.services.app;compose.services[options.appServiceName]=app;}
  if(profile.integrated)applyDependencyLifecycle(app,materialized,effective);
  if(profile.attachTester&&!options.meshMode){const testerEnvRaw=effective.tester?.env??{};assertTesterReferencesArePublic(testerEnvRaw,"build","tester.env");const testerEnv=options.deferReferenceResolution?testerEnvRaw:resolveEnv(testerEnvRaw,registry,"tester.env");compose.services.tester={build:{context:".",...(raw.dockerfile?{dockerfile:raw.dockerfile}:{}),target:"test-e2e"},network_mode:"host",environment:testerEnv,depends_on:{app:{condition:"service_healthy"}}};}

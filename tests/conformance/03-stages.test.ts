@@ -1,3 +1,8 @@
+import { symlinkSync } from "node:fs";
+import { rebaseAppOverridePaths, rebaseComposePaths } from "../../src/core/composition/composePaths.js";
+import path from "node:path";
+import { checkAllEffectiveServiceStages } from "../../src/core/checkers/checkEffectiveServiceStages.js";
+import { checkMeshServices } from "../../src/core/mesh/checkers/checkMeshServices.js";
 import { runStep } from "../../src/core/checkers/runStep.js";
 import { checkDockerfileContract } from "../../src/core/checkers/checkDockerfileContract.js";
 vi.mock("../../src/core/checkers/runStep.js",()=>({runStep:vi.fn()}));
@@ -202,5 +207,154 @@ describe("catalog 03: stages, Dockerfile, and override Compose", () => {
     const root = fixture({ app: { endpoints: { http: http() } }, e2e: { app: { env: { BAD: "${app.endpoints.missing.network_host}" } } } });
     expect(() => compileService("prod", root)).not.toThrow();
     expect(() => compileService("e2e", root)).toThrow(/missing/);
+  });
+
+  it("regression: nested build-args-only override preserves standalone Builder context", () => {
+    const override = ".docker/overrides/docker-compose.web-build.override.yml";
+    const root = fixture(
+      { app: {}, prod: { "override-compose": override }, e2e: { "override-compose": override } },
+      { [override]: { services: { app: { build: { args: { BASE_PATH: "/web" } } } } } },
+    );
+    for (const stage of ["prod", "e2e"] as const) {
+      const build = compileService(stage, root).compose.services.app?.build as Record<string, unknown>;
+      expect(build.context).toBe(".");
+      expect(build.target).toBe("prod");
+      expect(build.args).toEqual({ BASE_PATH: "/web" });
+    }
+  });
+
+  it("regression: cross-stage preflight accepts valid nested prod and e2e build-arg overrides", () => {
+    const override = ".docker/overrides/docker-compose.web-build.override.yml";
+    const root = fixture(
+      { app: {}, prod: { "override-compose": override }, e2e: { "override-compose": override } },
+      { [override]: { services: { app: { build: { args: { BASE_PATH: "/web" } } } } } },
+    );
+    expect(() => checkAllEffectiveServiceStages(root)).not.toThrow();
+  });
+
+  it("regression: explicit app context equal to Builder context is accepted", () => {
+    const override = ".docker/overrides/docker-compose.override.yml";
+    const root = fixture(
+      { app: {}, prod: { "override-compose": override } },
+      { [override]: { services: { app: { build: { context: ".", args: { MODE: "prod" } } } } } },
+    );
+    const build = compileService("prod", root).compose.services.app?.build as Record<string, unknown>;
+    expect(build.context).toBe(".");
+    expect(build.target).toBe("prod");
+    expect(build.args).toEqual({ MODE: "prod" });
+  });
+
+  it("regression: actual application build-context replacement remains forbidden", () => {
+    const override = ".docker/overrides/docker-compose.override.yml";
+    const root = fixture(
+      { app: {}, prod: { "override-compose": override } },
+      { [override]: { services: { app: { build: { context: "./other-context", args: { MODE: "prod" } } } } } },
+    );
+    expect(() => compileService("prod", root)).toThrow(/override cannot change app build context/i);
+  });
+
+  it("regression: nested override relative bind source is relative to the service project", () => {
+    const override = ".docker/overrides/docker-compose.dev.override.yml";
+    const root = fixture(
+      { app: {}, dev: { "override-compose": override } },
+      { [override]: { services: { app: { volumes: [".:/workspace"] } } } },
+    );
+    const volumes = compileService("dev", root).compose.services.app?.volumes;
+    expect(volumes).toContain(".:/workspace");
+    expect(volumes).not.toContain("./.docker/overrides:/workspace");
+  });
+
+  it("regression: nested build-args-only override preserves Builder context in mesh prod and e2e", () => {
+    const override = ".docker/overrides/docker-compose.web-build.override.yml";
+    const mesh = {
+      services: { frontend: { path: "services/frontend" } },
+      tester: { compose: "e2e.yml", service: "runner" },
+    };
+    const root = meshFixture(mesh, {
+      "services/frontend": { app: {}, prod: { "override-compose": override }, e2e: { "override-compose": override } },
+    }, {
+      [`services/frontend/${override}`]: { services: { app: { build: { args: { BASE_PATH: "/web" } } } } },
+      "e2e.yml": { services: { runner: { image: "alpine" } } },
+    });
+    for (const stage of ["prod", "e2e"] as const) {
+      const build = compileMesh(stage, root).compose.services.frontend?.build as Record<string, unknown>;
+      expect(path.resolve(root, String(build.context))).toBe(path.resolve(root, "services/frontend"));
+      expect(build.target).toBe("prod");
+      expect(build.args).toEqual({ BASE_PATH: "/web" });
+    }
+    expect(() => checkMeshServices(mesh, root)).not.toThrow();
+  });
+
+  it("regression: mesh context validation compares path identity rather than raw spelling", () => {
+    const override = ".docker/overrides/docker-compose.override.yml";
+    const root = meshFixture(
+      { services: { frontend: { path: "services/frontend" } } },
+      { "services/frontend": { app: {}, prod: { "override-compose": override } } },
+      { [`services/frontend/${override}`]: { services: { app: { build: { context: ".", args: { MODE: "prod" } } } } } },
+    );
+    const build = compileMesh("prod", root).compose.services.frontend?.build as Record<string, unknown>;
+    expect(path.resolve(root, String(build.context))).toBe(path.resolve(root, "services/frontend"));
+  });
+
+  it("regression: override build ownership rejects strings, Dockerfiles, and non-string contexts", () => {
+    for (const build of [".", "./other", { dockerfile: "OtherDockerfile" }, { context: 42 }]) {
+      const root = fixture({ app: {}, prod: { "override-compose": "o.yml" } }, {
+        "o.yml": { services: { app: { build } } },
+      });
+      expect(() => compileService("prod", root)).toThrow(/services.app.build/);
+    }
+  });
+
+  it("regression: explicit symlink context is compared by filesystem identity", () => {
+    const root = fixture({ app: {}, prod: { "override-compose": "o.yml" } }, {
+      "o.yml": { services: { app: { build: { context: "./alias", args: { FLAG: "yes" } } } } },
+    });
+    symlinkSync(root, path.join(root, "alias"), "dir");
+    expect(compileService("prod", root).compose.services.app?.build).toMatchObject({
+      context: ".", target: "prod", args: { FLAG: "yes" },
+    });
+  });
+
+  it("regression: preflight still rejects invalid prod and e2e overrides", () => {
+    for (const stage of ["prod", "e2e"]) {
+      const root = fixture({ app: {}, [stage]: { "override-compose": "o.yml" } }, {
+        "o.yml": { services: { app: { build: { target: "anything" } } } },
+      });
+      expect(() => checkAllEffectiveServiceStages(root)).toThrow(/build.target/);
+    }
+  });
+
+  it("regression: dependency implicit context and app overlay paths retain distinct semantics", () => {
+    const root = fixture();
+    const service = path.join(root, "services/frontend");
+    const document = {
+      services: { app: {
+        build: { args: { FLAG: "yes" } },
+        env_file: ["./runtime.env", { path: "./optional.env", required: false }],
+        volumes: [".:/app", "cache:/cache", { type: "bind", source: "./src", target: "/src" }],
+      } },
+      configs: { settings: { file: "./settings.json" } },
+      secrets: { token: { file: "./token.txt" } },
+    };
+    const result = rebaseAppOverridePaths(document, service, root);
+    expect(result.services.app?.build).toEqual({ args: { FLAG: "yes" } });
+    expect(result.services.app?.env_file).toEqual([
+      "./services/frontend/runtime.env",
+      { path: "./services/frontend/optional.env", required: false },
+    ]);
+    expect(result.services.app?.volumes).toEqual([
+      "./services/frontend:/app", "cache:/cache",
+      { type: "bind", source: "./services/frontend/src", target: "/src" },
+    ]);
+    expect(result.configs?.settings).toEqual({ file: "./services/frontend/settings.json" });
+    expect(result.secrets?.token).toEqual({ file: "./services/frontend/token.txt" });
+    expect(rebaseAppOverridePaths({
+      services: { app: { env_file: "./runtime.env" } },
+    }, service, root).services.app?.env_file).toBe("./services/frontend/runtime.env");
+    const dependency = rebaseComposePaths(document, path.join(service, ".docker/dependency.yml"), root);
+    expect(dependency.services.app?.build).toEqual({
+      context: "./services/frontend/.docker", args: { FLAG: "yes" },
+    });
+    expect(document.services.app.build).toEqual({ args: { FLAG: "yes" } });
   });
 });

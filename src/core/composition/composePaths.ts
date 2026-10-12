@@ -19,3 +19,56 @@ export function rebaseComposePaths(document:ComposeDocument,composeFilePath:stri
  for(const kind of ["configs","secrets"] as const)for(const def of Object.values(doc[kind]??{}))if(def&&typeof def==="object"&&typeof (def as any).file==="string")(def as any).file=rebase((def as any).file,base,out);
  return doc;
 }
+
+/** App overlays resolve paths from the service project and never invent a build context. */
+export function rebaseAppOverridePaths(
+  document: ComposeDocument,
+  serviceProjectDir: string,
+  outputProjectDir: string,
+): ComposeDocument {
+  const doc = structuredClone(document);
+  const base = path.resolve(serviceProjectDir);
+  const out = path.resolve(outputProjectDir);
+
+  for (const svc of Object.values(doc.services ?? {})) {
+    if (svc.build && typeof svc.build === "object" && !Array.isArray(svc.build)) {
+      const build = svc.build as Record<string, unknown>;
+      if (typeof build.context === "string") {
+        build.context = rebase(build.context, base, out);
+      }
+    }
+    if (typeof svc.env_file === "string") {
+      svc.env_file = rebase(svc.env_file, base, out);
+    } else if (Array.isArray(svc.env_file)) {
+      svc.env_file = svc.env_file.map(entry => {
+        if (typeof entry === "string") return rebase(entry, base, out);
+        if (entry && typeof entry === "object") {
+          const value = entry as Record<string, unknown>;
+          if (typeof value.path === "string") return { ...value, path: rebase(value.path, base, out) };
+        }
+        return entry;
+      });
+    }
+    if (Array.isArray(svc.volumes)) {
+      svc.volumes = svc.volumes.map(volume => {
+        if (typeof volume === "string") return volumeShort(volume, base, out);
+        if (volume && typeof volume === "object") {
+          const value = volume as Record<string, unknown>;
+          if (value.type === "bind" && typeof value.source === "string") {
+            return { ...value, source: rebase(value.source, base, out) };
+          }
+        }
+        return volume;
+      });
+    }
+  }
+  for (const kind of ["configs", "secrets"] as const) {
+    for (const definition of Object.values(doc[kind] ?? {})) {
+      if (definition && typeof definition === "object") {
+        const value = definition as Record<string, unknown>;
+        if (typeof value.file === "string") value.file = rebase(value.file, base, out);
+      }
+    }
+  }
+  return doc;
+}

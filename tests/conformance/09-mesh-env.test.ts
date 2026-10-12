@@ -1,3 +1,4 @@
+import { runMeshTestUnit } from "../../src/core/mesh/runners/runMeshTestUnit.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { meshSchema } from "../../src/core/mesh/meshSchema.js";
 import { resolveMeshStage } from "../../src/core/config/resolveMeshStage.js";
@@ -158,5 +159,34 @@ describe("catalog 09: mesh overlays and environment precedence", () => {
     const result = compileMesh("prod", root);
     expect(env(result.compose.services.api).DB_MODE).toBe("external");
     expect(env(result.compose.services[result.endpoints.dependencies.api?.db?.api?.networkHost!]).DB_MODE).toBe("local");
+  });
+
+  it("regression: isolated mesh test-unit rejects cross-service environment references", async () => {
+    const root = meshFixture({
+      services: {
+        frontend: { path: "frontend", env: { FRONTEND_EXTERNAL_URL: "${gateway.app.endpoints.http.public_url}/web" } },
+        gateway: { path: "gateway", publish: ["app.endpoints.http"] },
+      },
+      test: {},
+    }, {
+      frontend: { app: {} },
+      gateway: { app: { endpoints: { http: http() } } },
+    });
+    await expect(runMeshTestUnit({ projectDir: root, dryRun: true }))
+      .rejects.toThrow(/Unknown mesh service reference "gateway"/);
+  });
+
+  it("regression: test overlay can replace integrated cross-service URL with isolated literal", async () => {
+    const root = meshFixture({
+      services: {
+        frontend: { path: "frontend", env: { FRONTEND_EXTERNAL_URL: "${gateway.app.endpoints.http.public_url}/web" } },
+        gateway: { path: "gateway", publish: ["app.endpoints.http"] },
+      },
+      test: { services: { frontend: { env: { FRONTEND_EXTERNAL_URL: "http://127.0.0.1:3000/web" } } } },
+    }, {
+      frontend: { app: {} },
+      gateway: { app: { endpoints: { http: http() } } },
+    });
+    await expect(runMeshTestUnit({ projectDir: root, dryRun: true })).resolves.toBe(0);
   });
 });
