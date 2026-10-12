@@ -14,3 +14,11 @@ describe("canonical mesh Phase 1 service tests",()=>{
  it("PIPE-003 uses root paths rather than test-stage path overrides",async()=>{const root=mesh({services:{api:{path:"api"}},test:{services:{api:{path:"alternate"}}}});runTest.mockResolvedValue(0);await runMeshServiceTests({projectDir:root});expect(runTest.mock.calls[0]![0].projectDir).toBe(path.join(root,"api"));});
  it("PIPE-004 forwards execution flags and does not require global tester",async()=>{const root=mesh({services:{api:{path:"api"}}});runTest.mockResolvedValue(0);await runMeshServiceTests({projectDir:root,debug:true,dryRun:true});expect(runTest).toHaveBeenCalledWith(expect.objectContaining({debug:true,detach:false,dryRun:true,skipBanner:true,projectDir:path.join(root,"api")}));});
 });
+
+it("does not start the next root service after cleanup rejects", async () => {
+ const root = mesh({services:{alpha:{path:"alpha"},zeta:{path:"zeta"}}});
+ const error = new Error("teardown failed");
+ runTest.mockRejectedValueOnce(error);
+ await expect(runMeshServiceTests({projectDir:root})).rejects.toBe(error);
+ expect(runTest).toHaveBeenCalledTimes(1);
+});

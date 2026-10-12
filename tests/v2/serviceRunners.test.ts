@@ -10,3 +10,10 @@ describe("service test orchestration",()=>{
  it("stops before E2E when unit tests fail",async()=>{unit.mockResolvedValueOnce(4);expect(await runTest({projectDir:"/tmp",debug:false,detach:false})).toBe(4);expect(e2e).not.toHaveBeenCalled();});
  it("runs E2E after successful unit tests",async()=>{unit.mockResolvedValueOnce(0);e2e.mockResolvedValueOnce(0);expect(await runTest({projectDir:"/tmp",debug:false,detach:false})).toBe(0);expect(e2e).toHaveBeenCalledOnce();});
 });
+
+it("stops before E2E when unit cleanup rejects", async () => {
+ const error = new Error("teardown failed");
+ unit.mockRejectedValueOnce(error);
+ await expect(runTest({projectDir:"/tmp",debug:false,detach:false})).rejects.toBe(error);
+ expect(e2e).not.toHaveBeenCalled();
+});

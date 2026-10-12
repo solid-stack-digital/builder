@@ -1,3 +1,4 @@
+import { runWithCleanup } from "../runWithCleanup.js";
 import { anonymousVolumeServices } from "../composition/composeVolumes.js";
 import pc from "picocolors";
 import { parse } from "yaml";
@@ -53,18 +54,18 @@ export const runDev = async (options: RunOptions): Promise<number> => {
     upArgs.push("-d");
   }
 
-  let status = 0;
-  try {
-    status = await runCompose(upArgs, finalYamlConfig, options.projectDir, {
+  const status = await runWithCleanup(
+    () => runCompose(upArgs, finalYamlConfig, options.projectDir, {
       removeVolumes: false,
-    });
-  } finally {
-    if (!options.detach) {
-      await teardownCompose(finalYamlConfig, options.projectDir, {
-        removeVolumes: false,
-      });
-      clearRunState(options.projectDir);
-    }
-  }
+    }),
+    async () => {
+      if (!options.detach) {
+        await teardownCompose(finalYamlConfig, options.projectDir, {
+          removeVolumes: false,
+        });
+        clearRunState(options.projectDir);
+      }
+    },
+  );
   return status;
 };

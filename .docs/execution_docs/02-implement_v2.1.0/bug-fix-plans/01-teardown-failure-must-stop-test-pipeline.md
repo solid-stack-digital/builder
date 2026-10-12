@@ -1,6 +1,6 @@
 # 01 — Fail the test pipeline when teardown fails
 
-**ID:** V210-001. **Priority:** High. **Status:** reproduced on the audited commit. **Fix not applied.**
+**ID:** V210-001. **Priority:** High. **Status:** implemented and verified on 2026-10-12. The original reproduction and implementation plan are preserved below.
 
 ## Bug, trigger, and impact
 
@@ -122,3 +122,27 @@ For runner tests, reuse existing mocks in `tests/v2/serviceRunners.test.ts` and 
 ## Completion checks and risks
 
 Run the exact gate, cleanup regressions, service/mesh runner tests, then the final checks in plan 00. Existing callers that relied on swallowed errors may now fail; that is required for command/test correctness, but audit signal-handler rejection handling carefully. This change cannot guarantee Docker cleanup succeeds; it guarantees Builder never reports a failed cleanup as a clean test boundary.
+
+## Implementation record — 2026-10-12
+
+The unmodified implementation failed the exact V210-001 gate: two failed cleanup attempts returned success. The implementation therefore proceeded under the required red-test gate.
+
+Changes applied:
+
+- `teardownCompose` now throws `ScriptError` after both down attempts fail, including silent mode, process errors, and timeouts. The final process error remains available as `cause`, and the teardown signal guard is reset in `finally`.
+- Service and mesh runners use `runWithCleanup` to preserve both execution and cleanup failures, including nonzero execution exit codes. The combined message contains both diagnostics for ordinary CLI output. Saved run state is cleared only after successful cleanup.
+- Failed initial cleanup prevents execution and prevents overwriting previous run state. Existing down handlers propagate failure and retain state.
+- Signal shutdown awaits sequential cleanup, reports failures, attempts remaining active projects, and exits with the signal's nonzero status. It does not erase saved recovery state.
+- Permanent tests cover initial/final cleanup failure in all four test runners, successful cleanup, recovery-state persistence, down commands, signal shutdown, retry recovery/exhaustion, process errors/timeouts, and propagation through service and mesh pipelines.
+
+Validation:
+
+- Original red gate: failed as documented before source edits.
+- Cleanup-focused tests: 21 passed.
+- Runner, signal, combined-error, and pipeline tests: 36 passed.
+- Full suite: 60 files / 731 tests passed.
+- Conformance: 16 files / 495 tests passed.
+- TypeScript check and removed-V1-token check passed.
+- Final diagnostic-message change: 23 focused tests passed; TypeScript check passed again.
+
+No live Docker acceptance tests were run; process outcomes were simulated and recovery-state persistence was checked with real temporary state files. Plans 02–07 remain separate work.

@@ -8,3 +8,10 @@ describe("mesh test phases", () => {
   it("stops before global E2E when a service lifecycle fails", async () => { services.mockResolvedValueOnce(2); expect(await runMeshTest({})).toBe(2); expect(e2e).not.toHaveBeenCalled(); });
   it("runs global E2E only after all service lifecycles pass", async () => { services.mockResolvedValueOnce(0); e2e.mockResolvedValueOnce(0); expect(await runMeshTest({})).toBe(0); expect(services).toHaveBeenCalledOnce(); expect(e2e).toHaveBeenCalledOnce(); });
 });
+
+it("stops before global E2E when service cleanup rejects", async () => {
+ const error = new Error("teardown failed");
+ services.mockRejectedValueOnce(error);
+ await expect(runMeshTest({})).rejects.toBe(error);
+ expect(e2e).not.toHaveBeenCalled();
+});
