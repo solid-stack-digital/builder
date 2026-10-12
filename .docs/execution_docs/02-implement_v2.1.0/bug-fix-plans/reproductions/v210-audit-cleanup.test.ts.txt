@@ -1,0 +1,16 @@
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
+import { spawn } from 'node:child_process';
+import { afterEach, expect, it, vi } from 'vitest';
+import { teardownCompose } from '../src/core/teardownCompose.js';
+vi.mock('node:child_process', () => ({ spawn: vi.fn(() => {
+  const child = Object.assign(new EventEmitter(), { stdin: new PassThrough(), kill: vi.fn() });
+  queueMicrotask(() => child.emit('close', 1));
+  return child;
+}) }));
+afterEach(() => vi.clearAllMocks());
+it('V210-001 rejects when both cleanup attempts fail', async () => {
+  const outcome = await teardownCompose('services: {app: {image: alpine}}', process.cwd(), { removeVolumes: true, silent: true }).then(() => ({ rejected: false }), error => ({ rejected: true, error }));
+  expect(spawn).toHaveBeenCalledTimes(2);
+  expect(outcome.rejected).toBe(true);
+});
