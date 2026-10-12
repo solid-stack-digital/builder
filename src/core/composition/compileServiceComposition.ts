@@ -24,6 +24,7 @@ import { normalizeComposeEnvironment, mergeComposeEnvironment } from "./composeE
 import { namespaceDependencyCompose } from "./namespaceDependencyCompose.js";
 import { validateDependencyCompose } from "./validateDependencyCompose.js";
 import { validateAndPrepareAppOverride } from "./validateOverrideCompose.js";
+import { mergeAppOverride } from "./mergeAppOverride.js";
 import { applyDependencyLifecycle } from "./dependencyLifecycle.js";
 import { buildStandaloneAppEndpoints, buildStandaloneDependencyEndpoints } from "./serviceEndpoints.js";
 import type { ComposeEnvironmentMap, ComposeDocument, ComposeService, CompiledServiceComposition, MaterializedDependency, ServiceExecutionProfile } from "./types.js";
@@ -83,7 +84,7 @@ export function compileServiceComposition(stage:Environment,projectDir:string,op
   if(getPrimaryEndpoint(effective.app.endpoints)&&"PORT" in overrideEnv)throw new ConfigError({sourceFile:overridePath,configPath:"services.app.environment.PORT",stage,composition:"service",reason:"Override cannot set Builder-owned PORT"});
   const overrideStage=layer.stage === "base" ? stage : layer.stage;const stageOrder:Record<string,number>={base:0,dev:1,prod:1,test:1,e2e:2};let insertAt=appEnvironmentLayers.findIndex(item=>(stageOrder[item.stage]??0)>(stageOrder[overrideStage]??0));if(insertAt<0)insertAt=appEnvironmentLayers.length;appEnvironmentLayers.splice(insertAt,0,{kind:"override-compose",stage:overrideStage,sourceFile:overridePath,configPath:`${layer.stage}.override-compose.services.app.environment`,values:overrideEnv});
   const preparedApp={...prepared.app};delete preparedApp.environment;delete preparedApp.build;
-  const merged={...app,...preparedApp};
+  const merged=mergeAppOverride(app,preparedApp);
   merged.environment={...app.environment,...(options.externalAppEnv?Object.fromEntries(Object.entries(options.externalAppEnv).map(([k,v])=>[k,v.replace(/\$/g,"$$$$")])):{}),...internal};
   const overrideBuild=prepared.app.build&&typeof prepared.app.build==="object"?prepared.app.build as Record<string,unknown>:{};
   if(overrideBuild.args!==undefined){const current=appBuild.args,incoming=overrideBuild.args;appBuild.args=current&&incoming&&typeof current==="object"&&typeof incoming==="object"&&!Array.isArray(current)&&!Array.isArray(incoming)?{...(current as object),...(incoming as object)}:incoming;}

@@ -1,6 +1,6 @@
 # 02 — Deep-merge inherited app Compose maps
 
-**ID:** V210-002. **Priority:** Medium. **Status:** two reproduced cases. **Fix not applied.**
+**ID:** V210-002. **Priority:** Medium. **Status:** implemented and verified on 2026-10-12. The original red test and implementation plan are preserved below.
 
 ## Bug and expected behavior
 
@@ -121,3 +121,13 @@ pnpm typecheck
 ```
 
 Run plan 00's final checks after all accepted fixes. The implementation expands deep merging to permitted runtime maps; review array/scalar controls carefully to avoid introducing a Compose-style sequence union where the Builder specification requires replacement.
+
+## Implementation record — 2026-10-12
+
+The two exact behavioral regressions failed before the source change: the E2E healthcheck contained only `start_period`, and the E2E logging map contained only `max-size`. Both passed after changing the app overlay merge.
+
+`src/core/composition/mergeAppOverride.ts` now recursively merges plain maps, replaces scalars and arrays, inherits omitted fields, and clones nested values without mutating either input. `compileServiceComposition.ts` uses it only for app override fields; the existing dedicated environment, build, lifecycle, and network assignments retain their precedence and ownership rules.
+
+The permanent suite is `tests/conformance/v210-compose-overlay-merge.test.ts`. It includes the two red regressions, scalar and array replacement, omitted-map inheritance, non-mutation, mesh E2E parity, and forbidden Builder-owned fields.
+
+Validation: 73 focused/related tests passed, 504 conformance tests passed, typecheck passed, and the removed-V1-token check passed. A concurrent full-suite run had one unrelated host-port allocation test fail because it expected port 20001 but received 20002. That test passed when run alone. A sequential full-suite rerun passed all 740 tests in 61 files. No live Docker acceptance run was performed.
