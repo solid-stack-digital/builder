@@ -13,7 +13,9 @@ Root `mesh.json.tester` selects a Compose implementation and its exact runner se
 }
 ```
 
-The tester Compose file may contain helper services referenced by the runner. `tester.service` must identify the selected finite runner exactly; Builder does not infer the first service. Tester env may use only public endpoint properties, so publish every service endpoint that the external runner needs. Tester services using `extends` are rejected because inherited networking/ports cannot be safely validated for the host-side runner. The root tester is required for global mesh E2E and `mesh up test`; `builder mesh check` permits it to be absent unless `--require-tester` is supplied.
+`tester.compose` points directly to the tester Compose file; `tester.service` selects the finite runner and exit-code source. The file may include setup and helper services, which remain part of the tester implementation. Builder host-networks only the selected runner. The selected runner receives the root `.env.e2e-tester`, `tester.env`, and Builder-owned `EXEC_MODE=e2e`; it receives no `INFRA_MODE`.
+
+Tester env may use only effectively published public endpoint properties, so publish every service endpoint the external runner needs. The root tester is required for global mesh E2E and `mesh up test`; `builder mesh check` permits it to be absent unless `--require-tester` is supplied.
 
 ```bash
 builder mesh check --require-tester
@@ -21,7 +23,7 @@ builder mesh up test-e2e
 builder mesh up test
 ```
 
-Mesh E2E uses `mesh.e2e`, service build `e2e` runtime configuration, and the app `prod` image target. It does not use `mesh.prod` overlays.
+Global E2E resolves mesh and service configuration as `base -> prod -> e2e`. Applications run target `prod` with `EXEC_MODE=prod`, `INFRA_MODE=integrated`, and each service's `.env.e2e`; `.env.prod` is not merged into `.env.e2e`.
 
 ## Related
 

@@ -73,6 +73,7 @@ export function validateMeshTestStage(
     "test",
     intents,
     validationMode,
+    { sourceFile: meshPath, composition: "mesh" },
   );
 
   return { bindings, appPublications, allocatedPorts };

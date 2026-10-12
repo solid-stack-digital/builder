@@ -24,7 +24,7 @@ type MeshService = {
 | `$schema` | string | No | Editor/schema tooling. |
 | `name` | string | No | Base mesh project identity; runtime stages use separate Compose project identities to keep resources distinct. |
 | `tester` | object | No generally | Required for global E2E and `mesh up test`; `mesh check --require-tester` enforces it. |
-| `services` | service map | **Yes** | Must produce at least one effective service; each effective service needs a path. |
+| `services` | service map | **Yes** | Must contain at least one root service; each effective service needs a path. Stage additions do not satisfy the root minimum. |
 | `dev`, `prod`, `test`, `e2e` | stage object | No | Stage-specific service overlays only. |
 
 ## Base mesh service fields
@@ -49,7 +49,7 @@ Binding keys must exist in the consumer's effective build dependencies; provider
 | `tester.service` | non-empty string | Required when tester exists | Exact runner service key; Builder does not select the first service. |
 | `tester.env` | string map | No | Applied to selected runner; mesh refs allowed but only `public_*` endpoint properties. |
 
-The tester runner is a host-side E2E client. Services it needs must be effectively published.
+The selected tester runner is a host-side E2E client. It uses root `.env.e2e-tester`, gets `EXEC_MODE=e2e`, and receives no `INFRA_MODE`; services it needs must be effectively published. Helper services in the tester Compose file are retained.
 
 ## Stage overlays
 
@@ -64,7 +64,7 @@ Each root stage (`dev`, `prod`, `test`, `e2e`) contains only `services`. Each `<
 | `<stage>.services.<name>.dependsOn` | string array | No | Stable union, base order then stage order. |
 | `<stage>.services.<name>.publish` | string array | No | Stable union, base order then stage order. |
 
-No deletion syntax exists. Every active binding, reference, dependency path, readiness edge, and publication is validated against effective stage configuration. E2E uses `e2e`, not `prod` overlays.
+No deletion syntax exists. Every active binding, reference, dependency path, readiness edge, and publication is validated against effective stage configuration. Inheritance is `dev=base->dev`, `prod=base->prod`, `test=base->test`, and `e2e=base->prod->e2e`; mesh env, paths, bindings, dependencies, lifecycle edges, and publications inherit in that order.
 
 ## Complete example
 

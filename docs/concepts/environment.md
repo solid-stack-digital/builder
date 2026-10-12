@@ -2,7 +2,7 @@
 
 Builder-managed JSON environment maps accept strings only. Quote numbers and booleans if they are intended as text. Nulls, arrays, and objects are invalid. `${...}` in Builder JSON environment is endpoint-reference syntax; raw `override-compose` environment remains Compose environment syntax.
 
-App values may come from `app.env`, a build stage's `app.env`, `.env.<stage>`, an active `override-compose`, mesh service `env`, and Builder-owned runtime values. The exact precedence is listed in [environment precedence](../reference/environment-precedence.md). Mesh layers apply only in mesh execution; an active mesh value can replace a service project's value.
+App values may come from `.env.<stage>`, `app.env`, structured build-stage layers, ordered `override-compose` layers, mesh service `env`, and Builder-owned runtime values. For E2E, structured build config is `base -> prod -> e2e`; mesh env follows `base -> prod -> e2e`. The exact precedence is listed in [environment precedence](../reference/environment-precedence.md). Mesh layers apply only in mesh execution; an active mesh value can replace a service project's value.
 
 Other environment locations:
 

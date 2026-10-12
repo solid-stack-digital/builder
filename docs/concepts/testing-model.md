@@ -1,10 +1,30 @@
 # Unit, service E2E, and mesh E2E
 
-`service up test-unit` runs the `test` Dockerfile target with the `test` configuration overlay and isolated dependencies. `service up test-e2e` uses the `prod` app image target with `e2e` runtime configuration, integrates local dependencies, and runs the service's `test-e2e` tester target. `service up test` runs unit tests first and skips E2E if they fail.
+## Standalone service
 
-`mesh up test-unit` runs per-service isolated unit tests using effective `test` overlays. `mesh up test-e2e` runs one global E2E composition using `e2e` configuration and a root `mesh.json.tester` runner. `mesh up test` runs mesh unit tests first and then that global E2E phase; it does not run each service's service-level E2E tester.
+`service up test` runs two finite phases: unit/isolated tests, then service E2E if the unit phase succeeds. The E2E app uses Docker target `prod`, `EXEC_MODE=prod`, `INFRA_MODE=integrated`, and `.env.e2e`. Its tester uses target `test-e2e`, `EXEC_MODE=e2e`, no `INFRA_MODE`, and `.env.e2e-tester`.
 
-Testers are host-side clients. Their env can use only public endpoint properties, and the services they need must be published. E2E is not a `prod` runtime overlay: it uses the production app image target with E2E runtime configuration.
+## Global mesh
+
+`mesh up test` runs these phases:
+
+```text
+Phase 1
+for each root mesh.json.services entry, sequentially:
+  standalone service unit/isolated test
+  service E2E
+  full teardown
+
+Phase 2
+fresh base -> prod -> e2e mesh
+  production-mode apps
+  global E2E tester
+  full teardown
+```
+
+Any failure stops subsequent work. Each finite composition is torn down, so Phase 1 state does not leak into Phase 2. Services added only by a stage are not Phase-1 members unless they also appear in root `services`. `mesh up test-unit` remains an explicit mesh `test` stage operation, not canonical Phase 1.
+
+Testers are host-side clients and may use only effectively published `public_*` endpoint properties. E2E applications run as production code; only tester processes use `EXEC_MODE=e2e`.
 
 ## Related
 

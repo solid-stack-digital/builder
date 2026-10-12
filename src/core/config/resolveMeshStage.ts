@@ -5,6 +5,7 @@ import { mergeStringMap, stageOverlayChain, unionStable } from "./stageMerge.js"
 import type { EffectiveMeshConfig } from "./types.js";
 import type { MeshConfig, MeshConfigStage } from "../mesh/types.js";
 export function resolveMeshStage(mesh: MeshConfig, stage: MeshConfigStage, sourceFile: string): EffectiveMeshConfig {
+ if (Object.keys(mesh.services).length === 0) throw new ConfigError({ sourceFile, configPath: "services", stage, composition: "mesh", reason: "mesh.json must declare at least one root service" });
  const services: Record<string, any> = {};
  for (const [name, service] of Object.entries(mesh.services)) services[name] = { path: service.path, env: { ...(service.env ?? {}) }, dependencies: { ...(service.dependencies ?? {}) }, dependsOn: [...(service.dependsOn ?? [])], publish: [...(service.publish ?? [])] };
  for (const overlayStage of stageOverlayChain(stage)) for (const [name, patch] of Object.entries(mesh[overlayStage]?.services ?? {})) {

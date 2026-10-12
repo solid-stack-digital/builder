@@ -64,7 +64,7 @@ Default files are `.env.dev`, `.env.prod`, `.env.test`, `.env.e2e`. If a target 
 
 `builder mesh check [-C, --project-dir <dir>] [--require-tester]` validates mesh/services; `--require-tester` requires root `mesh.json.tester`.
 
-`builder mesh up [stage]` defaults to `dev`; accepts `dev`, `prod`, `test`, `test-unit`, `test-e2e`. `test-unit` uses test overlays and isolated per-service runs; `test-e2e` uses e2e overlays and global tester; `test` runs unit then global E2E.
+`builder mesh up [stage]` defaults to `dev`; accepts `dev`, `prod`, `test`, `test-unit`, `test-e2e`. `test-unit` explicitly exercises the effective mesh `test` overlay in isolated runs; it is not canonical Phase 1. `test-e2e` starts the effective `base -> prod -> e2e` mesh and global tester. `test` runs each root service's standalone unit and service-E2E lifecycle sequentially with teardown, then starts a fresh global E2E mesh.
 
 | Flag | Meaning / scope | Example |
 |---|---|---|

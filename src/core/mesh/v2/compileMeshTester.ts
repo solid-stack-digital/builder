@@ -53,15 +53,15 @@ export function compileMeshTester(meshDir:string,tester:MeshTesterConfig,endpoin
  if(selectedRaw.networks!==undefined)throw new ConfigError({sourceFile:file,configPath:`services.${tester.service}.networks`,stage,composition:"mesh",reason:"Selected host-network tester runner cannot declare Compose networks"});
  if(selectedRaw.ports!==undefined)throw new ConfigError({sourceFile:file,configPath:`services.${tester.service}.ports`,stage,composition:"mesh",reason:"Selected host-network tester runner cannot define ports"});
 
+ const meshCtx:MeshReferenceContext=referenceContext??{services:{},bindings:new Map(),endpoints:endpointRegistry,stage,meshJsonPath:meshPath};
  const testerBuilderKeys=[EXEC_MODE_KEY,INFRA_MODE_KEY] as const,rawRunnerEnvironment=normalizeComposeEnvironment(selectedRaw.environment,"tester runner environment");
  assertNoBuilderOwnedEnvKeys(rawRunnerEnvironment,testerBuilderKeys,{sourceFile:file,configPath:`services.${tester.service}.environment`,stage,composition:"mesh"});
  for(const envFile of envFilePaths(selectedRaw.env_file))assertDotenvDoesNotDefineKeys(path.resolve(meshDir,envFile),testerBuilderKeys,{configPath:`services.${tester.service}.env_file`,stage,composition:"mesh"});
  const meshTesterDotenv=path.join(meshDir,".env.e2e-tester");assertDotenvDoesNotDefineKeys(meshTesterDotenv,testerBuilderKeys,{configPath:".env.e2e-tester",stage,composition:"mesh"});
- const testerEnv=tester.env??{};assertNoBuilderOwnedEnvKeys(testerEnv,testerBuilderKeys,{sourceFile:meshPath,configPath:"tester.env",stage,composition:"mesh"});assertMeshTesterEnvPublic(testerEnv,"tester.env");
+ const testerEnv=tester.env??{};assertNoBuilderOwnedEnvKeys(testerEnv,testerBuilderKeys,{sourceFile:meshPath,configPath:"tester.env",stage,composition:"mesh"});assertMeshTesterEnvPublic(testerEnv,meshCtx);
 
  const ns=namespaceDependencyCompose({dependencyKey:"mesh-tester",namespacePrefix:"mesh-tester",document:raw,allocator:nameAllocator,identityPrefix:JSON.stringify(["mesh-tester"])});
  const runner=ns.serviceNameMap.get(tester.service)!;const runnerSvc=ns.document.services[runner]!;applyTesterBuildTarget(runnerSvc);runnerSvc.network_mode="host";delete runnerSvc.networks;runnerSvc.env_file=appendEnvFile(runnerSvc.env_file,{path:".env.e2e-tester",required:false});
- const meshCtx:MeshReferenceContext=referenceContext??{services:{},bindings:new Map(),endpoints:endpointRegistry,stage,meshJsonPath:meshPath};
  runnerSvc.environment={...normalizeComposeEnvironment(runnerSvc.environment,"tester runner environment"),...resolveMeshEnvMap(testerEnv,meshCtx,"tester.env"),EXEC_MODE:"e2e"};
  const depends=normalizeComposeDependsOn(runnerSvc.depends_on);for(const app of effectiveTopLevelApps)depends[app]={condition:"service_healthy"};runnerSvc.depends_on=depends;
  return {services:ns.document.services as Record<string,ComposeService>,...(ns.document.volumes?{volumes:ns.document.volumes}:{}),...(ns.document.networks?{networks:ns.document.networks}:{}),...(ns.document.configs?{configs:ns.document.configs}:{}),...(ns.document.secrets?{secrets:ns.document.secrets}:{}),runnerServiceName:runner};
