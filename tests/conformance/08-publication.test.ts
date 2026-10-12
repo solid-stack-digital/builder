@@ -154,3 +154,24 @@ describe("catalog 08: explicit publication and host ports", () => {
     expect(message).toContain("gateway.app.endpoints.http"); expect(message).toContain("orders.dependencies.db.endpoints.api"); expect(message).toContain("34000");
   });
 });
+
+it("AUDIT-B01 allocates AUTO app then dependencies within each mesh service", () => {
+  const root = meshFixture(
+    {
+      services: {
+        a: { path: "a", publish: ["app.endpoints.http", "dependencies.db.endpoints.api"] },
+        b: { path: "b", publish: ["app.endpoints.http", "dependencies.db.endpoints.api"] },
+      },
+    },
+    {
+      a: { app: { endpoints: { http: http(3000, { publicPort: "AUTO" }) } }, dependencies: { db: dep("d.yml", "owner", 6379, { publicPort: "AUTO" }) } },
+      b: { app: { endpoints: { http: http(3000, { publicPort: "AUTO" }) } }, dependencies: { db: dep("d.yml", "owner", 6379, { publicPort: "AUTO" }) } },
+    },
+    { "a/d.yml": ownerBundle(), "b/d.yml": ownerBundle() },
+  );
+  const result = compileMesh("prod", root);
+  expect(result.endpoints.app.a?.http?.publicPort).toBe(60000);
+  expect(result.endpoints.dependencies.a?.db?.api?.publicPort).toBe(59999);
+  expect(result.endpoints.app.b?.http?.publicPort).toBe(59998);
+  expect(result.endpoints.dependencies.b?.db?.api?.publicPort).toBe(59997);
+});

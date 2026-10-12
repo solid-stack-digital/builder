@@ -6,6 +6,7 @@ import { resolveMeshStage } from "../../config/resolveMeshStage.js";
 import { compileServiceComposition } from "../../composition/compileServiceComposition.js";
 import { checkInfra } from "../../checkers/checkInfra.js";
 import { compileMeshComposition } from "../v2/compileMeshComposition.js";
+import { validateMeshTestStage } from "../v2/validateMeshTestStage.js";
 import { loadEffectiveMeshServices } from "../v2/loadMeshServices.js";
 import { resolveMeshEnvMap,resolveServiceBuildEnvThroughMesh,type MeshReferenceContext } from "../v2/meshReferences.js";
 import type { MeshEndpointRegistry } from "../v2/types.js";
@@ -17,6 +18,7 @@ export function checkMeshServices(mesh: MeshConfig, meshDir: string): void {
   for (const stage of ["dev","prod","test","e2e"] as const) {
     const effective = resolveMeshStage(mesh,stage,meshPath);
     const services = loadEffectiveMeshServices(root,effective,stage);
+    if (stage === "test") validateMeshTestStage(services,root,meshPath,true);
     for (const [name,svc] of Object.entries(services)) {
       if (!checked.has(svc.absolutePath)) { console.log(pc.cyan(`\n🔍 Checking mesh service ${name}...`)); checkInfra(svc.absolutePath); checked.add(svc.absolutePath); }
       if (stage === "test") {

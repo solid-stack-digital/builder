@@ -110,3 +110,34 @@ describe("catalog 10: global mesh E2E tester", () => {
     expect(second.endpoints).toEqual(first.endpoints);
   });
 });
+
+it("AUDIT-B06 rejects tester services with missing named resource definitions", () => {
+  const root = meshFixture(
+    { services: { gateway: { path: "gateway" } }, tester: { compose: "t.yml", service: "runner" } },
+    { gateway: { app: {} } },
+    { "t.yml": { services: { runner: { image: "alpine", secrets: ["missing"] } } } },
+  );
+  expect(() => compileMesh("e2e", root)).toThrow(/missing|secret|resource/i);
+});
+
+it.each(["ipc", "pid"] as const)("AUDIT-B08 includes tester %s service dependency", property => {
+  const root = meshFixture(
+    { services: { gateway: { path: "gateway" } }, tester: { compose: "t.yml", service: "runner" } },
+    { gateway: { app: {} } },
+    { "t.yml": { services: { runner: { image: "alpine", [property]: "service:helper" }, helper: { image: "alpine" } } } },
+  );
+  const result = compileMesh("e2e", root);
+  const runner = result.compose.services[result.testerServiceName!]!;
+  const helper = Object.keys(result.compose.services).find(name => name.includes("helper"));
+  expect(helper).toBeDefined();
+  expect(runner[property]).toBe(`service:${helper}`);
+});
+
+it("AUDIT-B08 fails closed for tester extends", () => {
+  const root = meshFixture(
+    { services: { gateway: { path: "gateway" } }, tester: { compose: "t.yml", service: "runner" } },
+    { gateway: { app: {} } },
+    { "t.yml": { services: { base: { image: "alpine" }, runner: { extends: { service: "base" } } } } },
+  );
+  expect(() => compileMesh("e2e", root)).toThrow(/extends|unsupported/i);
+});

@@ -12,10 +12,24 @@ function volumeShort(v:string,base:string,out:string):string {
 function isRemoteBuildContext(value:string):boolean {
  return /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value) || /^[^/@\s]+@[^:\s]+:.+/.test(value);
 }
+function rebaseAdditionalContext(value:string,base:string,out:string):string {
+ if(value.startsWith("service:")||isRemoteBuildContext(value))return value;
+ return rebase(value,base,out);
+}
+function rebaseAdditionalContexts(value:unknown,base:string,out:string):unknown {
+ if(Array.isArray(value))return value.map(entry=>{
+  if(typeof entry!=="string")return entry;
+  const separator=entry.indexOf("=");
+  if(separator<0)return entry;
+  return `${entry.slice(0,separator)}=${rebaseAdditionalContext(entry.slice(separator+1),base,out)}`;
+ });
+ if(value&&typeof value==="object")return Object.fromEntries(Object.entries(value as Record<string,unknown>).map(([name,context])=>[name,typeof context==="string"?rebaseAdditionalContext(context,base,out):context]));
+ return value;
+}
 export function rebaseComposePaths(document:ComposeDocument,composeFilePath:string,outputProjectDir:string):ComposeDocument{
  const doc=structuredClone(document),base=path.dirname(composeFilePath),out=path.resolve(outputProjectDir);
  for(const svc of Object.values(doc.services??{})){
-  if(typeof svc.build==="string"){if(!isRemoteBuildContext(svc.build))svc.build=rebase(svc.build,base,out);}else if(svc.build&&typeof svc.build==="object"){const b=svc.build as Record<string,unknown>;const context=typeof b.context==="string"?b.context:".";if(!isRemoteBuildContext(context))b.context=rebase(context,base,out);/* dockerfile remains relative to its build context, which is rebased as a unit. */}
+  if(typeof svc.build==="string"){if(!isRemoteBuildContext(svc.build))svc.build=rebase(svc.build,base,out);}else if(svc.build&&typeof svc.build==="object"){const b=svc.build as Record<string,unknown>;const context=typeof b.context==="string"?b.context:".";if(!isRemoteBuildContext(context))b.context=rebase(context,base,out);/* dockerfile remains relative to its build context, which is rebased as a unit. */if(b.additional_contexts!==undefined)b.additional_contexts=rebaseAdditionalContexts(b.additional_contexts,base,out);}
   if(typeof svc.env_file==="string")svc.env_file=rebase(svc.env_file,base,out);else if(Array.isArray(svc.env_file))svc.env_file=svc.env_file.map(v=>typeof v==="string"?rebase(v,base,out):v&&typeof v==="object"&&typeof (v as any).path==="string"?{...(v as any),path:rebase((v as any).path,base,out)}:v);
   if(Array.isArray(svc.volumes))svc.volumes=svc.volumes.map(v=>typeof v==="string"?volumeShort(v,base,out):v&&typeof v==="object"&&(v as any).type==="bind"&&typeof (v as any).source==="string"?{...(v as any),source:rebase((v as any).source,base,out)}:v);
  }

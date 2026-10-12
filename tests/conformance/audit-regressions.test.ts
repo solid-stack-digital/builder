@@ -2,6 +2,7 @@ import { afterEach, expect, it } from 'vitest';
 import { rmSync, symlinkSync } from 'node:fs';
 import path from 'node:path';
 import { namespaceDependencyCompose } from '../../src/core/composition/namespaceDependencyCompose.js';
+import { rebaseComposePaths } from '../../src/core/composition/composePaths.js';
 import { validateDependencyCompose } from '../../src/core/composition/validateDependencyCompose.js';
 import { cleanupFixtures, compileService, compileMesh, fixture, meshFixture, write, dep, ownerBundle } from './fixture.js';
 afterEach(cleanupFixtures);
@@ -19,7 +20,7 @@ it.each([undefined,'missing.Dockerfile'])('rejects missing Dockerfile %s during 
 });
 it('preserves a dependency customized implicit default network',()=>{
  const result=namespaceDependencyCompose({dependencyKey:'db',namespacePrefix:'dep--db',document:{services:{owner:{image:'alpine'}},networks:{default:{internal:true}}}}).document;
- expect(result.services['dep--db--owner']?.networks).toEqual({'dep--db--network--default':null});
+ expect(result.services['dep--db--owner']?.networks).toEqual({'dep--db--network--default':{aliases:['owner']}});
 });
 it('rewrites ipc and pid service references',()=>{
  const result=namespaceDependencyCompose({dependencyKey:'db',namespacePrefix:'dep--db',document:{services:{base:{image:'alpine'},owner:{ipc:'service:base',pid:'service:base'}}}}).document;
@@ -55,7 +56,6 @@ it('rejects dependency Compose extends until effective semantics are supported',
 });
 
 import { env } from './fixture.js';
-import { rebaseComposePaths } from '../../src/core/composition/composePaths.js';
 
 // AUDIT GATE: Do not patch production code unless this test fails for the
 // exact pre-fix behavior described in the audit plan.
@@ -253,4 +253,76 @@ it('audit gate A12 control: preserves long build secret options while rewriting 
  }});
  expect((result.document.services[result.serviceNameMap.get('owner')!]!.build as any).secrets)
   .toEqual([{source:result.secretNameMap.get('token'),target:'npm-token',uid:'1000',mode:256}]);
+});
+
+it("AUDIT-B04 rejects absolute in-project dependency compose path", () => {
+ const root=fixture({app:{},dependencies:{db:dep("d.yml")}},{"d.yml":ownerBundle()});
+ write(root,"build.json",{app:{},dependencies:{db:dep(path.join(root,"d.yml"))}});
+ expect(()=>compileService("prod",root)).toThrow(/relative|absolute/i);
+});
+
+it("AUDIT-B04 rejects absolute in-project Dockerfile path", () => {
+ const root=fixture({app:{}});
+ write(root,"build.json",{app:{},dockerfile:path.join(root,"Dockerfile")});
+ expect(()=>compileService("dev",root)).toThrow(/relative|absolute/i);
+});
+
+it("AUDIT-B04 rejects absolute in-project mesh service path", () => {
+ const root=meshFixture({services:{api:{path:"api"}}},{api:{app:{}}});
+ write(root,"mesh.json",{services:{api:{path:path.join(root,"api")}}});
+ expect(()=>compileMesh("dev",root)).toThrow(/relative|absolute/i);
+});
+
+it("AUDIT-B04 rejects absolute in-project override-compose path", () => {
+ const root=fixture({app:{},dev:{"override-compose":"o.yml"}},{"o.yml":{services:{app:{}}}});
+ write(root,"build.json",{app:{},dev:{"override-compose":path.join(root,"o.yml")}});
+ expect(()=>compileService("dev",root)).toThrow(/relative|absolute/i);
+});
+
+it("AUDIT-B04 rejects absolute in-project tester Compose path", () => {
+ const root=meshFixture(
+  {services:{api:{path:"api"}},tester:{compose:"t.yml",service:"runner"}},
+  {api:{app:{}}},
+  {"t.yml":{services:{runner:{image:"alpine"}}}},
+ );
+ write(root,"mesh.json",{services:{api:{path:"api"}},tester:{compose:path.join(root,"t.yml"),service:"runner"}});
+ expect(()=>compileMesh("e2e",root)).toThrow(/relative|absolute/i);
+});
+
+it("AUDIT-B07 rebases map-form local build.additional_contexts", () => {
+ const result=rebaseComposePaths({
+  services:{owner:{build:{context:".",additional_contexts:{fixtures:"../fixtures"}}}},
+ },"/project/infra/dependency.yml","/project");
+ expect((result.services.owner!.build as any).additional_contexts.fixtures).toBe("./fixtures");
+});
+
+it("AUDIT-B07 rebases list-form local build.additional_contexts", () => {
+ const result=rebaseComposePaths({
+  services:{owner:{build:{context:".",additional_contexts:["fixtures=../fixtures"]}}},
+ },"/project/infra/dependency.yml","/project");
+ expect((result.services.owner!.build as any).additional_contexts).toEqual(["fixtures=./fixtures"]);
+});
+
+it.each(["https://github.com/org/repo.git","docker-image://alpine:3.20","git@github.com:org/repo.git"])(
+ "AUDIT-B07 preserves remote additional context %s",value=>{
+  const result=rebaseComposePaths({
+   services:{owner:{build:{context:".",additional_contexts:{remote:value}}}},
+  },"/project/infra/dependency.yml","/project");
+  expect((result.services.owner!.build as any).additional_contexts.remote).toBe(value);
+ },
+);
+
+it("AUDIT-B10 adds original dependency service aliases only to dependency-owned networks", () => {
+ const root=meshFixture(
+  {services:{api:{path:"api"}}},
+  {api:{app:{},dependencies:{dbslot:{compose:"d.yml",endpoints:{ready:{service:"owner",port:3000,primary:true}}}}}},
+  {"api/d.yml":{services:{owner:{image:"alpine",healthcheck:{test:["CMD","true"]}},db:{image:"alpine"}}}},
+ );
+ const result=compileMesh("prod",root);
+ const owner=result.compose.services[result.endpoints.dependencies.api!.dbslot!.ready!.networkHost]!;
+ const dependencyDefault=Object.keys(result.compose.networks??{}).find(name=>name.includes("network--default"))!;
+ const attached=owner.networks as Record<string,any>;
+ expect(attached[dependencyDefault].aliases).toContain("owner");
+ expect(attached["mesh--api"]).toBeNull();
+ expect(attached["mesh"]).toBeUndefined();
 });

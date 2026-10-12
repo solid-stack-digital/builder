@@ -1,9 +1,17 @@
+import { validateComposeResourceReferences } from "../../composition/validateComposeResourceReferences.js";
 import { normalizeComposeDependsOn } from "../../composition/composeDependsOn.js";
 import { collectBuildSecretReferences, assertNoServiceBuildContexts } from "../../composition/composeBuildResources.js";
 import { GeneratedComposeNameAllocator } from "../../composition/generatedNames.js";
 import { ConfigError } from "../../../errors/ConfigError.js";import { resolveInsideProject } from "../../config/pathSafety.js";import { loadComposeDocument } from "../../composition/loadCompose.js";import { rebaseComposePaths } from "../../composition/composePaths.js";import { namespaceDependencyCompose } from "../../composition/namespaceDependencyCompose.js";import { normalizeComposeEnvironment } from "../../composition/composeEnvironment.js";import type { ComposeService,ComposeDocument } from "../../composition/types.js";import type { MeshTesterConfig } from "../types.js";import type { MeshEndpointRegistry } from "./types.js";import { assertMeshTesterEnvPublic,resolveMeshEnvMap, type MeshReferenceContext } from "./meshReferences.js";
 export interface CompiledMeshTester{services:Record<string,ComposeService>;volumes?:Record<string,unknown>;networks?:Record<string,unknown>;configs?:Record<string,unknown>;secrets?:Record<string,unknown>;runnerServiceName:string;}
-function refs(svc:ComposeService):string[]{const out:string[]=[];const add=(v:unknown)=>{if(typeof v==="string")out.push(v);};if(Array.isArray(svc.depends_on))svc.depends_on.forEach(add);else if(svc.depends_on&&typeof svc.depends_on==="object")Object.keys(svc.depends_on).forEach(add);if(Array.isArray(svc.links))svc.links.forEach(v=>add(typeof v==="string"?v.split(":")[0]:v));if(Array.isArray(svc.volumes_from))svc.volumes_from.forEach(v=>add(typeof v==="string"?v.split(":")[0]:v));if(typeof svc.network_mode==="string"&&svc.network_mode.startsWith("service:"))out.push(svc.network_mode.slice(8));return out;}
+function refs(svc:ComposeService):string[]{
+ const out=new Set<string>();const add=(v:unknown)=>{if(typeof v==="string"&&v)out.add(v);};
+ if(Array.isArray(svc.depends_on))svc.depends_on.forEach(add);else if(svc.depends_on&&typeof svc.depends_on==="object")Object.keys(svc.depends_on).forEach(add);
+ if(Array.isArray(svc.links))svc.links.forEach(v=>add(typeof v==="string"?v.split(":")[0]:v));
+ if(Array.isArray(svc.volumes_from))svc.volumes_from.forEach(v=>add(typeof v==="string"?v.split(":")[0]:v));
+ for(const property of ["network_mode","ipc","pid"] as const){const value=svc[property];if(typeof value==="string"&&value.startsWith("service:"))add(value.slice("service:".length));}
+ return [...out];
+}
 function referencedResources(svc:ComposeService,doc:ComposeDocument){const sets={volumes:new Set<string>(),networks:new Set<string>(),configs:new Set<string>(),secrets:new Set<string>()};for(const v of Array.isArray(svc.volumes)?svc.volumes:[]){if(typeof v==="string"){const source=v.split(":")[0]!;if(doc.volumes?.[source])sets.volumes.add(source);}else if(v&&typeof v==="object"&&(v as any).type==="volume"&&doc.volumes?.[(v as any).source])sets.volumes.add((v as any).source);}
  const nets=svc.networks;if(Array.isArray(nets))nets.forEach(n=>{if(typeof n==="string"&&doc.networks?.[n])sets.networks.add(n)});else if(nets&&typeof nets==="object")Object.keys(nets).forEach(n=>{if(doc.networks?.[n])sets.networks.add(n)});
  for(const kind of ["configs","secrets"] as const){const v=svc[kind];if(Array.isArray(v))for(const x of v){const n=typeof x==="string"?x:(x as any)?.source;if(typeof n==="string"&&doc[kind]?.[n])sets[kind].add(n);}}
@@ -11,7 +19,8 @@ function referencedResources(svc:ComposeService,doc:ComposeDocument){const sets=
  return sets;}
 export function compileMeshTester(meshDir:string,tester:MeshTesterConfig,endpointRegistry:MeshEndpointRegistry,effectiveTopLevelApps:string[],stage:"e2e",referenceContext?:MeshReferenceContext,nameAllocator=new GeneratedComposeNameAllocator(effectiveTopLevelApps)):CompiledMeshTester{
  const meshPath=`${meshDir}/mesh.json`,file=resolveInsideProject(meshDir,tester.compose,{sourceFile:meshPath,configPath:"tester.compose",stage}),raw=rebaseComposePaths(loadComposeDocument(file,{sourceFile:meshPath,configPath:"tester.compose",stage,composition:"mesh"}),file,meshDir);if(!raw.services||!raw.services[tester.service])throw new ConfigError({sourceFile:meshPath,configPath:"tester.service",stage,composition:"mesh",value:tester.service,reason:"Selected tester service does not exist in tester Compose"});
- const included=new Set<string>(),visit=(name:string)=>{if(included.has(name))return;if(!raw.services[name])throw new ConfigError({sourceFile:file,configPath:`services.${name}`,stage,composition:"mesh",reason:"Tester service dependency does not exist"});included.add(name);for(const ref of refs(raw.services[name]!))visit(ref);};visit(tester.service);
+ const included=new Set<string>(),visit=(name:string)=>{if(included.has(name))return;const service=raw.services[name];if(!service)throw new ConfigError({sourceFile:file,configPath:`services.${name}`,stage,composition:"mesh",reason:"Tester service dependency does not exist"});if(service.extends!==undefined)throw new ConfigError({sourceFile:file,configPath:`services.${name}.extends`,stage,composition:"mesh",reason:"Tester Compose extends is unsupported until effective Compose inheritance can be validated before host-network rewriting"});included.add(name);for(const ref of refs(service))visit(ref);};visit(tester.service);
+ validateComposeResourceReferences(raw,{sourceFile:file,stage,composition:"mesh"},included);
  for(const name of included){
   const svc=raw.services[name]!;
   assertNoServiceBuildContexts(svc,`services.${name}`,file);

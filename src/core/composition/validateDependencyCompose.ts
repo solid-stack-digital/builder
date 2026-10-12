@@ -1,3 +1,4 @@
+import { validateComposeResourceReferences } from "./validateComposeResourceReferences.js";
 import { assertNoServiceBuildContexts } from "./composeBuildResources.js";
 import { isEnabledValidComposeHealthcheck } from "./composeHealthcheck.js";
 import { parseVolume, isHostFilesystemRoot } from "./composeVolumes.js";
@@ -8,6 +9,7 @@ import type { ComposeDocument, ComposeService } from "./types.js";
 export function validateDependencyCompose(dependencyKey:string,dependency:EffectiveBuildConfig["dependencies"][string],document:ComposeDocument,context:{composePath:string;stage:Environment}):void{
  const fail=(configPath:string,reason:string,value?:unknown):never=>{throw new ConfigError({sourceFile:context.composePath,configPath,stage:context.stage,composition:"service",...(value===undefined?{}:{value}),reason:`Dependency "${dependencyKey}": ${reason}`})};
  if(document.include!==undefined)fail("include","Compose include is unsupported for atomic dependency implementations");
+ validateComposeResourceReferences(document,{sourceFile:context.composePath,stage:context.stage,composition:"service"});
  const services=document.services??{};
  for(const [name,svc] of Object.entries(services)){
   assertNoServiceBuildContexts(svc,`services.${name}`,context.composePath);

@@ -98,8 +98,8 @@ describe("catalog 04: atomic dependency Compose and namespacing", () => {
     const doc: any = { services: { owner: { ...healthy, networks: ["backplane"] }, worker: { image: "alpine", networks: ["backplane"] } }, networks: { backplane: { internal: true } } };
     const a = namespaceDependencyCompose({ dependencyKey: "a", namespacePrefix: "a", document: doc }).document;
     expect(a.networks).toHaveProperty("a--network--backplane");
-    expect(a.services["a--owner"]?.networks).toContain("a--network--backplane");
-    expect(a.services["a--worker"]?.networks).toContain("a--network--backplane");
+    expect(a.services["a--owner"]?.networks).toHaveProperty("a--network--backplane");
+    expect(a.services["a--worker"]?.networks).toHaveProperty("a--network--backplane");
   });
   it("DEP-014 rewrites internal depends_on while preserving condition", () => {
     const root = standalone(dep(), { services: { owner: { ...healthy, depends_on: { helper: { condition: "service_completed_successfully" } } }, helper: { image: "alpine" } } });
@@ -233,5 +233,26 @@ describe("catalog 04: atomic dependency Compose and namespacing", () => {
       const root = standalone(dep(), { services: { owner: { ...healthy, ...invalid } } });
       expect(() => compileService("prod", root)).toThrow(/missing/);
     }
+  });
+});
+
+describe("AUDIT-B06 named resource reference validation", () => {
+  const healthyOwner = {
+    image: "alpine",
+    healthcheck: { test: ["CMD", "true"] },
+  };
+  const cases: Array<[string, object]> = [
+    ["volume", { volumes: ["missing:/data"] }],
+    ["network", { networks: ["missing"] }],
+    ["config", { configs: ["missing"] }],
+    ["secret", { secrets: ["missing"] }],
+    ["build secret", { build: { context: ".", secrets: ["missing"] } }],
+  ];
+  it.each(cases)("rejects missing %s definition", (_name, serviceOptions) => {
+    const root = fixture(
+      { app: {}, dependencies: { db: dep("d.yml") } },
+      { "d.yml": { services: { owner: { ...healthyOwner, ...serviceOptions } } } },
+    );
+    expect(() => compileService("prod", root)).toThrow(/missing|undefined|resource/i);
   });
 });

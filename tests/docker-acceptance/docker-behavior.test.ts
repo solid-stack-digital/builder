@@ -72,3 +72,59 @@ describe("Docker behavior behind V2 compiler contracts", () => {
     } finally { down(root, file); }
   }, 90000);
 });
+
+it("AUDIT-B10 preserves original dependency service DNS inside the atomic bundle", () => {
+  const resolvePeer = `
+    const dns = require("dns");
+    const fs = require("fs");
+    const tryResolve = () => dns.lookup("db", err => {
+      if (!err) fs.writeFileSync("/tmp/peer-ready", "yes");
+      else setTimeout(tryResolve, 100);
+    });
+    tryResolve();
+    setInterval(() => {}, 1000);
+  `;
+  const dependency = {
+    services: {
+      owner: {
+        image: "node:22-alpine",
+        command: ["node", "-e", resolvePeer],
+        healthcheck: {
+          test: ["CMD-SHELL", "test -f /tmp/peer-ready"],
+          interval: "250ms",
+          timeout: "1s",
+          retries: 20,
+        },
+      },
+      db: {
+        image: "node:22-alpine",
+        command: ["node", "-e", "setInterval(()=>{},1000)"],
+      },
+    },
+  };
+  const root = runtimeMesh(
+    { services: { api: { path: "api" } } },
+    { api: { app: {}, dependencies: { dbslot: {
+      compose: "dependency.yml",
+      endpoints: { ready: { service: "owner", port: 3000, primary: true } },
+    } } } },
+    { "api/dependency.yml": dependency },
+  );
+  const compiled = compileMeshComposition("prod", root);
+  const file = emitCompose(root, compiled.compose);
+  try {
+    const owner = compiled.endpoints.dependencies.api?.dbslot?.ready?.networkHost!;
+    const db = Object.keys(compiled.compose.services).find(name => name.includes("--dbslot--db"))!;
+    const create = dockerCompose(root, file, ["create", owner, db], 60_000);
+    expect(create.status, `${create.stdout}${create.stderr}`).toBe(0);
+    const start = dockerCompose(root, file, ["start", owner, db], 60_000);
+    expect(start.status, `${start.stdout}${start.stderr}`).toBe(0);
+    const probe = dockerCompose(root, file, [
+      "exec", "-T", owner, "node", "-e",
+      "require('dns').lookup('db', error => process.exit(error ? 1 : 0))",
+    ]);
+    expect(probe.status, `${probe.stdout}${probe.stderr}`).toBe(0);
+  } finally {
+    down(root, file);
+  }
+}, 90_000);

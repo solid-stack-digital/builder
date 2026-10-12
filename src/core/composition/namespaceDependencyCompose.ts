@@ -6,13 +6,28 @@ export interface NamespaceDependencyOptions {dependencyKey:string;namespacePrefi
 const entries=(obj:unknown)=>obj&&typeof obj==="object"&&!Array.isArray(obj)?Object.entries(obj as Record<string,unknown>):[];
 export function namespaceDependencyCompose(options:NamespaceDependencyOptions){
  const {document,namespacePrefix:prefix}=options,doc=structuredClone(document);
+ const originalServices=doc.services??{};
+ const usesImplicitDefault=Object.values(originalServices).some(service=>service.network_mode===undefined&&service.networks===undefined);
+ if(usesImplicitDefault&&!Object.hasOwn(doc.networks??{},"default"))doc.networks={...(doc.networks??{}),default:{}};
  const allocator=options.allocator??new GeneratedComposeNameAllocator();
  const identityPrefix=options.identityPrefix??JSON.stringify(["dependency",options.dependencyKey,prefix]);
  const make=(kind:string,keys:string[])=>new Map(keys.sort().map(k=>[k,allocator.allocate(JSON.stringify([identityPrefix,kind,k]),kind==="service"?`${prefix}--${k}`:`${prefix}--${kind}--${k}`)]));
  const serviceNameMap=make("service",Object.keys(doc.services??{}));
  const volumeNameMap=make("volume",Object.keys(doc.volumes??{})),networkNameMap=make("network",Object.keys(doc.networks??{})),configNameMap=make("config",Object.keys(doc.configs??{})),secretNameMap=make("secret",Object.keys(doc.secrets??{}));
  const rewriteKeys=(obj:unknown,map:Map<string,string>)=>Object.fromEntries(entries(obj).map(([k,v])=>[map.get(k)??k,v]));
- const rewriteResourceRefs=(svc:ComposeService)=>{
+ const addOriginalNetworkAliases=(name:string,svc:ComposeService):void=>{
+  if(svc.network_mode!==undefined||svc.networks===undefined)return;
+  const attached=Array.isArray(svc.networks)
+   ? Object.fromEntries(svc.networks.filter((network):network is string=>typeof network==="string").map(network=>[network,null]))
+   : svc.networks&&typeof svc.networks==="object"?{...svc.networks as Record<string,unknown>}:{};
+  for(const [network,rawOptions] of Object.entries(attached)){
+   const options=rawOptions&&typeof rawOptions==="object"&&!Array.isArray(rawOptions)?rawOptions as Record<string,unknown>:{};
+   const aliases=Array.isArray(options.aliases)?options.aliases.filter((alias):alias is string=>typeof alias==="string"):[];
+   attached[network]={...options,aliases:[...new Set([...aliases,name])]};
+  }
+  svc.networks=attached;
+ };
+ const rewriteResourceRefs=(svc:ComposeService,originalName:string)=>{
   rewriteBuildSecretReferences(svc,secretNameMap);
   if(Array.isArray(svc.depends_on)){svc.depends_on=svc.depends_on.map(v=>typeof v==="string"?(serviceNameMap.get(v)??v):v);}else if(svc.depends_on&&typeof svc.depends_on==="object")svc.depends_on=rewriteKeys(svc.depends_on,serviceNameMap);
   if(Array.isArray(svc.links))svc.links=svc.links.map(v=>{if(typeof v!=="string")return v;const [name,...rest]=v.split(":");return [serviceNameMap.get(name!)??name,...rest].join(":")});
@@ -23,8 +38,9 @@ export function namespaceDependencyCompose(options:NamespaceDependencyOptions){
   for (const key of ["ipc", "pid"] as const) if (typeof svc[key] === "string" && svc[key].startsWith("service:")) svc[key] = `service:${serviceNameMap.get(svc[key].slice(8)) ?? svc[key].slice(8)}`;
   if(Array.isArray(svc.networks))svc.networks=svc.networks.map(v=>typeof v==="string"?(networkNameMap.get(v)??v):v);else if(svc.networks&&typeof svc.networks==="object")svc.networks=rewriteKeys(svc.networks,networkNameMap);
   for(const key of ["configs","secrets"] as const)if(Array.isArray(svc[key]))svc[key]=(svc[key] as unknown[]).map(v=>typeof v==="string"?(key==="configs"?configNameMap:secretNameMap).get(v)??v:v&&typeof v==="object"?{...(v as any),source:(key==="configs"?configNameMap:secretNameMap).get((v as any).source)??(v as any).source}:v);
+  addOriginalNetworkAliases(originalName,svc);
  };
- for(const svc of Object.values(doc.services??{}))rewriteResourceRefs(svc);
+ for(const [name,svc] of Object.entries(originalServices))rewriteResourceRefs(svc,name);
  doc.services=rewriteKeys(doc.services,serviceNameMap) as Record<string,ComposeService>;
  if(doc.volumes)doc.volumes=rewriteKeys(doc.volumes,volumeNameMap);if(doc.networks)doc.networks=rewriteKeys(doc.networks,networkNameMap);if(doc.configs)doc.configs=rewriteKeys(doc.configs,configNameMap);if(doc.secrets)doc.secrets=rewriteKeys(doc.secrets,secretNameMap);
  return {document:doc,serviceNameMap,volumeNameMap,networkNameMap,configNameMap,secretNameMap};

@@ -1,6 +1,7 @@
 import net from "node:net";
 import { ScriptError } from "../errors/ScriptError.js";
 import { parse } from "yaml";
+import { parsePublishedHostPort } from "./composePublishedPort.js";
 
 export function extractHostPorts(yamlConfig: string): number[] {
   const ports: number[] = [];
@@ -9,16 +10,9 @@ export function extractHostPorts(yamlConfig: string): number[] {
     if (parsed?.services && typeof parsed.services === "object") {
       for (const svc of Object.values(parsed.services) as any[]) {
         if (Array.isArray(svc?.ports)) {
-          for (const p of svc.ports) {
-            if (typeof p === "string") {
-              const parts = p.split(":");
-              const hostPort =
-                parts.length > 1 ? parseInt(parts[0]!, 10) : parseInt(p, 10);
-              if (!isNaN(hostPort)) ports.push(hostPort);
-            } else if (typeof p === "object" && p.published) {
-              const hostPort = parseInt(p.published, 10);
-              if (!isNaN(hostPort)) ports.push(hostPort);
-            }
+          for (const mapping of svc.ports) {
+            const hostPort = parsePublishedHostPort(mapping);
+            if (hostPort !== undefined) ports.push(hostPort);
           }
         }
       }
