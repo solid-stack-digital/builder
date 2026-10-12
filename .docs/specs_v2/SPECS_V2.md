@@ -427,7 +427,7 @@ ${<mesh-service>.dependencies.<dependency>.endpoints.<endpoint>.<property>}
 
 There is no `services.` prefix.
 
-The primary current mesh consumer of these references is `tester.env`.
+Mesh service `env` and global `tester.env` may consume these references.
 
 References resolve after effective stage inheritance, dependency substitution, publication resolution, fixed-port reservation, and AUTO allocation.
 
@@ -447,35 +447,49 @@ No coercion is performed.
 
 Environment ownership is consumer-side:
 
-- `app.env` configures the application;
+- `app.env` configures the application at service level;
 - `dependencies.<name>.env` configures a dependency implementation;
+- `mesh.json services.<name>.env` applies composition-level overrides to that app;
 - `build.json.tester.env` configures the service E2E tester;
 - `mesh.json.tester.env` configures the global E2E tester.
 
 There is no `injects`.
 
-## 11.1 Mesh app env overrides are forbidden
+## 11.1 Mesh service environment
 
-`mesh.json` services do **not** have an `env` field.
+`mesh.json` may define:
 
-The orchestrator cannot arbitrarily override service-owned application environment.
+```text
+services.<name>.env
+<stage>.services.<name>.env
+```
 
-Composition-sensitive service wiring should be represented through the service's own logical dependency contract and mesh provider bindings.
+Both are strict `Record<string, string>` maps.
+
+Mesh env is an intentional composition-level override mechanism. It may override service-level application env when the composition requires it.
+
+Logical dependency/provider bindings remain the preferred mechanism for dependency relationships, but mesh env remains available for composition-specific application configuration.
+
+Environment references do not imply lifecycle ordering.
 
 ## 11.2 Application env precedence
 
-For ordinary stages, low to high:
+For ordinary mesh execution, low to high:
 
 ```text
 .env.<stage>
--> base build.json app.env
--> active-stage app.env
+-> build.json base app.env
+-> build.json active-stage app.env
 -> active-stage override-compose app environment
+-> mesh.json base services.<name>.env
+-> mesh.json active-stage services.<name>.env
 -> Builder internal base environment
 -> Builder internal active-stage environment
 ```
 
-For service/global E2E application execution:
+For standalone execution, the two mesh layers are simply absent.
+
+For service-level E2E, low to high:
 
 ```text
 .env.e2e
@@ -488,11 +502,27 @@ For service/global E2E application execution:
 -> Builder internal E2E environment
 ```
 
-`.env.prod` is not merged into `.env.e2e`.
+For global E2E, low to high:
 
-Structured config inherits prod; the env-file source remains E2E-specific.
+```text
+.env.e2e
+-> build.json base app.env
+-> build.json prod app.env
+-> build.json prod override-compose app environment
+-> build.json e2e app.env
+-> build.json e2e override-compose app environment
+-> mesh.json base services.<name>.env
+-> mesh.json prod.services.<name>.env
+-> mesh.json e2e.services.<name>.env
+-> Builder internal base environment
+-> Builder internal E2E environment
+```
 
-Builder-owned keys are authoritative. A user layer attempting to set a Builder-owned key is an error.
+`.env.prod` is **not** merged into `.env.e2e`.
+
+E2E inherits production structured overlays, not the production env file.
+
+Builder-owned keys are authoritative. If a lower/user-controlled layer attempts to set a Builder-owned key, Builder fails instead of silently accepting it.
 
 ## 11.3 Tester env precedence
 
@@ -869,12 +899,13 @@ Mesh service fields are:
 
 ```text
 path
+env
 dependencies
 dependsOn
 publish
 ```
 
-There is no mesh service `env`.
+`env` is a composition-level application environment override.
 
 See `MESH_JSON_DOCS.md` for every field.
 
@@ -1157,7 +1188,6 @@ services.<name>.port
 services.<name>.preservePort
 services.<name>.provideDependency
 services.<name>.replaceMocks
-services.<name>.env
 services.<name>.envOverrides
 services.<name>.healthcheck
 tester.path
@@ -1170,6 +1200,7 @@ inherit-published
 Use:
 
 ```text
+services.<name>.env
 services.<name>.dependencies
 services.<name>.dependsOn
 services.<name>.publish

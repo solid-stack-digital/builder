@@ -29,6 +29,7 @@ type MeshJsonV2 = {
 
 type MeshService = {
   path: string;
+  env?: Record<string, string>;
   dependencies?: Record<string, string>;
   dependsOn?: string[];
   publish?: string[];
@@ -40,13 +41,12 @@ type MeshStage = {
 
 type MeshServiceStageOverlay = {
   path?: string;
+  env?: Record<string, string>;
   dependencies?: Record<string, string>;
   dependsOn?: string[];
   publish?: string[];
 };
 ```
-
-There is deliberately **no mesh service `env` field**.
 
 Effective stage inheritance:
 
@@ -164,7 +164,10 @@ Defines the independently runnable application services that make up the mesh.
 {
   "services": {
     "backend": {
-      "path": "./services/backend"
+      "path": "./services/backend",
+      "env": {
+        "SERVICE_NAME": "backend"
+      }
     },
     "frontend": {
       "path": "./services/frontend"
@@ -598,55 +601,145 @@ There is no stage removal syntax.
 
 ---
 
-# 5. Prohibited mesh service environment
+# 5. Mesh service environment
 
-There is no:
+## 5.1 `services.<name>.env`
 
-```text
-services.<name>.env
-<stage>.services.<name>.env
+### Type
+
+```ts
+Record<string, string>
 ```
 
-These fields are invalid.
+### Required
 
-### Reason
+No.
 
-The orchestrator must not arbitrarily override service-owned application environment.
+### Purpose
 
-Application env belongs to the service's own:
+Adds composition-level runtime environment to that mesh service's application container.
 
-```text
-build.json app.env
-build.json stage app.env
-.env.<execution>
-override-compose
-```
-
-Cross-service application connectivity should be modeled through logical dependency slots:
+### Example
 
 ```json
-"frontend": {
-  "dependencies": {
-    "backend": "backend"
+"gateway": {
+  "path": "./services/gateway",
+  "env": {
+    "FRONTEND_URL": "${frontend.app.endpoints.http.network_url}",
+    "BACKEND_URL": "${backend.app.endpoints.http.network_url}",
+    "LOG_LEVEL": "debug"
   }
 }
 ```
 
-while the consumer's own `build.json` declares how that dependency becomes application env.
+### Side effects
 
-Example consumer-owned wiring:
+Mesh env overlays the target service's build-owned application env.
+
+All values must be strings.
+
+Supported Builder endpoint references may be used.
+
+An env reference does **not** create lifecycle ordering. Use `dependsOn` or dependency substitution when readiness ordering is required.
+
+### Recommended use
+
+Use service-owned logical dependency slots for dependency relationships whenever that models the relationship cleanly.
+
+Mesh env remains intentionally available for composition-specific configuration, gateway/routing values, feature flags, or any other application environment that the composition needs to override.
+
+## 5.2 `<stage>.services.<name>.env`
+
+Stage service env is also allowed.
+
+It keywise-merges over base mesh service env.
+
+For example:
 
 ```json
 {
-  "app": {
-    "env": {
-      "BACKEND_URL": "${dependencies.backend.endpoints.http.network_url}"
+  "services": {
+    "backend": {
+      "path": "./services/backend",
+      "env": {
+        "LOG_LEVEL": "info",
+        "FEATURE_X": "off"
+      }
+    }
+  },
+
+  "prod": {
+    "services": {
+      "backend": {
+        "env": {
+          "LOG_LEVEL": "warn"
+        }
+      }
+    }
+  },
+
+  "e2e": {
+    "services": {
+      "backend": {
+        "env": {
+          "LOG_LEVEL": "debug",
+          "FEATURE_X": "on"
+        }
+      }
     }
   }
 }
 ```
 
-This preserves service ownership and avoids root-level arbitrary environment mutation.
+Effective E2E mesh env:
+
+```json
+{
+  "LOG_LEVEL": "debug",
+  "FEATURE_X": "on"
+}
+```
+
+because E2E inheritance is:
+
+```text
+base -> prod -> e2e
+```
+
+## 5.3 Complete app env precedence
+
+For ordinary mesh execution, low to high:
+
+```text
+.env.<stage>
+-> build.json base app.env
+-> build.json active-stage app.env
+-> active-stage override-compose app environment
+-> mesh.json base services.<name>.env
+-> mesh.json active-stage services.<name>.env
+-> Builder internal base environment
+-> Builder internal active-stage environment
+```
+
+For global E2E, low to high:
+
+```text
+.env.e2e
+-> build.json base app.env
+-> build.json prod app.env
+-> build.json prod override-compose app environment
+-> build.json e2e app.env
+-> build.json e2e override-compose app environment
+-> mesh.json base services.<name>.env
+-> mesh.json prod.services.<name>.env
+-> mesh.json e2e.services.<name>.env
+-> Builder internal base environment
+-> Builder internal E2E environment
+```
+
+`.env.prod` is not merged into `.env.e2e`.
+
+Builder-owned internal values remain authoritative.
 
 ---
 
@@ -1123,7 +1216,33 @@ A newly added effective service must resolve a valid path.
 
 ---
 
-## 8.3 `<stage>.services.<name>.dependencies`
+## 8.3 `<stage>.services.<name>.env`
+
+### Type
+
+```ts
+Record<string, string>
+```
+
+### Merge
+
+Keywise merge over inherited mesh service env.
+
+For E2E the mesh env chain is:
+
+```text
+base service env
+-> prod service env
+-> e2e service env
+```
+
+Stage values win for matching keys.
+
+Environment references do not imply lifecycle ordering.
+
+---
+
+## 8.4 `<stage>.services.<name>.dependencies`
 
 ### Type
 
@@ -1181,7 +1300,7 @@ For a key overridden by the stage:
 
 ---
 
-## 8.4 `<stage>.services.<name>.dependsOn`
+## 8.5 `<stage>.services.<name>.dependsOn`
 
 Union-merges with inherited values.
 
@@ -1199,7 +1318,7 @@ Every effective target must exist and become healthy.
 
 ---
 
-## 8.5 `<stage>.services.<name>.publish`
+## 8.6 `<stage>.services.<name>.publish`
 
 Union-merges with inherited values.
 
@@ -1438,6 +1557,9 @@ Builder may invoke the underlying service lifecycle directly; literal shell exec
 
     "gateway": {
       "path": "./services/gateway",
+      "env": {
+        "ROUTING_MODE": "mesh"
+      },
       "dependencies": {
         "frontend": "frontend",
         "backend": "backend"
@@ -1460,6 +1582,11 @@ Builder may invoke the underlying service lifecycle directly; literal shell exec
 
   "prod": {
     "services": {
+      "backend": {
+        "env": {
+          "LOG_LEVEL": "info"
+        }
+      },
       "gateway": {
         "dependsOn": [
           "frontend",
@@ -1471,6 +1598,12 @@ Builder may invoke the underlying service lifecycle directly; literal shell exec
 
   "e2e": {
     "services": {
+      "backend": {
+        "env": {
+          "LOG_LEVEL": "debug"
+        }
+      },
+
       "fake-payments": {
         "path": "./testing/fake-payments"
       },
@@ -1515,8 +1648,7 @@ The E2E provider override is intentional and allowed even though the topology be
 | service `preservePort` | no equivalent; build owns endpoint port intent |
 | service `provideDependency` | service `dependencies` |
 | service `replaceMocks` | service `dependencies` |
-| service `env` | prohibited; service owns application env |
-| service `envOverrides` | prohibited; service owns application env |
+| service `envOverrides` | service `env` |
 | service `healthcheck` | app Dockerfile healthcheck |
 | tester `path` | tester `compose` |
 | tester `dockerfile` | tester Compose owns implementation |
@@ -1535,12 +1667,11 @@ Builder performs no automatic legacy translation.
 ```text
 Which independent services participate?
 Which top-level service fulfills each logical dependency slot?
+What composition-level app environment overrides apply?
 Which top-level services must be healthy before another proceeds?
 Which build-declared endpoints are actually host-published?
-What topology changes in dev/prod/e2e?
+What topology/configuration changes in dev/prod/e2e?
 What global black-box E2E runner executes?
 ```
 
-It does **not** own arbitrary service application environment.
-
-Service-owned runtime configuration remains in each service's `build.json` and env files.
+Service defaults remain in each service's `build.json` and env files, while mesh service `env` may intentionally override them for the active composition.

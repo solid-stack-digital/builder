@@ -355,20 +355,24 @@ They do **not** automatically become Docker build arguments.
 
 Environment references do not create lifecycle edges.
 
-### Ordinary-stage precedence
+### Complete application env precedence
 
-Low to high:
+For ordinary mesh execution, low to high:
 
 ```text
 .env.<stage>
--> base app.env
--> active-stage app.env
+-> build.json base app.env
+-> build.json active-stage app.env
 -> active-stage override-compose app environment
+-> mesh.json base services.<name>.env
+-> mesh.json active-stage services.<name>.env
 -> Builder internal base environment
 -> Builder internal active-stage environment
 ```
 
-### E2E precedence
+For standalone execution, the mesh layers are absent.
+
+### Service E2E precedence
 
 Service E2E structured config inherits:
 
@@ -376,7 +380,7 @@ Service E2E structured config inherits:
 base -> prod -> e2e
 ```
 
-Application env precedence is therefore:
+Low to high:
 
 ```text
 .env.e2e
@@ -389,9 +393,29 @@ Application env precedence is therefore:
 -> Builder internal E2E environment
 ```
 
+### Global E2E precedence
+
+When this service is run inside global E2E, low to high:
+
+```text
+.env.e2e
+-> build.json base app.env
+-> build.json prod app.env
+-> build.json prod override-compose app environment
+-> build.json e2e app.env
+-> build.json e2e override-compose app environment
+-> mesh.json base services.<name>.env
+-> mesh.json prod.services.<name>.env
+-> mesh.json e2e.services.<name>.env
+-> Builder internal base environment
+-> Builder internal E2E environment
+```
+
 `.env.prod` is **not** merged into `.env.e2e`.
 
-The production structured stage is inherited; the env-file source is still E2E-specific.
+The production structured stage is inherited; the env-file source remains E2E-specific.
+
+Mesh service env is an intentional composition-level override and may override service-level app env.
 
 ### Builder-owned keys
 
