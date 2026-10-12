@@ -25,6 +25,8 @@ Builder requires:
 - Docker Engine with a reachable daemon;
 - Docker Compose **2.24.0 or newer**.
 
+For the complete user guide, tutorials, configuration references, recipes, and troubleshooting, start at the [Builder V2 documentation](docs/README.md).
+
 ## Installation
 
 Install the package globally:
