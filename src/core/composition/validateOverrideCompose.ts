@@ -1,3 +1,4 @@
+import { GeneratedComposeNameAllocator } from "./generatedNames.js";
 import path from "node:path";
 import { canonicalPath } from "../../utils/paths.js";
 import { parseVolume, namespaceVolume } from "./composeVolumes.js";
@@ -6,6 +7,8 @@ import { normalizeComposeEnvironment } from "./composeEnvironment.js";
 import type { ComposeDocument, ComposeService } from "./types.js";
 export interface PreparedAppOverride {app:ComposeService;resources:Pick<ComposeDocument,"volumes"|"networks"|"configs"|"secrets">;}
 export interface AppOverrideValidationContext {
+  allocator?: GeneratedComposeNameAllocator;
+  resourceNamespace?: string;
   file: string;
   stage: string;
   /** Builder context in the final Compose coordinate system. */
@@ -24,8 +27,10 @@ function isSameBuildContext(actual: string, expected: string, baseDir: string): 
 
 export function validateAndPrepareAppOverride(document:ComposeDocument,context:AppOverrideValidationContext):PreparedAppOverride{
  const fail=(path:string,reason:string,value?:unknown):never=>{throw new ConfigError({sourceFile:context.file,configPath:path,stage:context.stage,composition:"service",...(value===undefined?{}:{value}),reason})};
+ const allowedRootKeys=new Set(["services","volumes","networks","configs","secrets"]);
+ for(const key of Object.keys(document))if(!key.startsWith("x-")&&!allowedRootKeys.has(key))fail(key,"unsupported override Compose top-level field");
  const keys=Object.keys(document.services??{});if(keys.length!==1||keys[0]!=="app")fail("services","override must define exactly one service named app");const app=structuredClone(document.services.app!);
- for(const k of ["ports","depends_on","network_mode","container_name","privileged"] as const)if(app[k]!==undefined)fail(`services.app.${k}`,"override cannot own endpoint or lifecycle behavior");
+ for(const k of ["ports","depends_on","network_mode","container_name","privileged","profiles","extends","env_file"] as const)if(app[k]!==undefined)fail(`services.app.${k}`,"override cannot own endpoint or lifecycle behavior");
  if(app.healthcheck&&typeof app.healthcheck==="object"){const health=app.healthcheck as Record<string,unknown>;for(const key of Object.keys(health))if(!["interval","timeout","retries","start_period","start_interval"].includes(key))fail(`services.app.healthcheck.${key}`,"override may set only healthcheck timing fields");}
 
  if (typeof app.build === "string") {
@@ -33,8 +38,8 @@ export function validateAndPrepareAppOverride(document:ComposeDocument,context:A
  }
  if (app.build && typeof app.build === "object") {
   const build = app.build as Record<string, unknown>;
-  for (const key of ["target", "dockerfile"] as const) {
-   if (build[key] !== undefined) {
+  for (const key of Object.keys(build)) {
+   if (!["args", "context"].includes(key)) {
     fail(`services.app.build.${key}`, "override cannot change Builder-owned build configuration");
    }
   }
@@ -48,6 +53,7 @@ export function validateAndPrepareAppOverride(document:ComposeDocument,context:A
   }
  }
  const env=normalizeComposeEnvironment(app.environment,"services.app.environment");for(const k of ["EXEC_MODE","INFRA_MODE"])if(k in env)fail(`services.app.environment.${k}`,"override cannot set Builder-owned environment");app.environment=env;
+ const allocator=context.allocator??new GeneratedComposeNameAllocator();
  const resourceKeys=["volumes","networks","configs","secrets"] as const;const resources:PreparedAppOverride["resources"]={};
  for (const kind of resourceKeys) {
   const defs = document[kind] ?? {}, refs = new Set<string>(), value = app[kind];
@@ -60,7 +66,8 @@ export function validateAndPrepareAppOverride(document:ComposeDocument,context:A
   const names = new Map<string, string>(), mapped: Record<string, unknown> = {};
   for (const [name, definition] of Object.entries(defs)) {
    if (!refs.has(name)) fail(`${kind}.${name}`, "override resource must be consumed by app");
-   const target = `app-override--${context.stage}--${kind.slice(0, -1)}--${name}`;
+   const prefix=context.resourceNamespace && context.resourceNamespace!=="app" ? `svc--${context.resourceNamespace}--app-override` : "app-override";
+   const target = allocator.allocate(JSON.stringify(["service",context.resourceNamespace??"app","override",context.stage,kind,name]),`${prefix}--${context.stage}--${kind.slice(0, -1)}--${name}`);
    names.set(name, target); mapped[target] = definition;
   }
   if (names.size) resources[kind] = mapped;

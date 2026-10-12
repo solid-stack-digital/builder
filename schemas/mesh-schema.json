@@ -52,8 +52,26 @@
               "dependencies": {
                 "type": "object",
                 "additionalProperties": {
-                  "type": "string",
-                  "pattern": "^[a-z][a-z0-9-]*$"
+                  "allOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    {
+                      "not": {
+                        "enum": [
+                          "app",
+                          "dependencies",
+                          "tester",
+                          "services",
+                          "dev",
+                          "prod",
+                          "test",
+                          "e2e"
+                        ]
+                      }
+                    }
+                  ]
                 },
                 "propertyNames": {
                   "pattern": "^[a-z][a-z0-9-]*$"
@@ -62,8 +80,26 @@
               "dependsOn": {
                 "type": "array",
                 "items": {
-                  "type": "string",
-                  "pattern": "^[a-z][a-z0-9-]*$"
+                  "allOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    {
+                      "not": {
+                        "enum": [
+                          "app",
+                          "dependencies",
+                          "tester",
+                          "services",
+                          "dev",
+                          "prod",
+                          "test",
+                          "e2e"
+                        ]
+                      }
+                    }
+                  ]
                 }
               },
               "publish": {
@@ -77,6 +113,28 @@
               "path"
             ],
             "additionalProperties": false
+          },
+          "propertyNames": {
+            "allOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              {
+                "not": {
+                  "enum": [
+                    "app",
+                    "dependencies",
+                    "tester",
+                    "services",
+                    "dev",
+                    "prod",
+                    "test",
+                    "e2e"
+                  ]
+                }
+              }
+            ]
           }
         },
         "dev": {
@@ -100,8 +158,26 @@
                   "dependencies": {
                     "type": "object",
                     "additionalProperties": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9-]*$"
+                      "allOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]*$"
+                        },
+                        {
+                          "not": {
+                            "enum": [
+                              "app",
+                              "dependencies",
+                              "tester",
+                              "services",
+                              "dev",
+                              "prod",
+                              "test",
+                              "e2e"
+                            ]
+                          }
+                        }
+                      ]
                     },
                     "propertyNames": {
                       "pattern": "^[a-z][a-z0-9-]*$"
@@ -110,8 +186,26 @@
                   "dependsOn": {
                     "type": "array",
                     "items": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9-]*$"
+                      "allOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]*$"
+                        },
+                        {
+                          "not": {
+                            "enum": [
+                              "app",
+                              "dependencies",
+                              "tester",
+                              "services",
+                              "dev",
+                              "prod",
+                              "test",
+                              "e2e"
+                            ]
+                          }
+                        }
+                      ]
                     }
                   },
                   "publish": {
@@ -122,6 +216,28 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              "propertyNames": {
+                "allOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]*$"
+                  },
+                  {
+                    "not": {
+                      "enum": [
+                        "app",
+                        "dependencies",
+                        "tester",
+                        "services",
+                        "dev",
+                        "prod",
+                        "test",
+                        "e2e"
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -148,8 +264,26 @@
                   "dependencies": {
                     "type": "object",
                     "additionalProperties": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9-]*$"
+                      "allOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]*$"
+                        },
+                        {
+                          "not": {
+                            "enum": [
+                              "app",
+                              "dependencies",
+                              "tester",
+                              "services",
+                              "dev",
+                              "prod",
+                              "test",
+                              "e2e"
+                            ]
+                          }
+                        }
+                      ]
                     },
                     "propertyNames": {
                       "pattern": "^[a-z][a-z0-9-]*$"
@@ -158,8 +292,26 @@
                   "dependsOn": {
                     "type": "array",
                     "items": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9-]*$"
+                      "allOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]*$"
+                        },
+                        {
+                          "not": {
+                            "enum": [
+                              "app",
+                              "dependencies",
+                              "tester",
+                              "services",
+                              "dev",
+                              "prod",
+                              "test",
+                              "e2e"
+                            ]
+                          }
+                        }
+                      ]
                     }
                   },
                   "publish": {
@@ -170,6 +322,28 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              "propertyNames": {
+                "allOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]*$"
+                  },
+                  {
+                    "not": {
+                      "enum": [
+                        "app",
+                        "dependencies",
+                        "tester",
+                        "services",
+                        "dev",
+                        "prod",
+                        "test",
+                        "e2e"
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -196,8 +370,26 @@
                   "dependencies": {
                     "type": "object",
                     "additionalProperties": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9-]*$"
+                      "allOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]*$"
+                        },
+                        {
+                          "not": {
+                            "enum": [
+                              "app",
+                              "dependencies",
+                              "tester",
+                              "services",
+                              "dev",
+                              "prod",
+                              "test",
+                              "e2e"
+                            ]
+                          }
+                        }
+                      ]
                     },
                     "propertyNames": {
                       "pattern": "^[a-z][a-z0-9-]*$"
@@ -206,8 +398,26 @@
                   "dependsOn": {
                     "type": "array",
                     "items": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9-]*$"
+                      "allOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]*$"
+                        },
+                        {
+                          "not": {
+                            "enum": [
+                              "app",
+                              "dependencies",
+                              "tester",
+                              "services",
+                              "dev",
+                              "prod",
+                              "test",
+                              "e2e"
+                            ]
+                          }
+                        }
+                      ]
                     }
                   },
                   "publish": {
@@ -218,6 +428,28 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              "propertyNames": {
+                "allOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]*$"
+                  },
+                  {
+                    "not": {
+                      "enum": [
+                        "app",
+                        "dependencies",
+                        "tester",
+                        "services",
+                        "dev",
+                        "prod",
+                        "test",
+                        "e2e"
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -244,8 +476,26 @@
                   "dependencies": {
                     "type": "object",
                     "additionalProperties": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9-]*$"
+                      "allOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]*$"
+                        },
+                        {
+                          "not": {
+                            "enum": [
+                              "app",
+                              "dependencies",
+                              "tester",
+                              "services",
+                              "dev",
+                              "prod",
+                              "test",
+                              "e2e"
+                            ]
+                          }
+                        }
+                      ]
                     },
                     "propertyNames": {
                       "pattern": "^[a-z][a-z0-9-]*$"
@@ -254,8 +504,26 @@
                   "dependsOn": {
                     "type": "array",
                     "items": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9-]*$"
+                      "allOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]*$"
+                        },
+                        {
+                          "not": {
+                            "enum": [
+                              "app",
+                              "dependencies",
+                              "tester",
+                              "services",
+                              "dev",
+                              "prod",
+                              "test",
+                              "e2e"
+                            ]
+                          }
+                        }
+                      ]
                     }
                   },
                   "publish": {
@@ -266,6 +534,28 @@
                   }
                 },
                 "additionalProperties": false
+              },
+              "propertyNames": {
+                "allOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]*$"
+                  },
+                  {
+                    "not": {
+                      "enum": [
+                        "app",
+                        "dependencies",
+                        "tester",
+                        "services",
+                        "dev",
+                        "prod",
+                        "test",
+                        "e2e"
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },

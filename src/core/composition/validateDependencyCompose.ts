@@ -1,3 +1,5 @@
+import { assertNoServiceBuildContexts } from "./composeBuildResources.js";
+import { isEnabledValidComposeHealthcheck } from "./composeHealthcheck.js";
 import { parseVolume, isHostFilesystemRoot } from "./composeVolumes.js";
 import { ConfigError } from "../../errors/ConfigError.js";
 import type { EffectiveBuildConfig } from "../config/types.js";
@@ -8,6 +10,9 @@ export function validateDependencyCompose(dependencyKey:string,dependency:Effect
  if(document.include!==undefined)fail("include","Compose include is unsupported for atomic dependency implementations");
  const services=document.services??{};
  for(const [name,svc] of Object.entries(services)){
+  assertNoServiceBuildContexts(svc,`services.${name}`,context.composePath);
+  if(svc.profiles!==undefined)fail(`services.${name}.profiles`,"dependency Compose profiles are unsupported because a materialized dependency is atomic");
+  if(svc.extends!==undefined)fail(`services.${name}.extends`,"dependency Compose extends is unsupported until effective endpoint-owner networking and health can be validated");
   if(svc.ports!==undefined)fail(`services.${name}.ports`,"raw dependency ports are forbidden");
   if(svc.network_mode==="host")fail(`services.${name}.network_mode`,"host network mode is forbidden");
   if(svc.privileged===true)fail(`services.${name}.privileged`,`privileged services are forbidden`);
@@ -20,12 +25,11 @@ export function validateDependencyCompose(dependencyKey:string,dependency:Effect
   if(typeof svc.network_mode==="string"&&svc.network_mode.startsWith("service:"))internalRefs.push(["network_mode",svc.network_mode.slice(8)]);
   if(Array.isArray(svc.volumes_from))for(const ref of svc.volumes_from)if(typeof ref==="string")internalRefs.push(["volumes_from",ref.split(":")[0]!]);
   for (const key of ["ipc", "pid"] as const) if (typeof svc[key] === "string" && svc[key].startsWith("service:")) internalRefs.push([key, svc[key].slice(8)]);
-  if (svc.extends && typeof svc.extends === "object") { const ref = svc.extends as Record<string, unknown>; if (ref.file !== undefined) fail(`services.${name}.extends.file`, "external extends is unsupported for atomic dependency implementations"); if (typeof ref.service === "string") internalRefs.push(["extends.service", ref.service]); }
   for(const [property,target] of internalRefs)if(!services[target])fail(`services.${name}.${property}`,`internal service reference "${target}" does not exist in this dependency Compose bundle`,target);
  }
  if(!Object.keys(dependency.endpoints).length)return;
  if(!Object.keys(services).length)fail("services","endpoint-bearing dependency Compose must define services");
  const owners=new Set<string>();
  for(const [endpoint,definition] of Object.entries(dependency.endpoints)){const owner=definition.service;if(!services[owner])fail(`endpoints.${endpoint}.service`,`declared endpoint owner "${owner}" does not exist`,owner);owners.add(owner);}
- for(const owner of owners){if(services[owner]!.network_mode!==undefined)fail(`services.${owner}.network_mode`,`endpoint owner cannot use network_mode`);const health=services[owner]!.healthcheck as Record<string,unknown>|undefined;if(!health||health.disable===true||!health.test||(typeof health.test==="string"&&!health.test.trim())||(Array.isArray(health.test)&&(!health.test.length||health.test[0]==="NONE"||health.test.every(v=>typeof v==="string"&&!v.trim()))))fail(`services.${owner}.healthcheck`,`endpoint owner requires an enabled, non-empty healthcheck`);}
+ for(const owner of owners){if(services[owner]!.network_mode!==undefined)fail(`services.${owner}.network_mode`,`endpoint owner cannot use network_mode`);if(!isEnabledValidComposeHealthcheck(services[owner]!.healthcheck))fail(`services.${owner}.healthcheck`,"endpoint owner requires a valid enabled Compose healthcheck");}
 }

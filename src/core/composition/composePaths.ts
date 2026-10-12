@@ -9,10 +9,13 @@ function volumeShort(v:string,base:string,out:string):string {
  if(mount?.type !== "bind" || !mount.source || /^(?:[\\/]|~|[a-z]:)/i.test(mount.source)) return v;
  return rewriteVolumeSource(v,rebase(mount.source,base,out)) as string;
 }
+function isRemoteBuildContext(value:string):boolean {
+ return /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value) || /^[^/@\s]+@[^:\s]+:.+/.test(value);
+}
 export function rebaseComposePaths(document:ComposeDocument,composeFilePath:string,outputProjectDir:string):ComposeDocument{
  const doc=structuredClone(document),base=path.dirname(composeFilePath),out=path.resolve(outputProjectDir);
  for(const svc of Object.values(doc.services??{})){
-  if(typeof svc.build==="string")svc.build=rebase(svc.build,base,out);else if(svc.build&&typeof svc.build==="object"){const b=svc.build as Record<string,unknown>;const context=typeof b.context==="string"?b.context:".";b.context=rebase(context,base,out);/* dockerfile remains relative to its build context, which is rebased as a unit. */}
+  if(typeof svc.build==="string"){if(!isRemoteBuildContext(svc.build))svc.build=rebase(svc.build,base,out);}else if(svc.build&&typeof svc.build==="object"){const b=svc.build as Record<string,unknown>;const context=typeof b.context==="string"?b.context:".";if(!isRemoteBuildContext(context))b.context=rebase(context,base,out);/* dockerfile remains relative to its build context, which is rebased as a unit. */}
   if(typeof svc.env_file==="string")svc.env_file=rebase(svc.env_file,base,out);else if(Array.isArray(svc.env_file))svc.env_file=svc.env_file.map(v=>typeof v==="string"?rebase(v,base,out):v&&typeof v==="object"&&typeof (v as any).path==="string"?{...(v as any),path:rebase((v as any).path,base,out)}:v);
   if(Array.isArray(svc.volumes))svc.volumes=svc.volumes.map(v=>typeof v==="string"?volumeShort(v,base,out):v&&typeof v==="object"&&(v as any).type==="bind"&&typeof (v as any).source==="string"?{...(v as any),source:rebase((v as any).source,base,out)}:v);
  }
