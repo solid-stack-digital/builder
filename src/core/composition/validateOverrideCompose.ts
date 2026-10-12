@@ -5,6 +5,7 @@ import { parseVolume, namespaceVolume } from "./composeVolumes.js";
 import { ConfigError } from "../../errors/ConfigError.js";
 import { normalizeComposeEnvironment } from "./composeEnvironment.js";
 import { namespaceResourceDefinition } from "./namespaceResourceDefinition.js";
+import { validateComposeResourceReferences } from "./validateComposeResourceReferences.js";
 import type { ComposeDocument, ComposeService } from "./types.js";
 export interface PreparedAppOverride {app:ComposeService;resources:Pick<ComposeDocument,"volumes"|"networks"|"configs"|"secrets">;}
 export interface AppOverrideValidationContext {
@@ -30,7 +31,9 @@ export function validateAndPrepareAppOverride(document:ComposeDocument,context:A
  const fail=(path:string,reason:string,value?:unknown):never=>{throw new ConfigError({sourceFile:context.file,configPath:path,stage:context.stage,composition:"service",...(value===undefined?{}:{value}),reason})};
  const allowedRootKeys=new Set(["services","volumes","networks","configs","secrets"]);
  for(const key of Object.keys(document))if(!key.startsWith("x-")&&!allowedRootKeys.has(key))fail(key,"unsupported override Compose top-level field");
- const keys=Object.keys(document.services??{});if(keys.length!==1||keys[0]!=="app")fail("services","override must define exactly one service named app");const app=structuredClone(document.services.app!);
+ const keys=Object.keys(document.services??{});if(keys.length!==1||keys[0]!=="app")fail("services","override must define exactly one service named app");
+ validateComposeResourceReferences(document,{sourceFile:context.file,stage:context.stage,composition:"service"});
+ const app=structuredClone(document.services.app!);
  for(const k of ["ports","depends_on","network_mode","container_name","privileged","profiles","extends","env_file"] as const)if(app[k]!==undefined)fail(`services.app.${k}`,"override cannot own endpoint or lifecycle behavior");
  if(app.healthcheck&&typeof app.healthcheck==="object"){const health=app.healthcheck as Record<string,unknown>;for(const key of Object.keys(health))if(!["interval","timeout","retries","start_period","start_interval"].includes(key))fail(`services.app.healthcheck.${key}`,"override may set only healthcheck timing fields");}
 

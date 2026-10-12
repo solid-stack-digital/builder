@@ -1,6 +1,6 @@
 # 04 — Reject undefined app override resources before runtime
 
-**ID:** V210-004. **Priority:** Medium. **Status:** four reproduced invalid configurations. **Fix not applied.**
+**ID:** V210-004. **Priority:** Medium. **Status:** implemented and verified on 2026-10-12. The original red test and implementation plan are preserved below.
 
 ## Bug and impact
 
@@ -116,3 +116,13 @@ Also cover:
 ## Completion
 
 Run the exact gate, stage override/conformance tests, path-boundary tests, and plan 00's final checks. Source change is limited to `validateOverrideCompose.ts` plus permanent tests. No schema update is necessary. Check error output includes file/stage/reference and does not dump secret content.
+
+## Implementation record — 2026-10-12
+
+All four V210-004 regressions failed before the source change because `compileService("prod", ...)` accepted undefined volume, network, config, and secret references. After the change, each fails with a `ConfigError` tied to the original override file, `services.app.<kind>`, the missing resource key, and the active stage.
+
+`validateOverrideCompose.ts` now calls the existing `validateComposeResourceReferences` on the source document after verifying its root/service shape and before cloning or namespacing. This keeps diagnostics in source coordinates and preserves the existing resource allocation behavior. No schema or other compiler behavior was changed.
+
+The permanent `tests/conformance/v210-override-resources.test.ts` includes the four regressions and controls for long resource syntax, network maps, bind and anonymous volumes, implicit default networking, declared and external resources, unused definitions, mesh service overrides, and separate prod/E2E override resources.
+
+Validation: 158 focused and related tests passed, 528 conformance tests passed, 764 full-suite tests passed, TypeScript check passed, and the removed-V1-token check passed. No live Docker acceptance run was performed. Plans 05–07 remain separate work.
