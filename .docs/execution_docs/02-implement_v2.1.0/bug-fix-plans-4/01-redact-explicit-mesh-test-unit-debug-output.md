@@ -66,3 +66,12 @@ The file is currently compressed into long lines. The implementer may reformat t
 4. Inspect stdout from `builder mesh up test-unit --dry-run --debug` against a disposable fixture with a fake token. Never use a real credential in this check. Ensure the YAML remains useful and the fake token is absent.
 
 Retain the regression file in `tests/conformance/` after the source fix. Public docs already state the intended behavior; no docs edit is needed if the code now fulfills it.
+
+## Implementation record — 2026-10-13
+
+`builder mesh up test-unit --debug` previously printed unredacted Compose YAML to stdout, exposing sensitive environment variables such as `API_TOKEN`.
+
+In `src/core/mesh/runners/runMeshTestUnit.ts`, imported `redactYamlSecrets` and applied it to the debug YAML output before printing to `console.log`, matching the behavior of sibling runners while preserving the unredacted YAML for internal Compose execution.
+
+Validation: All V214-001 regression and control tests passed, including checking that secrets are redacted in debug output and absent in non-debug output.
+

@@ -4,12 +4,12 @@ Audited commit: `cba37da9df999fd9277b1dd6aae5c3f6117449e4` on 2026-10-13 (Asia/M
 
 ## Findings
 
-| Number | Area | Confirmed bug | Evidence |
-|---|---|---|---|
-| [01](01-redact-explicit-mesh-test-unit-debug-output.md) | Explicit mesh `test-unit` / debug | Raw compiled YAML exposes an `API_TOKEN` value in console output despite the public CLI promise of secret redaction | `V214-001` red; non-debug control green |
-| [02](02-scope-mesh-test-unit-port-collisions-per-isolated-run.md) | Explicit mesh `test-unit` / host ports | Two sequential isolated services using the same fixed test port are rejected as a simultaneous conflict | `V214-002` red; isolated standalone and integrated-mesh controls green |
+| Number | Area | Confirmed bug | Status | Evidence |
+|---|---|---|---|---|
+| [01](01-redact-explicit-mesh-test-unit-debug-output.md) | Explicit mesh `test-unit` / debug | Raw compiled YAML exposes an `API_TOKEN` value in console output despite the public CLI promise of secret redaction | Implemented & Verified | `V214-001` red; non-debug control green |
+| [02](02-scope-mesh-test-unit-port-collisions-per-isolated-run.md) | Explicit mesh `test-unit` / host ports | Two sequential isolated services using the same fixed test port are rejected as a simultaneous conflict | Implemented & Verified | `V214-002` red; isolated standalone and integrated-mesh controls green |
 
-Both bugs are implementation defects. The public CLI reference already describes redacted debug output and isolated `test-unit` execution; no separate public documentation correction was confirmed in this pass. The public `docs/` tree was reviewed for feature claims, with particular attention to quickstarts, stage behavior, publication, testing, CLI flags, and environment export. Existing docs corrections and fixes from iteration 3 remain present.
+Both bugs are implementation defects. Both have been implemented and verified with regression coverage in `tests/conformance/v214-audit.test.ts`. The public CLI reference already describes redacted debug output and isolated `test-unit` execution; no separate public documentation correction was required. The public `docs/` tree was reviewed for feature claims, with particular attention to quickstarts, stage behavior, publication, testing, CLI flags, and environment export. Existing docs corrections and fixes from iteration 3 remain present.
 
 ## Normative source and scope
 

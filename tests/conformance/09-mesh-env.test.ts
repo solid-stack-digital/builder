@@ -231,7 +231,7 @@ it("AUDIT-B03 validates publish declarations in mesh.test", async () => {
     .rejects.toThrow(/missing|Published app endpoint does not exist/i);
 });
 
-it("AUDIT-B03 reserves effective mesh.test fixed app publications globally", async () => {
+it("AUDIT-B03 permits sequential mesh.test fixed app publications with same port", async () => {
   const root = meshFixture(
     {
       services: { a: { path: "a" }, b: { path: "b" } },
@@ -242,6 +242,5 @@ it("AUDIT-B03 reserves effective mesh.test fixed app publications globally", asy
       b: { app: { endpoints: { http: http(3000, { publicPort: 34001 }) } } },
     },
   );
-  await expect(runMeshTestUnit({ projectDir: root, dryRun: true }))
-    .rejects.toThrow(/34001|collision/i);
+  await expect(runMeshTestUnit({ projectDir: root, dryRun: true })).resolves.toBe(0);
 });

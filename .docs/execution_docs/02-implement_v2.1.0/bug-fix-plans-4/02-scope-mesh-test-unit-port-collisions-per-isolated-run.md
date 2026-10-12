@@ -79,3 +79,16 @@ For AUTO ports, per-service allocation may return the same currently available p
 5. If a changed test expects different fixed ports across **sequential** test-unit services, update that expectation only after the original red assertion has proved the false conflict. Keep integrated-mesh collision tests unchanged.
 
 Retain the regression file in `tests/conformance/` after fixing the source. The public docs already describe isolated test-unit execution, so a separate docs change is unnecessary.
+
+## Implementation record — 2026-10-13
+
+`builder mesh up test-unit` previously performed a single host port allocation covering all effective test-stage services at once in `validateMeshTestStage`. Consequently, two sequential isolated test services that each claimed the same fixed `publicPort` failed with a false-positive `PortConflictError`, even though unit test runs are isolated and teardown occurs between them.
+
+In `src/core/mesh/v2/validateMeshTestStage.ts`, scoped `allocateHostPorts` to iterate over each service in deterministic sorted order, allocating `PortIntent[]` per isolated service run and accumulating the results into `allocatedPorts`. Intra-service duplicate fixed publications continue to be rejected by `allocateHostPorts`, and simultaneous conflicts in integrated compositions remain unaffected.
+
+Validation: All V214-002 regression assertions and controls passed, including:
+- Sequential isolated services reusing the same fixed host port.
+- Standalone service compilation control.
+- Simultaneous integrated mesh conflict control.
+- Negative intra-service port collision rejection control (`PortConflictError`).
+- Deterministic distinct AUTO allocation within a single service and valid allocation across sequential services.
