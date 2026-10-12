@@ -142,11 +142,14 @@ describe("catalog 09: mesh overlays and environment precedence", () => {
     expect(env(result.compose.services.app).INFRA_MODE).toBe("isolated");
     expect(Object.keys(result.compose.services)).toEqual(["app"]);
   });
-  it("MEN-028 runs global E2E with prod app image and E2E runtime", () => {
+  it("MEN-028 runs global E2E apps as production execution with E2E configuration", () => {
     const root = one({ tester }, { app: {}, dependencies: { db: dep("d.yml") }, e2e: { app: { env: { STAGE: "e2e" } } } }, { "api/d.yml": ownerBundle() });
     const result = compileMesh("e2e", root);
     expect((result.compose.services.api?.build as any).target).toBe("prod");
     expect(env(result.compose.services.api)).toMatchObject({ EXEC_MODE: "prod", INFRA_MODE: "integrated", STAGE: "e2e" });
+    const testerRunner=result.compose.services[result.testerServiceName!]!;
+    expect(env(testerRunner).EXEC_MODE).toBe("e2e");expect(env(testerRunner).INFRA_MODE).toBeUndefined();
+    expect(testerRunner.env_file).toContainEqual({path:".env.e2e-tester",required:false});
     expect(result.testerServiceName).toBeDefined();
   });
   it("MEN-029 validates bad E2E effective stage while prod passes", () => {

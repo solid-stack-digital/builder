@@ -35,7 +35,8 @@ export const registerMeshUpCommand = (cmd: Command): void => {
   $ builder mesh up test-e2e
 
 JSON overlays: test-unit uses mesh/build test; test-e2e uses mesh/build e2e.
-The test command runs per-service unit tests before global E2E.`
+The test command runs each root service test lifecycle (unit, then service E2E) before global E2E.
+The explicit test-unit stage exercises mesh.json.test overlays only.`
     )
     .action(
       async (stage: string = "dev", options: Record<string, any> = {}) => {
