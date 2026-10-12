@@ -2,7 +2,6 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { normalizeProjectName, deriveProjectName } from "../src/utils/projectName.js";
 import { toComposePath, isBindMount, isPathInside } from "../src/utils/paths.js";
-import { extractOverrides } from "../src/utils/extractOverrides.js";
 import { redactYamlSecrets } from "../src/utils/redactSecrets.js";
 import { ScriptError } from "../src/errors/ScriptError.js";
 
@@ -63,30 +62,6 @@ describe("Audit-1 fixes unit test suite", () => {
     });
   });
 
-  describe("extractOverrides validation (M13)", () => {
-    it("accepts valid stages (dev, prod, test, e2e)", () => {
-      const buildJson = {
-        overrides: {
-          dev: { path: ".docker/dev.override.yml" },
-          prod: { path: ".docker/prod.override.yml" },
-        },
-      };
-      const res = extractOverrides(buildJson, "/fake");
-      expect(res.dev).toBeDefined();
-      expect(res.prod).toBeDefined();
-    });
-
-    it("rejects unknown stage overrides such as 'prd' or 'production'", () => {
-      const buildJson = {
-        overrides: {
-          prd: { path: ".docker/dev.override.yml" },
-        },
-      };
-      expect(() => extractOverrides(buildJson, "/fake")).toThrow(ScriptError);
-      expect(() => extractOverrides(buildJson, "/fake")).toThrow(/Unknown stage override/);
-    });
-  });
-
   describe("Secret redaction in debug logs (M10, M16)", () => {
     it("redacts sensitive environment variables, tokens, and URLs while preserving author/keyboard", () => {
       const yaml = `
@@ -98,7 +73,6 @@ services:
       DB_PASSWORD: mypassword
       AUTH_TOKEN: authsecret
       DATABASE_URL: postgres://admin:supersecret@localhost:5432/mydb
-      PUBLIC_PORT: 3000
       AUTHOR_NAME: John Doe
       KEYBOARD_TYPE: mechanical
 `;
@@ -108,7 +82,6 @@ services:
       expect(redacted).toContain("DB_PASSWORD: ********");
       expect(redacted).toContain("AUTH_TOKEN: ********");
       expect(redacted).toContain("DATABASE_URL: postgres://admin:********@localhost:5432/mydb");
-      expect(redacted).toContain("PUBLIC_PORT: 3000");
       expect(redacted).toContain("AUTHOR_NAME: John Doe");
       expect(redacted).toContain("KEYBOARD_TYPE: mechanical");
     });

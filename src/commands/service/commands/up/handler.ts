@@ -14,7 +14,7 @@ export async function handleServiceUp(
   const projectDir = resolveProjectDir(options.projectDir);
   const stage = (rawStage || "dev").toLowerCase();
 
-  const isFull = Boolean(options.full || options.integrated);
+  const isFull = Boolean(options.full);
   const runOptions = {
     projectDir,
     debug: Boolean(options.debug),

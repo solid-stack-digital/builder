@@ -1,12 +1,7 @@
-services: 
-  app: 
-    build: 
+services:
+  app:
+    build:
       target: test
     env_file:
       - path: .env.test
         required: false
-    environment:
-      - INFRA_MODE=isolated
-      - EXEC_MODE=test
-
- 

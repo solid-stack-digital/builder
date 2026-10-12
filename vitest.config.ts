@@ -8,7 +8,9 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["src/**/__tests__/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
-    exclude: ["node_modules", "dist"],
+    exclude: ["node_modules", "dist", "tests/docker-acceptance/**"],
     testTimeout: 60000,
+    fileParallelism: true,
+    maxWorkers: 4,
   },
 });

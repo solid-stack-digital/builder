@@ -23,11 +23,7 @@ export const registerUpCommand = (cmd: Command): void => {
     )
     .option(
       "--full",
-      "Run dev environment with mock dependencies and integrated infra mode"
-    )
-    .option(
-      "--integrated",
-      "Alias for --full"
+      "Run dev with all declared local dependencies integrated"
     )
     .option(
       "-C, --project-dir <dir>",
@@ -41,7 +37,10 @@ export const registerUpCommand = (cmd: Command): void => {
   $ builder service up prod
   $ builder service up test
   $ builder service up test-unit
-  $ builder service up test-e2e`
+  $ builder service up test-e2e
+
+JSON overlays: test-unit uses build.json test; test-e2e uses build.json e2e.
+The test command runs unit tests before E2E.`
     )
     .action(
       async (stage: string = "dev", options: Record<string, any> = {}) => {
@@ -52,7 +51,7 @@ export const registerUpCommand = (cmd: Command): void => {
           dryRun: options.dryRun,
           skipChecks: options.skipChecks,
           silenceWarnings: options.silenceWarnings,
-          full: Boolean(options.full || options.integrated),
+          full: Boolean(options.full),
         });
         if (exitCode !== 0) {
           process.exit(exitCode);

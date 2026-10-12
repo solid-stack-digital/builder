@@ -1,0 +1,7 @@
+services:
+  app:
+    environment:
+      FEATURE: enabled
+    build:
+      args:
+        FEATURE: enabled

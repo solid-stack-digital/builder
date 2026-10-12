@@ -1,3 +1,4 @@
+import { anonymousVolumeServices } from "../../composition/composeVolumes.js";
 import pc from "picocolors";
 import { parse } from "yaml";
 import { checkHostPortCollisions, extractHostPorts } from "../../../utils/checkPortCollision.js";
@@ -6,7 +7,6 @@ import { redactYamlSecrets } from "../../../utils/redactSecrets.js";
 import { clearRunState, writeRunState } from "../../../utils/runState.js";
 import { runCompose } from "../../runCompose.js";
 import { teardownCompose } from "../../teardownCompose.js";
-import { checkMesh } from "../checkers/checkMesh.js";
 import { compileMeshEnvironment } from "../compileMeshEnvironment.js";
 import type { MeshRunOptions } from "../MeshRunOptions.js";
 
@@ -14,13 +14,8 @@ export async function runMeshDev(options: MeshRunOptions = {}): Promise<number> 
   const meshDir = resolveProjectDir(options.projectDir);
 
   console.log(pc.cyan(`\n🚀 Starting Global DEV Mesh Environment...`));
-  if (!options.skipChecks) {
-    checkMesh(meshDir, { requireTester: false });
-  }
 
-  const { yaml } = compileMeshEnvironment("dev", meshDir, {
-    silenceWarnings: options.silenceWarnings,
-  });
+  const { yaml } = compileMeshEnvironment("dev", meshDir);
   const parsed = parse(yaml);
   const projectName = parsed?.name || "mesh-dev";
 
@@ -43,6 +38,7 @@ export async function runMeshDev(options: MeshRunOptions = {}): Promise<number> 
   // Stateful tracking
   writeRunState(meshDir, {
     projectName,
+    anonymousVolumeServices: anonymousVolumeServices(parsed?.services ?? {}),
     stage: "dev",
     projectDir: meshDir,
   });

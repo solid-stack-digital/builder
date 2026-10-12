@@ -4,7 +4,7 @@ import { resolveProjectDir } from "../../utils/paths.js";
 import { checkDockerfile } from "./checkDockerfile.js";
 import { checkDockerfileContract } from "./checkDockerfileContract.js";
 import { checkYamlFiles } from "./checkYamlFiles.js";
-import { checkComposeContract } from "./checkComposeContract.js";
+import { checkAllEffectiveServiceStages } from "./checkEffectiveServiceStages.js";
 
 export function checkInfra(projectDir: string = process.cwd()): void {
   const absProjectDir = resolveProjectDir(projectDir);
@@ -13,7 +13,7 @@ export function checkInfra(projectDir: string = process.cwd()): void {
   checkDockerfile(buildJson, absProjectDir);
   checkDockerfileContract(buildJson, absProjectDir);
   checkYamlFiles(buildJson, absProjectDir);
-  checkComposeContract(buildJson, absProjectDir);
+  checkAllEffectiveServiceStages(absProjectDir);
 
-  console.log(pc.green("\n✅ All infrastructure and contract checks passed.\n"));
+  console.log(pc.green("\n✅ All V2 service infrastructure and contract checks passed.\n"));
 }

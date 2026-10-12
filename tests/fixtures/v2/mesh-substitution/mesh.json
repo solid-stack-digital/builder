@@ -1,0 +1,17 @@
+{
+  "name": "mesh-substitution",
+  "services": {
+    "api": {
+      "path": "./app",
+      "publish": [
+        "app.endpoints.http"
+      ],
+      "dependencies": {
+        "alpha": "provider"
+      }
+    },
+    "provider": {
+      "path": "./provider"
+    }
+  }
+}

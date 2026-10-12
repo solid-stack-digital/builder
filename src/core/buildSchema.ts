@@ -1,109 +1,14 @@
 import { z } from "zod";
-
-export const buildPolicyConfigSchema = z
-  .object({
-    dockerfile: z
-      .string()
-      .optional()
-      .describe("Relative path to policy directory for Dockerfile checks"),
-    compose: z
-      .string()
-      .optional()
-      .describe("Relative path to policy directory for Compose contract checks"),
-  })
-  .strict()
-  .describe("Policy configurations for infra/contract verification");
-
-export const auxiliaryPortMappingSchema = z
-  .string()
-  .regex(/^([1-9]\d{0,4}):([1-9]\d{0,4})$/, 'Must use "HOST_PORT:CONTAINER_PORT"')
-  .refine((value) => value.split(":").every((part) => Number(part) <= 65535), {
-    message: "Host and container ports must be between 1 and 65535",
-  });
-
-export const buildDependencySchema = z
-  .object({
-    path: z
-      .string({ required_error: 'Dependency "path" is required' })
-      .describe("Relative path to mock Docker Compose file"),
-    service: z
-      .string()
-      .optional()
-      .describe("Target service name in the mock compose file"),
-    port: z
-      .union([z.number(), z.string()])
-      .optional()
-      .describe("Host port to map to this dependency locally"),
-    ports: z.array(auxiliaryPortMappingSchema).optional()
-      .describe("Additional explicit HOST_PORT:CONTAINER_PORT mappings for local dependency tooling"),
-  })
-  .strict()
-  .describe("Service dependency specification");
-
-export const buildOverrideSchema = z
-  .object({
-    path: z
-      .string({ required_error: 'Override "path" is required' })
-      .describe("Relative path to the environment stage override file"),
-  })
-  .strict()
-  .describe("Environment override specification");
-
-export const buildTesterSchema = z
-  .object({
-    envOverrides: z
-      .record(z.string(), z.string())
-      .optional()
-      .describe(
-        "Environment variable overrides for the individual E2E tester with URL templating"
-      ),
-  })
-  .strict()
-  .describe("E2E tester configuration");
-
-export const buildJsonSchema = z
-  .object({
-    $schema: z
-      .string()
-      .optional()
-      .describe("JSON Schema URL or relative path"),
-    name: z.string().optional().describe("Service project name"),
-    dockerfile: z
-      .string()
-      .optional()
-      .describe("Relative path to the Dockerfile (defaults to 'Dockerfile')"),
-    port: z
-      .union([z.number(), z.string()])
-      .optional()
-      .describe(
-        "Host port exposed by this service when listening publicly"
-      ),
-    policy: buildPolicyConfigSchema.optional(),
-    policies: buildPolicyConfigSchema.optional(),
-    composeFiles: z
-      .array(z.string())
-      .optional()
-      .describe("Additional compose files to merge"),
-    dependencies: z
-      .record(z.string(), buildDependencySchema)
-      .optional()
-      .describe("Service dependencies and mocks"),
-    envOverrides: z
-      .record(z.string(), z.string())
-      .optional()
-      .describe("Environment variable overrides for the app service with URL templating"),
-    overrides: z
-      .record(
-        z.enum(["dev", "prod", "test", "e2e"]),
-        buildOverrideSchema
-      )
-      .optional()
-      .describe("Stage overrides (dev, prod, test, e2e)"),
-    services: z
-      .record(z.string(), z.any())
-      .optional()
-      .describe("Additional Docker Compose service overrides"),
-    tester: buildTesterSchema.optional(),
-  })
-  .strict()
-  .describe("Solid Stack service build and deployment configuration");
+import { BUILDER_IDENTIFIER_PATTERN, ENDPOINT_SCHEME_PATTERN } from "./config/constants.js";
+const identifierSchema = z.string().regex(BUILDER_IDENTIFIER_PATTERN, "must match ^[a-z][a-z0-9-]*$");
+const envSchema = z.record(z.string(), z.string());
+const portSchema = z.number().int().min(1).max(65535);
+const publicPortSchema = z.union([portSchema, z.literal("AUTO")]);
+export const appEndpointSchema = z.object({ port: portSchema, publicPort: publicPortSchema.optional(), primary: z.boolean().optional(), scheme: z.string().regex(ENDPOINT_SCHEME_PATTERN).optional() }).strict();
+export const dependencyEndpointSchema = appEndpointSchema.extend({ service: z.string().min(1) }).strict();
+export const dependencySchema = z.object({ compose: z.string().min(1), env: envSchema.optional(), endpoints: z.record(identifierSchema, dependencyEndpointSchema).optional(), dependsOn: z.array(z.string()).optional() }).strict();
+const appStageEndpointSchema = appEndpointSchema.partial().strict();
+const dependencyStageEndpointSchema = dependencyEndpointSchema.partial().strict();
+const dependencyStageSchema = z.object({ compose: z.string().min(1).optional(), env: envSchema.optional(), endpoints: z.record(identifierSchema, dependencyStageEndpointSchema).optional(), dependsOn: z.array(z.string()).optional() }).strict();
+export const buildStageSchema = z.object({ "override-compose": z.string().min(1).optional(), app: z.object({ env: envSchema.optional(), endpoints: z.record(identifierSchema, appStageEndpointSchema).optional() }).strict().optional(), dependencies: z.record(identifierSchema, dependencyStageSchema).optional() }).strict();
+export const buildJsonSchema = z.object({ $schema: z.string().optional(), name: z.string().optional(), dockerfile: z.string().min(1).optional(), app: z.object({ env: envSchema.optional(), endpoints: z.record(identifierSchema, appEndpointSchema).optional() }).strict(), dependencies: z.record(identifierSchema, dependencySchema).optional(), tester: z.object({ env: envSchema.optional() }).strict().optional(), dev: buildStageSchema.optional(), prod: buildStageSchema.optional(), test: buildStageSchema.optional(), e2e: buildStageSchema.optional() }).strict();

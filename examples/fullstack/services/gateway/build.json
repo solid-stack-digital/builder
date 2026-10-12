@@ -1,27 +1,58 @@
 {
   "name": "fullstack-gateway",
-  "dependencies": {
-    "frontend": {
-      "path": ".docker/mocks/docker-compose.frontend.yml",
-      "service": "mock-frontend"
-    },
-    "backend": {
-      "path": ".docker/mocks/docker-compose.backend.yml",
-      "service": "mock-backend"
+  "app": {
+    "endpoints": {
+      "http": {
+        "port": 3000,
+        "publicPort": "AUTO",
+        "primary": true,
+        "scheme": "http"
+      }
     }
   },
-  "overrides": {
-    "dev": {
-      "path": ".docker/overrides/docker-compose.dev.override.yml"
+  "dependencies": {
+    "frontend": {
+      "compose": ".docker/mocks/docker-compose.frontend.yml",
+      "endpoints": {
+        "http": {
+          "service": "mock-frontend",
+          "port": 3001,
+          "primary": true,
+          "scheme": "http"
+        }
+      }
     },
-    "test": {
-      "path": ".docker/overrides/docker-compose.test.override.yml"
-    },
-    "prod": {
-      "path": ".docker/overrides/docker-compose.prod.override.yml"
-    },
-    "e2e": {
-      "path": ".docker/overrides/docker-compose.e2e.override.yml"
+    "backend": {
+      "compose": ".docker/mocks/docker-compose.backend.yml",
+      "endpoints": {
+        "http": {
+          "service": "mock-backend",
+          "port": 3002,
+          "primary": true,
+          "scheme": "http"
+        }
+      }
+    }
+  },
+  "dev": {
+    "override-compose": ".docker/overrides/docker-compose.dev.override.yml"
+  },
+  "test": {
+    "override-compose": ".docker/overrides/docker-compose.test.override.yml"
+  },
+  "prod": {
+    "override-compose": ".docker/overrides/docker-compose.prod.override.yml"
+  },
+  "e2e": {
+    "app": {
+      "env": {
+        "CI": "true"
+      }
+    }
+  },
+  "tester": {
+    "env": {
+      "API_URL": "${app.endpoints.http.public_url}"
     }
   }
 }

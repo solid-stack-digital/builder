@@ -1,0 +1,7 @@
+import { describe, expect, it } from "vitest";
+import { meshSchema } from "../../src/core/mesh/meshSchema.js";
+describe("V2 mesh schema", () => {
+ it("accepts canonical service, stage, and tester fields", () => expect(meshSchema.safeParse({ services: { api: { path: "./api", env: { A: "b" }, dependencies: { db: "database" }, dependsOn: ["database"], publish: ["app.endpoints.http"] } }, tester: { compose: "./e2e.yml", service: "runner", env: { URL: "${api.app.endpoints.http.public_url}" } }, dev: { services: { api: { env: { A: "c" }, publish: ["app.endpoints.metrics"] } } } }).success).toBe(true));
+ it("accepts empty base services structurally, rejects env type and reserved names", () => { expect(meshSchema.safeParse({ services: {} }).success).toBe(true); expect(meshSchema.safeParse({ services: { api: { path: "x", env: { A: 1 } } } }).success).toBe(false); expect(meshSchema.safeParse({ services: { tester: { path: "x" } } }).success).toBe(false); });
+ it("rejects legacy mesh fields", () => { for (const key of ["dependencies", "port", "preservePort", "provideDependency", "replaceMocks", "envOverrides", "healthcheck"]) { const cfg = key === "dependencies" ? { services: { api: { path: "x" } }, [key]: {} } : { services: { api: { path: "x", [key]: {} } } }; expect(meshSchema.safeParse(cfg).success, key).toBe(false); } });
+});

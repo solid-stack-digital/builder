@@ -1,23 +1,47 @@
 {
   "name": "fullstack-filesystem",
-  "dependencies": {
-    "firebase": {
-      "path": ".docker/mocks/docker-compose.firebase.yml",
-      "service": "firebase-emulator"
+  "app": {
+    "endpoints": {
+      "http": {
+        "port": 3003,
+        "publicPort": "AUTO",
+        "primary": true,
+        "scheme": "http"
+      }
     }
   },
-  "overrides": {
-    "dev": {
-      "path": ".docker/overrides/docker-compose.dev.override.yml"
-    },
-    "test": {
-      "path": ".docker/overrides/docker-compose.test.override.yml"
-    },
-    "prod": {
-      "path": ".docker/overrides/docker-compose.prod.override.yml"
-    },
-    "e2e": {
-      "path": ".docker/overrides/docker-compose.e2e.override.yml"
+  "dependencies": {
+    "firebase": {
+      "compose": ".docker/mocks/docker-compose.firebase.yml",
+      "endpoints": {
+        "http": {
+          "service": "firebase-emulator",
+          "port": 8080,
+          "primary": true,
+          "scheme": "http"
+        }
+      }
+    }
+  },
+  "dev": {
+    "override-compose": ".docker/overrides/docker-compose.dev.override.yml"
+  },
+  "test": {
+    "override-compose": ".docker/overrides/docker-compose.test.override.yml"
+  },
+  "prod": {
+    "override-compose": ".docker/overrides/docker-compose.prod.override.yml"
+  },
+  "e2e": {
+    "app": {
+      "env": {
+        "CI": "true"
+      }
+    }
+  },
+  "tester": {
+    "env": {
+      "API_URL": "${app.endpoints.http.public_url}"
     }
   }
 }

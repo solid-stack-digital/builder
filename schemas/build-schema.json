@@ -1,157 +1,676 @@
 {
-  "$ref": "#/definitions/BuildJson",
+  "$ref": "#/definitions/BuildJsonV2",
   "definitions": {
-    "BuildJson": {
+    "BuildJsonV2": {
       "type": "object",
       "properties": {
         "$schema": {
-          "type": "string",
-          "description": "JSON Schema URL or relative path"
+          "type": "string"
         },
         "name": {
-          "type": "string",
-          "description": "Service project name"
+          "type": "string"
         },
         "dockerfile": {
           "type": "string",
-          "description": "Relative path to the Dockerfile (defaults to 'Dockerfile')"
+          "minLength": 1
         },
-        "port": {
-          "type": [
-            "number",
-            "string"
-          ],
-          "description": "Host port exposed by this service when listening publicly"
-        },
-        "policy": {
+        "app": {
           "type": "object",
           "properties": {
-            "dockerfile": {
-              "type": "string",
-              "description": "Relative path to policy directory for Dockerfile checks"
+            "env": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
             },
-            "compose": {
-              "type": "string",
-              "description": "Relative path to policy directory for Compose contract checks"
+            "endpoints": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  "publicPort": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      {
+                        "type": "string",
+                        "const": "AUTO"
+                      }
+                    ]
+                  },
+                  "primary": {
+                    "type": "boolean"
+                  },
+                  "scheme": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                  }
+                },
+                "required": [
+                  "port"
+                ],
+                "additionalProperties": false
+              },
+              "propertyNames": {
+                "pattern": "^[a-z][a-z0-9-]*$"
+              }
             }
           },
-          "additionalProperties": false,
-          "description": "Policy configurations for infra/contract verification"
-        },
-        "policies": {
-          "type": "object",
-          "properties": {
-            "dockerfile": {
-              "type": "string",
-              "description": "Relative path to policy directory for Dockerfile checks"
-            },
-            "compose": {
-              "type": "string",
-              "description": "Relative path to policy directory for Compose contract checks"
-            }
-          },
-          "additionalProperties": false,
-          "description": "Policy configurations for infra/contract verification"
-        },
-        "composeFiles": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Additional compose files to merge"
+          "additionalProperties": false
         },
         "dependencies": {
           "type": "object",
           "additionalProperties": {
             "type": "object",
             "properties": {
-              "path": {
+              "compose": {
                 "type": "string",
-                "description": "Relative path to mock Docker Compose file"
+                "minLength": 1
               },
-              "service": {
-                "type": "string",
-                "description": "Target service name in the mock compose file"
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
               },
-              "port": {
-                "type": [
-                  "number",
-                  "string"
-                ],
-                "description": "Host port to map to this dependency locally"
+              "endpoints": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "port": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535
+                    },
+                    "publicPort": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 65535
+                        },
+                        {
+                          "type": "string",
+                          "const": "AUTO"
+                        }
+                      ]
+                    },
+                    "primary": {
+                      "type": "boolean"
+                    },
+                    "scheme": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                    },
+                    "service": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "port",
+                    "service"
+                  ],
+                  "additionalProperties": false
+                },
+                "propertyNames": {
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                }
               },
-              "ports": {
+              "dependsOn": {
                 "type": "array",
                 "items": {
-                  "type": "string",
-                  "pattern": "^([1-9]\\d{0,4}):([1-9]\\d{0,4})$"
-                },
-                "description": "Additional explicit HOST_PORT:CONTAINER_PORT mappings for local dependency tooling"
+                  "type": "string"
+                }
               }
             },
             "required": [
-              "path"
+              "compose"
             ],
-            "additionalProperties": false,
-            "description": "Service dependency specification"
-          },
-          "description": "Service dependencies and mocks"
-        },
-        "envOverrides": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Environment variable overrides for the app service with URL templating"
-        },
-        "overrides": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "object",
-            "properties": {
-              "path": {
-                "type": "string",
-                "description": "Relative path to the environment stage override file"
-              }
-            },
-            "required": [
-              "path"
-            ],
-            "additionalProperties": false,
-            "description": "Environment override specification"
+            "additionalProperties": false
           },
           "propertyNames": {
-            "enum": [
-              "dev",
-              "prod",
-              "test",
-              "e2e"
-            ]
-          },
-          "description": "Stage overrides (dev, prod, test, e2e)"
-        },
-        "services": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional Docker Compose service overrides"
+            "pattern": "^[a-z][a-z0-9-]*$"
+          }
         },
         "tester": {
           "type": "object",
           "properties": {
-            "envOverrides": {
+            "env": {
               "type": "object",
               "additionalProperties": {
                 "type": "string"
-              },
-              "description": "Environment variable overrides for the individual E2E tester with URL templating"
+              }
             }
           },
-          "additionalProperties": false,
-          "description": "E2E tester configuration"
+          "additionalProperties": false
+        },
+        "dev": {
+          "type": "object",
+          "properties": {
+            "override-compose": {
+              "type": "string",
+              "minLength": 1
+            },
+            "app": {
+              "type": "object",
+              "properties": {
+                "env": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "endpoints": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "port": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      "publicPort": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 65535
+                          },
+                          {
+                            "type": "string",
+                            "const": "AUTO"
+                          }
+                        ]
+                      },
+                      "primary": {
+                        "type": "boolean"
+                      },
+                      "scheme": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "propertyNames": {
+                    "pattern": "^[a-z][a-z0-9-]*$"
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "dependencies": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "compose": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "env": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "endpoints": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "port": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 65535
+                        },
+                        "publicPort": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 65535
+                            },
+                            {
+                              "type": "string",
+                              "const": "AUTO"
+                            }
+                          ]
+                        },
+                        "primary": {
+                          "type": "boolean"
+                        },
+                        "scheme": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                        },
+                        "service": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "propertyNames": {
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    }
+                  },
+                  "dependsOn": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "propertyNames": {
+                "pattern": "^[a-z][a-z0-9-]*$"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "prod": {
+          "type": "object",
+          "properties": {
+            "override-compose": {
+              "type": "string",
+              "minLength": 1
+            },
+            "app": {
+              "type": "object",
+              "properties": {
+                "env": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "endpoints": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "port": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      "publicPort": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 65535
+                          },
+                          {
+                            "type": "string",
+                            "const": "AUTO"
+                          }
+                        ]
+                      },
+                      "primary": {
+                        "type": "boolean"
+                      },
+                      "scheme": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "propertyNames": {
+                    "pattern": "^[a-z][a-z0-9-]*$"
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "dependencies": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "compose": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "env": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "endpoints": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "port": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 65535
+                        },
+                        "publicPort": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 65535
+                            },
+                            {
+                              "type": "string",
+                              "const": "AUTO"
+                            }
+                          ]
+                        },
+                        "primary": {
+                          "type": "boolean"
+                        },
+                        "scheme": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                        },
+                        "service": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "propertyNames": {
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    }
+                  },
+                  "dependsOn": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "propertyNames": {
+                "pattern": "^[a-z][a-z0-9-]*$"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "test": {
+          "type": "object",
+          "properties": {
+            "override-compose": {
+              "type": "string",
+              "minLength": 1
+            },
+            "app": {
+              "type": "object",
+              "properties": {
+                "env": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "endpoints": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "port": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      "publicPort": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 65535
+                          },
+                          {
+                            "type": "string",
+                            "const": "AUTO"
+                          }
+                        ]
+                      },
+                      "primary": {
+                        "type": "boolean"
+                      },
+                      "scheme": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "propertyNames": {
+                    "pattern": "^[a-z][a-z0-9-]*$"
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "dependencies": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "compose": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "env": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "endpoints": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "port": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 65535
+                        },
+                        "publicPort": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 65535
+                            },
+                            {
+                              "type": "string",
+                              "const": "AUTO"
+                            }
+                          ]
+                        },
+                        "primary": {
+                          "type": "boolean"
+                        },
+                        "scheme": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                        },
+                        "service": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "propertyNames": {
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    }
+                  },
+                  "dependsOn": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "propertyNames": {
+                "pattern": "^[a-z][a-z0-9-]*$"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "e2e": {
+          "type": "object",
+          "properties": {
+            "override-compose": {
+              "type": "string",
+              "minLength": 1
+            },
+            "app": {
+              "type": "object",
+              "properties": {
+                "env": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "endpoints": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "port": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      "publicPort": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 65535
+                          },
+                          {
+                            "type": "string",
+                            "const": "AUTO"
+                          }
+                        ]
+                      },
+                      "primary": {
+                        "type": "boolean"
+                      },
+                      "scheme": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "propertyNames": {
+                    "pattern": "^[a-z][a-z0-9-]*$"
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "dependencies": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "compose": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "env": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "endpoints": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "port": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 65535
+                        },
+                        "publicPort": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 65535
+                            },
+                            {
+                              "type": "string",
+                              "const": "AUTO"
+                            }
+                          ]
+                        },
+                        "primary": {
+                          "type": "boolean"
+                        },
+                        "scheme": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                        },
+                        "service": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "propertyNames": {
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    }
+                  },
+                  "dependsOn": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "propertyNames": {
+                "pattern": "^[a-z][a-z0-9-]*$"
+              }
+            }
+          },
+          "additionalProperties": false
         }
       },
-      "additionalProperties": false,
-      "description": "Solid Stack service build and deployment configuration"
+      "required": [
+        "app"
+      ],
+      "additionalProperties": false
     }
   },
   "$schema": "http://json-schema.org/draft-07/schema#"

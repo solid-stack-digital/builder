@@ -10,6 +10,8 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 
 # development
 FROM base AS dev
+HEALTHCHECK --interval=2s --timeout=2s --start-period=3s --retries=10 \
+  CMD ["node", "-e", "const p=Number(process.env.PORT); if(!p) process.exit(1); const s=require('net').connect(p,'127.0.0.1'); s.on('connect',()=>{s.end();process.exit(0)}); s.on('error',()=>process.exit(1));"]
 CMD ["nginx", "-g", "daemon off;"]
 
 # unit testing
@@ -30,9 +32,9 @@ COPY . .
 FROM nginx:alpine AS prod
 # hadolint ignore=DL3018
 RUN apk add --no-cache nodejs
-COPY templates /etc/nginx/templates
+COPY --from=builder /etc/nginx/templates /etc/nginx/templates
 
 HEALTHCHECK --interval=2s --timeout=2s --start-period=3s --retries=10 \
-  CMD ["node", "-e", "require('net').connect(process.env.PORT || 3000, '127.0.0.1').on('connect', () => process.exit(0)).on('error', () => process.exit(1))"]
+  CMD ["node", "-e", "const p=Number(process.env.PORT); if(!p) process.exit(1); const s=require('net').connect(p,'127.0.0.1'); s.on('connect',()=>{s.end();process.exit(0)}); s.on('error',()=>process.exit(1));"]
 
 CMD ["nginx", "-g", "daemon off;"]

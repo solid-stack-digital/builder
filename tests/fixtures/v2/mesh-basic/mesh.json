@@ -1,0 +1,11 @@
+{
+  "name": "mesh-basic",
+  "services": {
+    "api": {
+      "path": "./app",
+      "publish": [
+        "app.endpoints.http"
+      ]
+    }
+  }
+}

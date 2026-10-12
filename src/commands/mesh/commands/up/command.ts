@@ -32,7 +32,10 @@ export const registerMeshUpCommand = (cmd: Command): void => {
   $ builder mesh up prod
   $ builder mesh up test
   $ builder mesh up test-unit
-  $ builder mesh up test-e2e`
+  $ builder mesh up test-e2e
+
+JSON overlays: test-unit uses mesh/build test; test-e2e uses mesh/build e2e.
+The test command runs per-service unit tests before global E2E.`
     )
     .action(
       async (stage: string = "dev", options: Record<string, any> = {}) => {
@@ -42,7 +45,6 @@ export const registerMeshUpCommand = (cmd: Command): void => {
           detach: options.detach,
           dryRun: options.dryRun,
           skipChecks: options.skipChecks,
-          silenceWarnings: options.silenceWarnings,
         });
         if (exitCode !== 0) {
           process.exit(exitCode);

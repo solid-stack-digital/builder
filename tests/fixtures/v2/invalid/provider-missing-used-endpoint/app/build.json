@@ -1,0 +1,34 @@
+{
+  "name": "fixture-service-e2e",
+  "app": {
+    "env": {
+      "SELF_URL": "${app.endpoints.http.network_url}",
+      "DB_PORT": "${dependencies.db.endpoints.tcp.network_port}"
+    },
+    "endpoints": {
+      "http": {
+        "port": 3000,
+        "publicPort": "AUTO",
+        "primary": true,
+        "scheme": "http"
+      }
+    }
+  },
+  "tester": {
+    "env": {
+      "API_URL": "${app.endpoints.http.public_url}"
+    }
+  },
+  "dependencies": {
+    "db": {
+      "compose": "./db.yml",
+      "endpoints": {
+        "tcp": {
+          "service": "db",
+          "port": 6379,
+          "primary": true
+        }
+      }
+    }
+  }
+}

@@ -1,12 +1,7 @@
 services:
-  app: 
+  app:
     build:
       target: prod
     env_file:
       - path: .env.prod
         required: false
-    environment:
-      - INFRA_MODE=integrated 
-      - EXEC_MODE=prod
-
-

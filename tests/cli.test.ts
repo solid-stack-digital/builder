@@ -1,3 +1,6 @@
+vi.mock("../src/core/teardownCompose.js",()=>({teardownCompose:vi.fn().mockResolvedValue(undefined)}));
+vi.mock("../src/utils/checkDependencies.js",()=>({checkDependencies:vi.fn(),checkComposeAvailability:vi.fn()}));
+vi.mock("../src/core/checkers/runStep.js",()=>({runStep:vi.fn()}));
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createCli, runCli } from "../src/cli.js";
@@ -62,14 +65,16 @@ describe("CLI parser and command handlers", () => {
     expect(exitCode).toBe(0);
   });
 
-  it("handles service up dev with --integrated flag in dry-run", async () => {
-    const exitCode = await handleServiceUp("dev", {
-      projectDir: EXAMPLE_BACKEND_DIR,
-      dryRun: true,
-      skipChecks: true,
-      integrated: true,
-    });
-    expect(exitCode).toBe(0);
+  it("rejects the removed integrated option at the parser", async () => {
+    const cli = createCli();
+    await expect(cli.parseAsync(["node","builder","service","up","dev","--integrated"])).rejects.toMatchObject({code:"commander.unknownOption"});
+  });
+
+  it("does not register the removed integrated option", () => {
+    const cli = createCli();
+    const service = cli.commands.find(c => c.name() === "service");
+    const up = service?.commands.find(c => c.name() === "up");
+    expect(up?.options.some(o => o.long === "--integrated")).toBe(false);
   });
 
   it("rejects unknown stage", async () => {

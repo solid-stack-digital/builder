@@ -8,7 +8,6 @@ export function registerExportCommand(service: Command): void {
     .addArgument(new Argument("[stage]", "Stage to export (defaults to all four)").choices(["dev", "prod", "test", "e2e"]))
     .option("-C, --project-dir <dir>", "Service project directory (defaults to cwd)")
     .option("--full", "Export dev with mock dependencies and integrated infra mode")
-    .option("--integrated", "Alias for --full")
     .option("--silence-warnings", "Silence non-critical URL templating warnings")
     .addHelpText("after", `\nExamples:
   $ builder service export env
@@ -18,7 +17,7 @@ export function registerExportCommand(service: Command): void {
     .action(async (stage: string | undefined, options) => {
       await handleExportEnv(stage, {
         projectDir: options.projectDir,
-        full: Boolean(options.full || options.integrated),
+        full: Boolean(options.full),
         silenceWarnings: options.silenceWarnings,
       });
     });

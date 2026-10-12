@@ -38,3 +38,11 @@ patch:
 
 lookci: 
 	@find src docker scripts templates tests package.json tsconfig.json vitest.config.ts tsup.config.ts -type f -exec tail -n +1 {} + 
+
+lookall:
+	git ls-files -z --cached --others --exclude-standard | \
+	while IFS= read -r -d '' file; do \
+		printf '\n===== %s =====\n' "$$file"; \
+		cat -- "$$file"; \
+		printf '\n'; \
+	done

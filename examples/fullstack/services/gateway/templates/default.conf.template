@@ -1,6 +1,5 @@
 server {
-    listen 3000;
-    listen 80;
+    listen ${PORT};
 
     # Internal healthcheck for gateway
     location = /health {

@@ -1,0 +1,6 @@
+import { describe, expect, it } from "vitest";
+import { assertTesterReferencesArePublic, collectBuilderReferences, interpolateBuilderReferences } from "../../src/core/config/references.js";
+describe("V2 endpoint references", () => {
+ it("parses all eight properties in build and mesh scope", () => { for (const p of ["network_host", "network_port", "network_address", "network_url", "public_host", "public_port", "public_address", "public_url"]) { expect(collectBuilderReferences(`x={app.endpoints.http.${p}}`.replace("\u001b", "$"), "build", "env.X")).toHaveLength(1); expect(collectBuilderReferences(`{api.dependencies.db.endpoints.redis.${p}}`.replace("\u001b", "$"), "mesh", "env.X")).toHaveLength(1); } });
+ it("supports embedded refs and escaped dollars; rejects invalid grammar and tester network refs", () => { expect(interpolateBuilderReferences("url=$${literal} ${app.endpoints.http.network_port}", "build", () => "3000")).toBe("url=${literal} 3000"); expect(() => collectBuilderReferences("${services.api.app.endpoints.http.public_url}", "mesh", "x")).toThrow(); expect(() => assertTesterReferencesArePublic({ URL: "${app.endpoints.http.network_url}" }, "build", "tester.env")).toThrow(); });
+});

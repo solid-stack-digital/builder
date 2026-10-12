@@ -1,0 +1,9 @@
+import { describe, expect, it } from "vitest";
+import { resolveBuildStage } from "../../src/core/config/resolveBuildStage.js";
+import { resolveMeshStage } from "../../src/core/config/resolveMeshStage.js";
+import { ConfigError } from "../../src/errors/ConfigError.js";
+describe("V2 stage resolution", () => {
+ it("merges build endpoints/env and dependency lifecycle arrays", () => { const result = resolveBuildStage({ app: { env: { A: "1" }, endpoints: { http: { port: 3, primary: true } } }, dependencies: { redis: { compose: "r.yml", endpoints: { redis: { service: "redis", port: 6379, primary: true } } } }, dev: { app: { env: { B: "2" }, endpoints: { http: { scheme: "http" } } }, dependencies: { redis: { dependsOn: [] } } } }, "dev", "build.json"); expect(result.app.env).toEqual({ A: "1", B: "2" }); expect(result.app.endpoints.http).toMatchObject({ port: 3, scheme: "http" }); });
+ it("enforces exactly one primary and detects dependency cycles", () => { expect(() => resolveBuildStage({ app: { endpoints: { a: { port: 1 } } } }, "dev", "build.json")).toThrow(ConfigError); const dep = (to: string) => ({ compose: "x", dependsOn: [`dependencies.${to}`], endpoints: { x: { service: "x", port: 1, primary: true } } }); expect(() => resolveBuildStage({ app: {}, dependencies: { a: dep("b"), b: dep("a") } }, "dev", "build.json")).toThrow(/a -> dependencies.b|cycle/i); });
+ it("merges mesh overlays without inheriting prod into e2e and catches cycles", () => { const mesh: any = { services: { api: { path: "api" }, db: { path: "db" } }, prod: { services: { api: { env: { X: "prod" } } } }, e2e: { services: { api: { dependsOn: ["db"] }, db: { dependsOn: ["api"] } } } }; expect(() => resolveMeshStage(mesh, "e2e", "mesh.json")).toThrow(ConfigError); const good = resolveMeshStage({ services: { api: { path: "api" } }, prod: { services: { api: { env: { X: "prod" } } } } }, "e2e", "mesh.json"); expect(good.services.api?.env).toEqual({}); });
+});

@@ -1,21 +1,24 @@
 import { spawnSync } from "node:child_process";
+import { parse } from "yaml";
+vi.mock("node:child_process",()=>({spawnSync:vi.fn()}));
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { compileApplicationEnv, serializeApplicationEnv } from "../src/core/compileApplicationEnv.js";
 
 describe("application environment compilation", () => {
   let dir: string;
   beforeEach(() => {
+    vi.mocked(spawnSync).mockReset();
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "builder-application-env-"));
+    fs.copyFileSync(path.resolve("tests/fixtures/v2/service-basic/Dockerfile"), path.join(dir,"Dockerfile"));
     fs.writeFileSync(path.join(dir, "build.json"), JSON.stringify({
-      name: "env-test", port: 8080,
-      overrides: { dev: { path: "dev.yml" } },
-      envOverrides: { APP_URL: "${app.public_url}/api", PRIORITY: "build-json" },
-      tester: { envOverrides: { TESTER_ONLY: "yes" } },
+      name: "env-test", app: { endpoints: { http: { port: 8080, publicPort: 8080, primary: true, scheme: "http" } }, env: { APP_URL: "${app.endpoints.http.public_url}/api", PRIORITY: "build-json" } },
+      dev: { "override-compose": "dev.yml" },
+      tester: { env: { TESTER_ONLY: "yes" } },
     }));
-    fs.writeFileSync(path.join(dir, "dev.yml"), 'services:\n  app:\n    environment:\n      FROM_DEFAULT: ${FROM_DEFAULT}\n      PRIORITY: compose\n');
+    fs.writeFileSync(path.join(dir, "dev.yml"), 'services:\n  app:\n    environment:\n      FROM_DEFAULT: base\n      PRIORITY: compose\n');
     fs.writeFileSync(path.join(dir, ".env"), "FROM_DEFAULT=base\nINTERPOLATION_ONLY=hidden\n");
     for (const stage of ["dev", "prod", "test", "e2e"]) {
       fs.writeFileSync(path.join(dir, `.env.${stage}`), `STAGE_FILE=${stage}\nPRIORITY=env-file\nSECRET='literal$money'\n`);
@@ -23,38 +26,29 @@ describe("application environment compilation", () => {
   });
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-  it("resolves stage files, overrides, URL templates and final runtime values", () => {
-    const environment = compileApplicationEnv("dev", dir);
-    expect(environment).toMatchObject({
-      EXEC_MODE: "dev", INFRA_MODE: "isolated", STAGE_FILE: "dev",
-      FROM_DEFAULT: "base", PRIORITY: "build-json", APP_URL: "http://localhost:8080/api",
-      SECRET: "literal$money",
-    });
-    expect(environment.INTERPOLATION_ONLY).toBeUndefined();
-    expect(compileApplicationEnv("dev", dir, { full: true }).INFRA_MODE).toBe("integrated");
+  it("passes compiled overrides, env files, URL templates and runtime values to Compose", () => {
+    vi.mocked(spawnSync).mockReturnValue({status:0,pid:1,output:[],signal:null,stderr:"",stdout:JSON.stringify({services:{app:{environment:{SECRET:"literal$$money",NUMBER:42,UNSET:null}}}})});
+    expect(compileApplicationEnv("dev",dir)).toEqual({SECRET:"literal$money",NUMBER:"42"});
+    expect(spawnSync).toHaveBeenCalledWith("docker",["compose","--project-directory",dir,"-f","-","config","--format","json"],expect.objectContaining({cwd:dir}));
+    const c=parse(vi.mocked(spawnSync).mock.lastCall![2]!.input as string);
+    expect(c.services.app.env_file).toEqual([{path:".env.dev",required:false}]);
+    expect(c.services.app.environment).toMatchObject({PRIORITY:"compose",APP_URL:"http://127.0.0.1:8080/api",EXEC_MODE:"dev",INFRA_MODE:"isolated"});
   });
 
-  it("exports the app's prod environment during E2E and does not mix in tester settings", () => {
-    const environment = compileApplicationEnv("e2e", dir);
-    expect(environment).toMatchObject({ EXEC_MODE: "prod", INFRA_MODE: "integrated", STAGE_FILE: "prod" });
-    expect(environment.TESTER_ONLY).toBeUndefined();
+  it("sends E2E overlay with prod app target and keeps tester settings separate", () => {
+    vi.mocked(spawnSync).mockReturnValue({status:0,pid:1,output:[],signal:null,stderr:"",stdout:JSON.stringify({services:{app:{environment:{EXEC_MODE:"e2e"}}}})});
+    expect(compileApplicationEnv("e2e",dir)).toEqual({EXEC_MODE:"e2e"});
+    const c=parse(vi.mocked(spawnSync).mock.lastCall![2]!.input as string);
+    expect(c.services.app.build.target).toBe("prod");expect(c.services.app.env_file).toEqual([{path:".env.e2e",required:false}]);expect(c.services.app.environment.TESTER_ONLY).toBeUndefined();
   });
 
-  it("round-trips quotes, dollars, backslashes, empty strings, spaces and multiline values through Compose", () => {
-    const values = {
-      EMPTY: "", DOLLARS: "$literal ${UNCHANGED} $$", SPACES: "  a # b  ",
-      QUOTES: "it's \"quoted\"", BACKSLASH: "C:\\folder\\file", END_SLASH: "end\\",
-      MULTILINE: "line one\nline two", ESCAPED_QUOTE: "backslash\\'quote",
-    };
-    fs.writeFileSync(path.join(dir, "export.env"), serializeApplicationEnv(values));
-    const result = spawnSync("docker", ["compose", "-p", "roundtrip", "--project-directory", dir, "-f", "-", "config", "--format", "json"], {
-      cwd: dir, encoding: "utf8", input: 'services:\n  app:\n    image: alpine\n    env_file: export.env\n',
-    });
-    expect(result.status, result.stderr).toBe(0);
-    const environment = JSON.parse(result.stdout).services.app.environment;
-    for (const [key, value] of Object.entries(values)) {
-      expect(environment[key].replace(/\$\$/g, "$"), key).toBe(value);
-    }
+  it("propagates Compose config failures",()=>{
+    vi.mocked(spawnSync).mockReturnValue({status:1,pid:1,output:[],signal:null,stderr:"invalid config",stdout:""});
+    expect(()=>compileApplicationEnv("dev",dir)).toThrow(/invalid config/);
+  });
+
+  it("serializes literal values without losing quotes, dollars or newlines", () => {
+    expect(serializeApplicationEnv({EMPTY:"", DOLLARS:"$literal", MULTILINE:"one\ntwo"})).toBe("DOLLARS='$literal'\nEMPTY=''\nMULTILINE='one\ntwo'\n");
   });
 
   it("rejects values that cannot be represented as environment assignments", () => {

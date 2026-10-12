@@ -1,3 +1,4 @@
+import { anonymousVolumeServices } from "../composition/composeVolumes.js";
 import pc from "picocolors";
 import { parse } from "yaml";
 import { checkHostPortCollisions, extractHostPorts } from "../../utils/checkPortCollision.js";
@@ -35,6 +36,7 @@ export const runProd = async (options: RunOptions): Promise<number> => {
   // Stateful tracking
   writeRunState(options.projectDir, {
     projectName,
+    anonymousVolumeServices: anonymousVolumeServices(parsed?.services ?? {}),
     stage: "prod",
     projectDir: options.projectDir,
   });

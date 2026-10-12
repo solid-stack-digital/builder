@@ -31,9 +31,8 @@ export async function handleMeshDown(
 
   if (options.debug) {
     try {
-      const mode = stage === "dev" ? "dev" : "prod";
-      const includeTester = stage === "test" || stage === "test-e2e";
-      const { yaml } = compileMeshEnvironment(mode, meshDir, { includeTester });
+      const mode = stage === "dev" ? "dev" : stage === "test-e2e" ? "e2e" : "prod";
+      const { yaml } = compileMeshEnvironment(mode, meshDir, { validateWithDocker: false });
       console.log(
         pc.yellow("\nFinal merged Mesh YAML configuration:\n"),
         redactYamlSecrets(yaml)
@@ -54,6 +53,7 @@ export async function handleMeshDown(
   for (const proj of uniqueProjects) {
     await teardownCompose("", meshDir, {
       projectName: proj,
+      ...(runState?.projectName === proj && runState.anonymousVolumeServices ? {anonymousVolumeServices: runState.anonymousVolumeServices} : {}),
       removeVolumes: Boolean(options.volumes),
     });
   }

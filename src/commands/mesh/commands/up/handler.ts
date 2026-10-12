@@ -1,3 +1,4 @@
+import { checkMesh } from "../../../../core/mesh/checkers/checkMesh.js";
 import { runMeshDev } from "../../../../core/mesh/runners/runMeshDev.js";
 import { runMeshProd } from "../../../../core/mesh/runners/runMeshProd.js";
 import { runMeshTest } from "../../../../core/mesh/runners/runMeshTest.js";
@@ -18,6 +19,10 @@ export async function handleMeshUp(
     ...options,
     projectDir,
   };
+
+  if (["dev", "prod", "test-unit", "test-e2e", "test"].includes(stage) && !options.skipChecks) {
+    checkMesh(projectDir, { requireTester: stage === "test-e2e" || stage === "test" });
+  }
 
   switch (stage) {
     case "dev":
