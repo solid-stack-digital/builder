@@ -1,0 +1,58 @@
+import { afterEach, expect, it } from "vitest";
+import { cleanupFixtures, compileMesh, compileService, dep, fixture, meshFixture } from "./fixture.js";
+
+afterEach(cleanupFixtures);
+
+it("V211-001 rejects a null app healthcheck override", () => {
+  const root = fixture({ app: {}, prod: { "override-compose": "prod.yml" } }, {
+    "prod.yml": { services: { app: { healthcheck: null } } },
+  });
+  expect(() => compileService("prod", root)).toThrow(/healthcheck/i);
+});
+
+it("V211-002 rejects a cycle inside a materialized standalone dependency bundle", () => {
+  const root = fixture({ app: {}, dependencies: { db: dep("db.yml", "owner") } }, {
+    "db.yml": { services: {
+      owner: { image: "alpine", healthcheck: { test: ["CMD", "true"] }, depends_on: ["helper"] },
+      helper: { image: "alpine", depends_on: ["owner"] },
+    } },
+  });
+  expect(() => compileService("prod", root)).toThrow(/cycl/i);
+});
+
+it("V211-003 rejects a cycle inside a global tester bundle", () => {
+  const root = meshFixture({ services: { appone: { path: "appone" } }, tester: { compose: "tester.yml", service: "runner" } },
+    { appone: { app: {} } },
+    { "tester.yml": { services: {
+      runner: { image: "alpine", depends_on: ["helper"] },
+      helper: { image: "alpine", depends_on: ["runner"] },
+    } } });
+  expect(() => compileMesh("e2e", root)).toThrow(/cycl/i);
+});
+
+it("V211-001 control accepts timing-only app healthcheck override", () => {
+  const root = fixture({ app: {}, prod: { "override-compose": "prod.yml" } }, {
+    "prod.yml": { services: { app: { healthcheck: { interval: "5s" } } } },
+  });
+  expect(compileService("prod", root).compose.services.app?.healthcheck).toEqual({ interval: "5s" });
+});
+
+it("V211-002 control accepts acyclic dependency bundle", () => {
+  const root = fixture({ app: {}, dependencies: { db: dep("db.yml", "owner") } }, {
+    "db.yml": { services: {
+      owner: { image: "alpine", healthcheck: { test: ["CMD", "true"] }, depends_on: ["helper"] },
+      helper: { image: "alpine" },
+    } },
+  });
+  expect(compileService("prod", root).compose.services["dep--db--owner"]).toBeDefined();
+});
+
+it("V211-003 control accepts acyclic global tester bundle", () => {
+  const root = meshFixture({ services: { appone: { path: "appone" } }, tester: { compose: "tester.yml", service: "runner" } },
+    { appone: { app: {} } },
+    { "tester.yml": { services: {
+      runner: { image: "alpine", depends_on: ["helper"] },
+      helper: { image: "alpine" },
+    } } });
+  expect(compileMesh("e2e", root).testerServiceName).toBeDefined();
+});
