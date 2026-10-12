@@ -6,7 +6,7 @@ Audit date: 2026-10-12, Asia/Manila. Audited commit: `e125df26a7044e59c456adeac5
 
 The code implements the central V2 schema and execution model, but it does **not fully implement the specified behavior**. Seven concrete defects were reproduced. The existing automated suite passed; new tests expose behavior it does not cover.
 
-At audit completion, these were implementation plans and no production source had been changed. **Implementation update (2026-10-12): plans 01–06 are now implemented and verified; see their implementation records. Plan 07 remains unapplied.** Audit regression sources are retained as `.test.ts.txt` artifacts so intentionally failing tests do not break the current default suite. Copy them into the stated test paths before implementation.
+At audit completion, these were implementation plans and no production source had been changed. **Implementation update (2026-10-12): all seven plans 01–07 are now implemented and verified; see their respective implementation records.** Audit regression sources are retained as `.test.ts.txt` artifacts so intentionally failing tests do not break the current default suite. Copy them into the stated test paths before implementation.
 
 ## Numbered bug reports
 

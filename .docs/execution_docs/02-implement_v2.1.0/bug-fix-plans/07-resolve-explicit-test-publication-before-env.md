@@ -1,6 +1,6 @@
 # 07 — Apply explicit test-stage publication before resolving environment
 
-**ID:** V210-007. **Priority:** Medium. **Status:** reproduced with the real explicit test runner in dry-run mode. **Fix not applied.**
+**ID:** V210-007. **Priority:** Medium. **Status:** implemented and verified on 2026-10-12. The original red test and implementation plan are preserved below.
 
 ## Bug and trigger
 
@@ -128,3 +128,22 @@ The checker test must explicitly request test-stage validation; otherwise plan 0
 ## Verification
 
 Run the exact gate, the explicit checker control, `tests/v2/meshRunners.test.ts`, host publication/reference tests, and plan 00 final checks. No schema changes, new CLI commands, or changes to canonical phase sequencing are required. Keep the published/private reference restrictions intact; only correct the sequence in which the existing publication and resolution functions execute.
+
+## Implementation record — 2026-10-12
+
+The V210-007 regression failed before the change because `runMeshTestUnit` and `checkMeshServices` resolved service environment references before applying explicit test-stage app publications, causing valid self-references to `public_*` properties to fail with an unpublished-endpoint error. After the change, publication is applied immediately after compiling the isolated service composition and before reference resolution, resolving `public_*` endpoint properties and port mappings correctly.
+
+In `src/core/mesh/runners/runMeshTestUnit.ts`, `applyTestAppPublications` is now invoked immediately after `compileServiceComposition`, mutating the Compose service's port mappings and marking the endpoint registry effectively published prior to reference resolution. In `src/core/mesh/checkers/checkMeshServices.ts`, the validated publication plan is captured from `validateMeshTestStage` and passed to `applyTestAppPublications` before environment resolution when `stage === "test"`.
+
+The permanent test suite `tests/conformance/v210-audit-test-publication.test.ts` covers:
+- Resolving published app endpoint self-references before explicit test execution.
+- Emitted port mappings and resolved URL in debug YAML output.
+- Verification in `checkMeshServices` with `{ includeTestStage: true }`.
+- Resolution of published references in `build.json` app env.
+- `AUTO` port resolution without creating a `.builder` port cache file.
+- Rejection of public references when endpoints are not published.
+- Rejection of publication when `publicPort` is missing.
+- Rejection of retained dependency publications in isolated test stage.
+- Verification of `target=test`, `EXEC_MODE=test`, `INFRA_MODE=isolated`, and omission of dependency containers and tester service.
+
+Validation: All 9 tests in `v210-audit-test-publication.test.ts` passed, 550 conformance tests in 22 files passed, 786 full-suite tests in 66 files passed, TypeScript check passed, and removed-V1-token check passed. All 7 audit bug fixes (plans 01–07) are now fully implemented and verified.

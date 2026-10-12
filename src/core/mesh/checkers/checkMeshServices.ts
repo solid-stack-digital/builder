@@ -6,7 +6,7 @@ import { resolveMeshStage } from "../../config/resolveMeshStage.js";
 import { compileServiceComposition } from "../../composition/compileServiceComposition.js";
 import { checkInfra } from "../../checkers/checkInfra.js";
 import { compileMeshComposition } from "../v2/compileMeshComposition.js";
-import { validateMeshTestStage } from "../v2/validateMeshTestStage.js";
+import { applyTestAppPublications, validateMeshTestStage } from "../v2/validateMeshTestStage.js";
 import { loadEffectiveMeshServices } from "../v2/loadMeshServices.js";
 import { resolveMeshEnvMap,resolveServiceBuildEnvThroughMesh,type MeshReferenceContext } from "../v2/meshReferences.js";
 import { resolveMeshAppEnvironmentLayers } from "../v2/resolveMeshAppEnvironment.js";
@@ -30,11 +30,14 @@ export function checkMeshServices(
   for (const stage of stages) {
     const effective = resolveMeshStage(mesh,stage,meshPath);
     const services = loadEffectiveMeshServices(root,effective,stage);
-    if (stage === "test") validateMeshTestStage(services,root,meshPath,true);
+    const testValidation = stage === "test"
+      ? validateMeshTestStage(services,root,meshPath,true)
+      : undefined;
     for (const [name,svc] of Object.entries(services)) {
       if (!checked.has(svc.absolutePath)) { console.log(pc.cyan(`\n🔍 Checking mesh service ${name}...`)); checkInfra(svc.absolutePath); checked.add(svc.absolutePath); }
       if (stage === "test") {
         const fragment = compileServiceComposition("test",svc.absolutePath,{validationMode:true,meshMode:true,deferReferenceResolution:true});
+        applyTestAppPublications(testValidation!, name, fragment.compose.services.app!, fragment.endpoints.app);
         const endpoints:MeshEndpointRegistry={app:{[name]:fragment.endpoints.app},dependencies:{[name]:fragment.endpoints.dependencies}};
         const ctx:MeshReferenceContext={services:{[name]:svc},bindings:new Map(),endpoints,stage:"test",meshJsonPath:meshPath};
         for (const key of ["EXEC_MODE","INFRA_MODE",...(Object.values(svc.effectiveBuild.app.endpoints).some(ep=>ep.primary)?["PORT"]:[])]) {
