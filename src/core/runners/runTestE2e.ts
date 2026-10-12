@@ -1,3 +1,4 @@
+import { runWithCleanup } from "../runWithCleanup.js";
 import pc from "picocolors";
 import { parse } from "yaml";
 import { checkHostPortCollisions, extractHostPorts } from "../../utils/checkPortCollision.js";
@@ -47,9 +48,8 @@ export const runTestE2e = async (options: RunOptions): Promise<number> => {
     projectDir: options.projectDir,
   });
 
-  let status = 0;
-  try {
-    status = await runCompose(
+  const status = await runWithCleanup(
+    () => runCompose(
       [
         "up",
         "--build",
@@ -60,12 +60,12 @@ export const runTestE2e = async (options: RunOptions): Promise<number> => {
       finalYamlConfig,
       options.projectDir,
       { removeVolumes: true }
-    );
-  } finally {
-    await teardownCompose(finalYamlConfig, options.projectDir, { removeVolumes: true });
-    clearRunState(options.projectDir);
-  }
-
+    ),
+    async () => {
+      await teardownCompose(finalYamlConfig, options.projectDir, { removeVolumes: true });
+      clearRunState(options.projectDir);
+    },
+  );
   if (status === 0) {
     console.log(pc.bold(pc.green(`\n✅ E2E tests passed successfully.\n`)));
   } else {

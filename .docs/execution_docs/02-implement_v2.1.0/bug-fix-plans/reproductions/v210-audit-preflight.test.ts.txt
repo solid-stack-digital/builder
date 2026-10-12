@@ -1,0 +1,20 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { cleanupFixtures, compileMesh, dep, http, meshFixture, ownerBundle } from './fixture.js';
+import { getMeshJson } from '../../src/core/mesh/getMeshJson.js';
+import { checkMeshServices } from '../../src/core/mesh/checkers/checkMeshServices.js';
+vi.mock('../../src/core/checkers/checkInfra.js', () => ({ checkInfra: vi.fn() }));
+afterEach(() => { cleanupFixtures(); vi.clearAllMocks(); });
+it('V210-006 accepts ordinary mesh cross-service env in preflight', () => {
+  const root = meshFixture({ services: { backend: { path: 'backend' }, frontend: { path: 'frontend', env: { API_URL: '${backend.app.endpoints.http.network_url}' } } } }, {
+    backend: { app: { endpoints: { http: http() } } }, frontend: { app: {} },
+  });
+  expect(() => compileMesh('dev', root)).not.toThrow();
+  expect(() => checkMeshServices(getMeshJson(root), root)).not.toThrow();
+});
+it('V210-006 accepts retained dependency publication in ordinary preflight', () => {
+  const root = meshFixture({ services: { api: { path: 'api', publish: ['dependencies.db.endpoints.api'] } } }, {
+    api: { app: {}, dependencies: { db: dep('db.yml', 'owner', 6379, { publicPort: 54321 }) } },
+  }, { 'api/db.yml': ownerBundle() });
+  expect(() => compileMesh('prod', root)).not.toThrow();
+  expect(() => checkMeshServices(getMeshJson(root), root)).not.toThrow();
+});

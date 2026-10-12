@@ -113,10 +113,10 @@ describe("catalog 09: mesh overlays and environment precedence", () => {
     const root = one({ tester }, build, { "api/.env.prod": "PROD_FILE=yes\n", "api/.env.e2e": "E2E_FILE=yes\n" });
     expect(compileMesh("e2e", root).compose.services.api?.env_file).toEqual([{ path: "api/.env.e2e", required: false }]);
   });
-  it("MEN-023 excludes mesh.prod env from E2E", () => {
+  it("MEN-023 inherits mesh.prod env into E2E", () => {
     const root = one({ tester, prod: { services: { api: { env: { ONLY_PROD: "yes" } } } }, e2e: { services: { api: { env: { ONLY_E2E: "yes" } } } } });
     const result = compileMesh("e2e", root);
-    expect(env(result.compose.services.api).ONLY_E2E).toBe("yes"); expect(env(result.compose.services.api).ONLY_PROD).toBeUndefined();
+    expect(env(result.compose.services.api)).toMatchObject({ ONLY_E2E: "yes", ONLY_PROD: "yes" });
     expect((result.compose.services.api?.build as any).target).toBe("prod");
   });
   it("MEN-024 applies E2E overlay over base env", () => {
@@ -142,11 +142,14 @@ describe("catalog 09: mesh overlays and environment precedence", () => {
     expect(env(result.compose.services.app).INFRA_MODE).toBe("isolated");
     expect(Object.keys(result.compose.services)).toEqual(["app"]);
   });
-  it("MEN-028 runs global E2E with prod app image and E2E runtime", () => {
+  it("MEN-028 runs global E2E apps as production execution with E2E configuration", () => {
     const root = one({ tester }, { app: {}, dependencies: { db: dep("d.yml") }, e2e: { app: { env: { STAGE: "e2e" } } } }, { "api/d.yml": ownerBundle() });
     const result = compileMesh("e2e", root);
     expect((result.compose.services.api?.build as any).target).toBe("prod");
-    expect(env(result.compose.services.api)).toMatchObject({ EXEC_MODE: "e2e", INFRA_MODE: "integrated", STAGE: "e2e" });
+    expect(env(result.compose.services.api)).toMatchObject({ EXEC_MODE: "prod", INFRA_MODE: "integrated", STAGE: "e2e" });
+    const testerRunner=result.compose.services[result.testerServiceName!]!;
+    expect(env(testerRunner).EXEC_MODE).toBe("e2e");expect(env(testerRunner).INFRA_MODE).toBeUndefined();
+    expect(testerRunner.env_file).toContainEqual({path:".env.e2e-tester",required:false});
     expect(result.testerServiceName).toBeDefined();
   });
   it("MEN-029 validates bad E2E effective stage while prod passes", () => {
@@ -228,7 +231,7 @@ it("AUDIT-B03 validates publish declarations in mesh.test", async () => {
     .rejects.toThrow(/missing|Published app endpoint does not exist/i);
 });
 
-it("AUDIT-B03 reserves effective mesh.test fixed app publications globally", async () => {
+it("AUDIT-B03 permits sequential mesh.test fixed app publications with same port", async () => {
   const root = meshFixture(
     {
       services: { a: { path: "a" }, b: { path: "b" } },
@@ -239,6 +242,5 @@ it("AUDIT-B03 reserves effective mesh.test fixed app publications globally", asy
       b: { app: { endpoints: { http: http(3000, { publicPort: 34001 }) } } },
     },
   );
-  await expect(runMeshTestUnit({ projectDir: root, dryRun: true }))
-    .rejects.toThrow(/34001|collision/i);
+  await expect(runMeshTestUnit({ projectDir: root, dryRun: true })).resolves.toBe(0);
 });

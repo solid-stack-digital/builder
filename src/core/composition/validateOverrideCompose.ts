@@ -4,6 +4,8 @@ import { canonicalPath } from "../../utils/paths.js";
 import { parseVolume, namespaceVolume } from "./composeVolumes.js";
 import { ConfigError } from "../../errors/ConfigError.js";
 import { normalizeComposeEnvironment } from "./composeEnvironment.js";
+import { namespaceResourceDefinition } from "./namespaceResourceDefinition.js";
+import { validateComposeResourceReferences } from "./validateComposeResourceReferences.js";
 import type { ComposeDocument, ComposeService } from "./types.js";
 export interface PreparedAppOverride {app:ComposeService;resources:Pick<ComposeDocument,"volumes"|"networks"|"configs"|"secrets">;}
 export interface AppOverrideValidationContext {
@@ -29,9 +31,36 @@ export function validateAndPrepareAppOverride(document:ComposeDocument,context:A
  const fail=(path:string,reason:string,value?:unknown):never=>{throw new ConfigError({sourceFile:context.file,configPath:path,stage:context.stage,composition:"service",...(value===undefined?{}:{value}),reason})};
  const allowedRootKeys=new Set(["services","volumes","networks","configs","secrets"]);
  for(const key of Object.keys(document))if(!key.startsWith("x-")&&!allowedRootKeys.has(key))fail(key,"unsupported override Compose top-level field");
- const keys=Object.keys(document.services??{});if(keys.length!==1||keys[0]!=="app")fail("services","override must define exactly one service named app");const app=structuredClone(document.services.app!);
+ const keys=Object.keys(document.services??{});if(keys.length!==1||keys[0]!=="app")fail("services","override must define exactly one service named app");
+ validateComposeResourceReferences(document,{sourceFile:context.file,stage:context.stage,composition:"service"});
+ const app=structuredClone(document.services.app!);
  for(const k of ["ports","depends_on","network_mode","container_name","privileged","profiles","extends","env_file"] as const)if(app[k]!==undefined)fail(`services.app.${k}`,"override cannot own endpoint or lifecycle behavior");
- if(app.healthcheck&&typeof app.healthcheck==="object"){const health=app.healthcheck as Record<string,unknown>;for(const key of Object.keys(health))if(!["interval","timeout","retries","start_period","start_interval"].includes(key))fail(`services.app.healthcheck.${key}`,"override may set only healthcheck timing fields");}
+ if (Object.hasOwn(app, "healthcheck")) {
+  const healthcheck = app.healthcheck;
+  if (
+    healthcheck === null ||
+    typeof healthcheck !== "object" ||
+    Array.isArray(healthcheck)
+  ) {
+    fail(
+      "services.app.healthcheck",
+      "override healthcheck must be a mapping of timing fields",
+      healthcheck,
+    );
+  }
+
+  const allowedTiming = new Set([
+    "interval", "timeout", "retries", "start_period", "start_interval",
+  ]);
+  for (const key of Object.keys(healthcheck as Record<string, unknown>)) {
+    if (!allowedTiming.has(key)) {
+      fail(
+        `services.app.healthcheck.${key}`,
+        "override may set only healthcheck timing fields",
+      );
+    }
+  }
+ }
 
  if (typeof app.build === "string") {
   fail("services.app.build", "override cannot replace Builder-owned app build context; use object-form build.args for build arguments", app.build);
@@ -68,7 +97,7 @@ export function validateAndPrepareAppOverride(document:ComposeDocument,context:A
    if (!refs.has(name)) fail(`${kind}.${name}`, "override resource must be consumed by app");
    const prefix=context.resourceNamespace && context.resourceNamespace!=="app" ? `svc--${context.resourceNamespace}--app-override` : "app-override";
    const target = allocator.allocate(JSON.stringify(["service",context.resourceNamespace??"app","override",context.stage,kind,name]),`${prefix}--${context.stage}--${kind.slice(0, -1)}--${name}`);
-   names.set(name, target); mapped[target] = definition;
+   names.set(name, target); mapped[target] = namespaceResourceDefinition(name, definition);
   }
   if (names.size) resources[kind] = mapped;
   if (Array.isArray(value)) (app as any)[kind] = value.map(ref => kind === "volumes" ? namespaceVolume(ref, names) : typeof ref === "string" ? names.get(ref) ?? ref : ref && typeof ref === "object" && typeof (ref as any).source === "string" ? { ...ref, source: names.get((ref as any).source) ?? (ref as any).source } : ref);

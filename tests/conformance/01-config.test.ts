@@ -174,6 +174,9 @@ describe("catalog 01: schema and fail-fast", () => {
     for (const services of [undefined, null, "bad", []]) expect(meshParsed({ services })).toBe(false);
     expect(() => resolveMeshStage({ services: {} } as any, "dev", "mesh.json")).toThrow(/service/i);
   });
+  it("rejects an empty root services map even when a stage adds a service", () => {
+    expect(meshSchema.safeParse({ services: {}, e2e: { services: { fake: { path: "./fake" } } } }).success).toBe(false);
+  });
   it("CFG-039 requires effective path for stage-added service", () => {
     expect(() => resolveMeshStage({ services: { api: { path: "api" } }, e2e: { services: { fake: { env: { X: "1" } } } } } as any, "e2e", "mesh.json")).toThrow(/services.fake.path/);
   });

@@ -64,16 +64,24 @@ export function validateMeshTestStage(
       };
     });
 
-  const intents: PortIntent[] = appPublications.map(pub => ({
-    logicalPath: pub.logicalPath,
-    requested: pub.requested,
-  }));
-  const allocatedPorts = allocateHostPorts(
-    meshDir,
-    "test",
-    intents,
-    validationMode,
-  );
+  const allocatedPorts = new Map<string, number>();
+  for (const name of Object.keys(services).sort((a, b) => a.localeCompare(b))) {
+    const intents: PortIntent[] = appPublications
+      .filter(pub => pub.meshService === name)
+      .map(pub => ({
+        logicalPath: pub.logicalPath,
+        requested: pub.requested,
+      }));
+
+    const ownPorts = allocateHostPorts(
+      meshDir,
+      "test",
+      intents,
+      validationMode,
+      { sourceFile: meshPath, composition: "mesh" },
+    );
+    for (const [logicalPath, port] of ownPorts) allocatedPorts.set(logicalPath, port);
+  }
 
   return { bindings, appPublications, allocatedPorts };
 }

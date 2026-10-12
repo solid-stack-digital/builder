@@ -13,7 +13,7 @@ function runSystem(mode: "success" | "unit-fail" | "e2e-fail"): Run {
     tester: { compose: "e2e/t.yml", service: "runner", env: { SYSTEM_URL: "${a.app.endpoints.http.public_url}", ...(mode === "e2e-fail" ? { E2E_EXIT: "23" } : {}) } },
   };
   const service = (ready: number, testExit = 0) => ({ app: { endpoints: { http: { port: 3000, primary: true, scheme: "http", publicPort: "AUTO" } } }, e2e: { app: { env: { READY_AFTER_MS: String(ready) } } }, test: { app: { env: { TEST_EXIT: String(testExit) } } } });
-  const root = runtimeMesh(mesh, { a: service(300), b: service(700, mode === "unit-fail" ? 7 : 0) }, { "e2e/t.yml": { services: { runner: { build: { context: ".", dockerfile: "Dockerfile" } } } } });
+  const root = runtimeMesh(mesh, { a: service(300), b: service(700, mode === "unit-fail" ? 7 : 0) }, { "e2e/t.yml": { services: { setup: { image: "busybox", command: ["sh", "-c", "echo GLOBAL_SETUP_STARTED; while true; do sleep 1; done"] }, runner: { build: { context: ".", dockerfile: "Dockerfile" }, depends_on: { setup: { condition: "service_started" } } }, unrelated: { image: "busybox", command: ["sh", "-c", "echo GLOBAL_UNRELATED_STARTED; while true; do sleep 1; done"] } } } });
   const result = builder(root, ["mesh", "up", "test"], 150000);
   return { status: result.status, output: `${result.stdout}${result.stderr}`, name, error: result.error };
 }
@@ -31,8 +31,8 @@ describe("catalog 11: real aggregate mesh CLI orchestration", () => {
   afterAll(cleanupFixtures);
   it("SYS-010 runs all isolated service tests before global E2E", () => {
     const r = runs.success!; expect(r.error).toBeUndefined(); expect(r.status, r.output).toBe(0);
-    const first = r.output.indexOf("UNIT_MARK"), second = r.output.indexOf("UNIT_MARK", first + 1), e2e = r.output.indexOf("E2E_MARK");
-    expect(first).toBeGreaterThanOrEqual(0); expect(second).toBeGreaterThan(first); expect(e2e).toBeGreaterThan(second);
+    const first = r.output.indexOf("UNIT_MARK"), firstE2e=r.output.indexOf("E2E_MARK"), second = r.output.indexOf("UNIT_MARK", firstE2e + 1), secondE2e=r.output.indexOf("E2E_MARK",second+1), globalE2e = r.output.indexOf("E2E_MARK",secondE2e+1);
+    expect(first).toBeGreaterThanOrEqual(0); expect(firstE2e).toBeGreaterThan(first);expect(second).toBeGreaterThan(firstE2e);expect(secondE2e).toBeGreaterThan(second);expect(globalE2e).toBeGreaterThan(secondE2e);expect(r.output).toContain("GLOBAL_SETUP_STARTED");expect(r.output).toContain("GLOBAL_UNRELATED_STARTED");
   });
   it("SYS-011 aborts global E2E after required unit failure", () => {
     const r = runs.unitFail!; expect(r.status).not.toBe(0); expect(r.output).toContain("UNIT_MARK"); expect(r.output).not.toContain("E2E_MARK");

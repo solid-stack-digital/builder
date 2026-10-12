@@ -1,3 +1,4 @@
+import { runWithCleanup } from "../../runWithCleanup.js";
 import { anonymousVolumeServices } from "../../composition/composeVolumes.js";
 import pc from "picocolors";
 import { parse } from "yaml";
@@ -48,16 +49,16 @@ export async function runMeshDev(options: MeshRunOptions = {}): Promise<number> 
     upArgs.push("-d");
   }
 
-  let status = 0;
-  try {
-    status = await runCompose(upArgs, yaml, meshDir, {
+  const status = await runWithCleanup(
+    () => runCompose(upArgs, yaml, meshDir, {
       removeVolumes: false,
-    });
-  } finally {
-    if (!options.detach) {
-      await teardownCompose(yaml, meshDir, { removeVolumes: false });
-      clearRunState(meshDir);
-    }
-  }
+    }),
+    async () => {
+      if (!options.detach) {
+        await teardownCompose(yaml, meshDir, { removeVolumes: false });
+        clearRunState(meshDir);
+      }
+    },
+  );
   return status;
 }

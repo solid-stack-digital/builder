@@ -12,6 +12,8 @@ Set `<stage>.override-compose` to a Compose YAML file that customizes the Builde
 
 Rejected: root-level `include` or other unsupported composition keys; extra services; raw `ports`; `depends_on`; `network_mode`; `container_name`; `privileged`; profiles; `extends`; `env_file`; Dockerfile or target replacement; changing Builder build context; unsupported build keys; Builder-owned env conflicts; disabling/replacing the readiness test; or declaring endpoint publication.
 
+Builder scopes app-owned named resources to the Compose project. Source definitions with an explicit `name` receive a project-scoped name in the generated composition. Declare `external: true` when the app must refer to an existing shared resource; Builder preserves that external identity. Existing data under a formerly fixed owned volume name is not moved automatically.
+
 ## Related
 
 - [Customize a stage](../guides/customize-a-stage-with-override-compose.md)

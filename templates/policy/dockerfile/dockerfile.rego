@@ -21,6 +21,8 @@ parent[a] := lower(input[i].Value[0]) if {
 edges := {a: neighbors | some i; a := alias_at[i]; neighbors := [p | p := parent[a]]}
 lineage[a] := graph.reachable(edges, {a}) | {a} if { some i; a := alias_at[i] }
 commands[a] := {i | some i; stage_at[i] in lineage[a]; input[i].Cmd == "cmd"} if { some j; a := alias_at[j] }
+runtime_instruction_indices[a] := {i | some i; stage_at[i] in lineage[a]; input[i].Cmd in {"cmd", "entrypoint"}} if { some j; a := alias_at[j] }
+has_runtime_instruction(a) if { count(runtime_instruction_indices[a]) > 0 }
 healthcheck_indices[a] := {i | some i; stage_at[i] in lineage[a]; input[i].Cmd == "healthcheck"} if { some j; a := alias_at[j] }
 effective_healthcheck_index[a] := max(indices) if { indices := healthcheck_indices[a]; count(indices) > 0 }
 effective_healthcheck_value[a] := lower(concat(" ", input[index].Value)) if { index := effective_healthcheck_index[a] }
@@ -34,6 +36,7 @@ deny contains msg if {
 }
 deny contains "Hardcoded EXPOSE is forbidden; Builder owns endpoint publication" if { some i; input[i].Cmd == "expose" }
 deny contains "dev stage requires a default CMD" if { "dev" in stages; count(commands.dev) == 0 }
+deny contains "prod stage requires an effective CMD or ENTRYPOINT" if { "prod" in stages; not has_runtime_instruction("prod") }
 deny contains "dev stage requires a valid HEALTHCHECK" if { "dev" in stages; not has_valid_effective_healthcheck("dev") }
 deny contains "prod stage requires a valid HEALTHCHECK" if { "prod" in stages; not has_valid_effective_healthcheck("prod") }
 deny contains "prod stage requires COPY --from= artifact isolation" if { "prod" in stages; count(artifact_copies.prod) == 0 }
@@ -46,16 +49,16 @@ deny contains msg if {
 }
 deny contains msg if {
   some i
-  input[i].Cmd == "cmd"
+  input[i].Cmd in {"cmd", "entrypoint"}
   command := lower(concat(" ", input[i].Value))
   regex.match("(^|[ ;])nohup[ ;]|&[[:space:]]*$|pm2[[:space:]]+start.*--daemon|nginx(.*[[:space:]])?-g[[:space:]]*['\"]?daemon[[:space:]]+on", command)
-  msg := sprintf("Runtime CMD must remain in foreground (instruction %v)", [i])
+  msg := sprintf("Runtime CMD/ENTRYPOINT must remain in foreground (instruction %v)", [i])
 }
 deny contains msg if {
   some i
-  input[i].Cmd == "cmd"
+  input[i].Cmd in {"cmd", "entrypoint"}
   command := lower(concat(" ", input[i].Value))
   regex.match("(^|[ ;])nginx([ ;]|$)", command)
   not contains(command, "daemon off")
-  msg := sprintf("nginx CMD must use daemon off (instruction %v)", [i])
+  msg := sprintf("nginx CMD/ENTRYPOINT must use daemon off (instruction %v)", [i])
 }

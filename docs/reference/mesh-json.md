@@ -24,7 +24,7 @@ type MeshService = {
 | `$schema` | string | No | Editor/schema tooling. |
 | `name` | string | No | Base mesh project identity; runtime stages use separate Compose project identities to keep resources distinct. |
 | `tester` | object | No generally | Required for global E2E and `mesh up test`; `mesh check --require-tester` enforces it. |
-| `services` | service map | **Yes** | Must produce at least one effective service; each effective service needs a path. |
+| `services` | service map | **Yes** | Must contain at least one root service; each effective service needs a path. Stage additions do not satisfy the root minimum. |
 | `dev`, `prod`, `test`, `e2e` | stage object | No | Stage-specific service overlays only. |
 
 ## Base mesh service fields
@@ -49,7 +49,7 @@ Binding keys must exist in the consumer's effective build dependencies; provider
 | `tester.service` | non-empty string | Required when tester exists | Exact runner service key; Builder does not select the first service. |
 | `tester.env` | string map | No | Applied to selected runner; mesh refs allowed but only `public_*` endpoint properties. |
 
-The tester runner is a host-side E2E client. Services it needs must be effectively published.
+The selected tester runner is a host-side E2E client. It uses root `.env.e2e-tester`, gets `EXEC_MODE=e2e`, and receives no `INFRA_MODE`; services it needs must be effectively published. Helper services in the tester Compose file are retained.
 
 ## Stage overlays
 
@@ -64,9 +64,21 @@ Each root stage (`dev`, `prod`, `test`, `e2e`) contains only `services`. Each `<
 | `<stage>.services.<name>.dependsOn` | string array | No | Stable union, base order then stage order. |
 | `<stage>.services.<name>.publish` | string array | No | Stable union, base order then stage order. |
 
-No deletion syntax exists. Every active binding, reference, dependency path, readiness edge, and publication is validated against effective stage configuration. E2E uses `e2e`, not `prod` overlays.
+No deletion syntax exists. Every active binding, reference, dependency path, readiness edge, and publication is validated against effective stage configuration. Inheritance is `dev=base->dev`, `prod=base->prod`, `test=base->test`, and `e2e=base->prod->e2e`; mesh env, paths, bindings, dependencies, lifecycle edges, and publications inherit in that order.
 
 ## Complete example
+
+The example assumes independently runnable service projects nested under the mesh project directory (`./services/<name>`):
+
+```text
+mesh-project/
+  mesh.json
+  services/
+    frontend/
+    backend/
+    gateway/
+    fake-payments/
+```
 
 ```json
 {
@@ -75,15 +87,14 @@ No deletion syntax exists. Every active binding, reference, dependency path, rea
   "tester": { "compose": "e2e/tester.yml", "service": "runner", "env": { "GATEWAY_URL": "${gateway.app.endpoints.http.public_url}" } },
   "services": {
     "frontend": {
-      "path": "../frontend",
+      "path": "./services/frontend",
       "env": { "BACKEND_URL": "${frontend.dependencies.backend.endpoints.http.network_url}" },
       "dependencies": { "backend": "backend" },
-      "dependsOn": ["gateway"],
       "publish": []
     },
-    "backend": { "path": "../backend", "publish": [] },
+    "backend": { "path": "./services/backend", "publish": [] },
     "gateway": {
-      "path": "../gateway",
+      "path": "./services/gateway",
       "env": { "FRONTEND_URL": "${frontend.app.endpoints.http.network_url}", "BACKEND_URL": "${backend.app.endpoints.http.network_url}" },
       "dependsOn": ["frontend", "backend"],
       "publish": ["app.endpoints.http"]
@@ -94,12 +105,14 @@ No deletion syntax exists. Every active binding, reference, dependency path, rea
   "test": { "services": { "frontend": { "env": { "TEST_MODE": "true" } } } },
   "e2e": {
     "services": {
-      "fake-payments": { "path": "../fake-payments", "publish": ["app.endpoints.http"] },
+      "fake-payments": { "path": "./services/fake-payments", "publish": ["app.endpoints.http"] },
       "frontend": { "dependencies": { "payments-api": "fake-payments" } }
     }
   }
 }
 ```
+
+Gateway waits for frontend and backend; frontend's backend binding supplies its own provider readiness. Neither service waits for gateway.
 
 The example assumes the corresponding service projects declare the listed logical dependencies/endpoints. The E2E-only provider must have a valid path and a publishable `http` endpoint; frontend must declare `payments-api` in its effective build configuration. The provider's `publish` overlay is added only in E2E.
 

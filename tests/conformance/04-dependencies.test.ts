@@ -162,13 +162,10 @@ describe("catalog 04: atomic dependency Compose and namespacing", () => {
     expect(() => compileService("prod", root)).not.toThrow();
     expect(services(root)["dep--db--helper"]?.healthcheck).toBeUndefined();
   });
-  it("DEP-030 swaps complete stage dependency implementation", () => {
+  it("DEP-030 rejects replacing an inherited dependency implementation", () => {
     const root = fixture({ app: {}, dependencies: { db: dep("a.yml") }, e2e: { dependencies: { db: { compose: "b.yml" } } } }, { "a.yml": { services: { owner: healthy, a: { image: "alpine" } }, volumes: { a: {} } }, "b.yml": { services: { owner: healthy, b: { image: "alpine" } }, volumes: { b: {} } } });
     expect(services(root)).toHaveProperty("dep--db--a");
-    const result = compileService("e2e", root);
-    expect(result.compose.services).toHaveProperty("dep--db--b");
-    expect(result.compose.services).not.toHaveProperty("dep--db--a");
-    expect(result.compose.volumes).toHaveProperty("dep--db--volume--b");
+    expect(() => compileService("e2e", root)).toThrow(/inherited|replace/i);
   });
   it("DEP-031 suppresses every local service on substitution", () => {
     const root = bound();

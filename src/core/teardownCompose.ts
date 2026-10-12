@@ -1,7 +1,7 @@
 import { parse } from "yaml";
 import { anonymousVolumeServices } from "./composition/composeVolumes.js";
 import { spawn } from "node:child_process";
-import pc from "picocolors";
+import { ScriptError } from "../errors/ScriptError.js";
 import { resolveProjectDir } from "../utils/paths.js";
 import { setTearingDown } from "./composeCleanup.js";
 
@@ -122,17 +122,11 @@ export async function teardownCompose(
       );
     }
 
-    if (result.error) {
-      if (!silent) {
-        console.error(
-          pc.red(`Failed to run docker compose down: ${result.error.message}`)
-        );
-      }
-    } else if (result.status !== 0 && !silent) {
-      console.error(
-        pc.red(
-          `Docker compose down exited with non-zero status code: ${result.status}`
-        )
+    if (result.error || result.status !== 0) {
+      const detail = result.error?.message ?? `exit code ${result.status ?? "unknown"}`;
+      throw new ScriptError(
+        `Failed to tear down Compose project in ${absProjectDir} after two attempts: ${detail}`,
+        result.error ? { cause: result.error } : undefined,
       );
     }
   } finally {

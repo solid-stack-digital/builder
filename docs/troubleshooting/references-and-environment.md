@@ -5,7 +5,7 @@
 - **Tester rejects network property:** testers run as host-side clients; replace `network_url` with an effectively published `public_url`.
 - **Reference unresolved after substitution:** provider must expose the exact endpoint name referenced through the logical dependency.
 - **Builder env conflict:** remove user values for Builder-owned keys such as `EXEC_MODE`, `INFRA_MODE`, or primary app `PORT`.
-- **Environment type rejected:** quote textual values; Builder JSON env supports strings only.
+- **Environment type rejected:** quote textual values; Builder JSON env supports strings only. E2E inherits the structured `prod` overlay, while `.env.prod` remains separate from `.env.e2e`.
 - **Need literal `${...}`:** use `$$` to escape a literal dollar where Builder/Compose interpolation applies.
 - **Reference exists but service not ready:** references do not add lifecycle edges; configure readiness separately.
 

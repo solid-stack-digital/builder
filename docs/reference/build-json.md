@@ -85,7 +85,7 @@ The supported JSON stage names are `dev`, `prod`, `test`, and `e2e`. Each stage 
 | `<stage>.app.endpoints.<name>.primary` | boolean | No | Replaces effective primary marker. |
 | `<stage>.app.endpoints.<name>.scheme` | scheme string | No | Replaces effective URL scheme. |
 | `<stage>.dependencies` | object map | No | Adds/overlays logical dependencies. |
-| `<stage>.dependencies.<name>.compose` | path string | Required for a newly added dependency | Replaces/sets implementation path. |
+| `<stage>.dependencies.<name>.compose` | path string | Required for a newly added dependency | Defines the implementation only when this stage first adds the dependency; inherited implementations cannot be replaced. |
 | `<stage>.dependencies.<name>.env` | string map | No | Keywise dependency env overlay. |
 | `<stage>.dependencies.<name>.endpoints` | endpoint map | No | Adds/overlays endpoints; endpoint fields below are partial. |
 | `<stage>.dependencies.<name>.endpoints.<endpoint>.service` | string | Required if newly added | Exact Compose service owner. |
@@ -95,7 +95,7 @@ The supported JSON stage names are `dev`, `prod`, `test`, and `e2e`. Each stage 
 | `<stage>.dependencies.<name>.endpoints.<endpoint>.scheme` | scheme string | No | URL metadata. |
 | `<stage>.dependencies.<name>.dependsOn` | string array | No | Stable union with base entries. |
 
-For all four stages, the `<stage>` placeholder means exactly each of `dev`, `prod`, `test`, and `e2e`. Objects merge by key, scalars replace, omitted values inherit, and there is no deletion syntax. `test-unit` uses `test`; `test-e2e` uses `e2e`. E2E uses the `prod` image target but does not inherit prod runtime env.
+For all four stages, the `<stage>` placeholder means exactly each of `dev`, `prod`, `test`, and `e2e`. Objects merge by key, scalars replace, omitted values inherit, and there is no deletion syntax. `test-unit` uses `test`; `test-e2e` uses `e2e`. E2E inherits structured values as `base -> prod -> e2e`, including app endpoints/env and dependency additions. Its app runs target `prod` with `EXEC_MODE=prod` and `INFRA_MODE=integrated`, while it loads `.env.e2e`; `.env.prod` is not merged into `.env.e2e`.
 
 ## Complete example
 

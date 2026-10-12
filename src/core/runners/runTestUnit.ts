@@ -1,3 +1,4 @@
+import { runWithCleanup } from "../runWithCleanup.js";
 import pc from "picocolors";
 import { parse } from "yaml";
 import { checkHostPortCollisions, extractHostPorts } from "../../utils/checkPortCollision.js";
@@ -47,19 +48,18 @@ export const runTestUnit = async (options: RunOptions): Promise<number> => {
     projectDir: options.projectDir,
   });
 
-  let status = 0;
-  try {
-    status = await runCompose(
+  const status = await runWithCleanup(
+    () => runCompose(
       ["up", "--build", "--abort-on-container-exit", "--exit-code-from", "app"],
       finalYamlConfig,
       options.projectDir,
       { removeVolumes: true }
-    );
-  } finally {
-    await teardownCompose(finalYamlConfig, options.projectDir, { removeVolumes: true });
-    clearRunState(options.projectDir);
-  }
-
+    ),
+    async () => {
+      await teardownCompose(finalYamlConfig, options.projectDir, { removeVolumes: true });
+      clearRunState(options.projectDir);
+    },
+  );
   if (status === 0) {
     console.log(pc.bold(pc.green(`\n✅ Unit tests passed successfully.\n`)));
   } else {

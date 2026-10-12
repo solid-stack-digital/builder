@@ -61,4 +61,24 @@ CMD ["sh", "-c", "exec sleep 30"]
  });
  it("requires production artifact isolation",()=>expect(policy(good.replace("COPY --from=builder /artifact /artifact\n","")).status).not.toBe(0));
  it("rejects detached runtime commands",()=>expect(policy(good.replace('CMD ["sh", "-c", "exec sleep 30"]\n','CMD ["sh", "-c", "sleep 30 &"]\n')).status).not.toBe(0));
+ it("requires an effective production CMD or ENTRYPOINT",()=>{
+  const prodBlock='FROM alpine AS prod\nCOPY --from=builder /artifact /artifact\nHEALTHCHECK CMD true\nCMD ["sh", "-c", "exec sleep 30"]\n';
+  const noProdRuntime=good.replace(prodBlock,'FROM alpine AS prod\nCOPY --from=builder /artifact /artifact\nHEALTHCHECK CMD true\n');
+  expect(policy(noProdRuntime).status).not.toBe(0);
+ });
+ it("accepts a foreground prod ENTRYPOINT as the effective runtime",()=>{
+  const prodBlock='FROM alpine AS prod\nCOPY --from=builder /artifact /artifact\nHEALTHCHECK CMD true\nCMD ["sh", "-c", "exec sleep 30"]\n';
+  const entrypoint=good.replace(prodBlock,'FROM alpine AS prod\nCOPY --from=builder /artifact /artifact\nHEALTHCHECK CMD true\nENTRYPOINT ["sh", "-c", "exec sleep 30"]\n');
+  expect(policy(entrypoint).status).toBe(0);
+ });
+ it("does not require test targets to declare their own runtime instruction",()=>expect(policy(good).status).toBe(0));
+ it("rejects detached ENTRYPOINT instructions",()=>{
+  const prodBlock='FROM alpine AS prod\nCOPY --from=builder /artifact /artifact\nHEALTHCHECK CMD true\nCMD ["sh", "-c", "exec sleep 30"]\n';
+  const detached=good.replace(prodBlock,'FROM alpine AS prod\nCOPY --from=builder /artifact /artifact\nHEALTHCHECK CMD true\nENTRYPOINT ["sh", "-c", "sleep 30 &"]\n');
+  expect(policy(detached).status).not.toBe(0);
+ });
+ it("accepts prod inheriting a foreground runtime instruction",()=>{
+  const inherited=good.replace('FROM alpine AS prod\nCOPY --from=builder /artifact /artifact\nHEALTHCHECK CMD true\nCMD ["sh", "-c", "exec sleep 30"]\n','FROM base AS prod\nCOPY --from=builder /artifact /artifact\n');
+  expect(policy(inherited).status).toBe(0);
+ });
 });

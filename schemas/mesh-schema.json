@@ -114,6 +114,7 @@
             ],
             "additionalProperties": false
           },
+          "minProperties": 1,
           "propertyNames": {
             "allOf": [
               {

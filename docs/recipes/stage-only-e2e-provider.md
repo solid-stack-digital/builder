@@ -6,7 +6,7 @@ Add `fake-payments` under `e2e.services` with a valid service-project `path`, th
 {
   "e2e": {
     "services": {
-      "fake-payments": { "path": "../fake-payments" },
+      "fake-payments": { "path": "./services/fake-payments" },
       "frontend": { "dependencies": { "payments-api": "fake-payments" } }
     }
   }

@@ -58,13 +58,13 @@ Stage is omitted to export all `dev`, `prod`, `test`, `e2e`, or choose exactly o
 | `--full` | Compile dev export with local dependencies integrated. |
 | `--silence-warnings` | Suppress non-critical URL-templating warnings. |
 
-Default files are `.env.dev`, `.env.prod`, `.env.test`, `.env.e2e`. If a target exists, an interactive prompt asks to overwrite; declining lets you choose another relative filename. Non-interactive overwrite requires selecting a different name. Exports can contain secrets; keep them out of version control.
+Default files are `.env.dev.resolved`, `.env.prod.resolved`, `.env.test.resolved`, `.env.e2e.resolved`. Output snapshots are kept distinct from runtime `.env.<stage>` inputs so Builder-owned keys (`EXEC_MODE`, `INFRA_MODE`, `PORT`) do not poison future runs. If a target exists, an interactive prompt asks to overwrite; declining lets you choose another relative filename. Non-interactive overwrite requires selecting a different name. Exports can contain secrets; keep them out of version control.
 
 ## Mesh commands
 
 `builder mesh check [-C, --project-dir <dir>] [--require-tester]` validates mesh/services; `--require-tester` requires root `mesh.json.tester`.
 
-`builder mesh up [stage]` defaults to `dev`; accepts `dev`, `prod`, `test`, `test-unit`, `test-e2e`. `test-unit` uses test overlays and isolated per-service runs; `test-e2e` uses e2e overlays and global tester; `test` runs unit then global E2E.
+`builder mesh up [stage]` defaults to `dev`; accepts `dev`, `prod`, `test`, `test-unit`, `test-e2e`. `test-unit` explicitly exercises the effective mesh `test` overlay in isolated runs; it is not canonical Phase 1. `test-e2e` starts the effective `base -> prod -> e2e` mesh and global tester. `test` runs each root service's standalone unit and service-E2E lifecycle sequentially with teardown, then starts a fresh global E2E mesh.
 
 | Flag | Meaning / scope | Example |
 |---|---|---|

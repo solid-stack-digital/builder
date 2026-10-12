@@ -2,13 +2,18 @@
 
 JSON configuration has exactly four overlay names: `dev`, `prod`, `test`, and `e2e`. CLI execution additionally accepts `test-unit` and `test-e2e`; these are commands, not JSON overlay names. `test-unit` uses the `test` overlay. `test-e2e` uses `e2e`.
 
-Objects and maps merge by key. Stage scalar values replace matching base values; omitted values inherit, and stage-only entries are added. Arrays normally replace their base array. The exceptions are build dependency `dependsOn`, mesh service `dependsOn`, and mesh service `publish`, which use stable union: base entries first, then stage entries, removing exact duplicates. V2 has no deletion syntax.
+The inheritance chains are:
 
-Validation uses the effective configuration after overlay merge. A dependency or mesh service added in a stage must have a complete effective contract, including its required Compose/path fields.
+```text
+dev  = base -> dev
+prod = base -> prod
+test = base -> test
+e2e  = base -> prod -> e2e
+```
 
-E2E selects the `prod` Dockerfile target for the app but uses `e2e` runtime configuration. It does not inherit `.env.prod`, `prod.app.env`, or `mesh.prod`.
+Objects and maps merge by key. Stage scalar values replace matching values; omitted values inherit, and stage-only entries are added. Arrays normally replace their base array. Build dependency `dependsOn`, mesh service `dependsOn`, and mesh service `publish` use stable union. V2 has no deletion syntax. A dependency’s inherited `compose` implementation cannot be replaced by a later stage; a newly added dependency must provide its own `compose`.
 
-For each command, image target, dotenv file, tester, and dependency behavior, see the [stage matrix](../reference/stage-matrix.md). 
+E2E inherits the structured `prod` configuration, including app and mesh environment, endpoints, dependencies, bindings, and publications. It selects `.env.e2e`; `.env.prod` is not merged into that file. For execution details, see the [stage matrix](../reference/stage-matrix.md).
 
 ## Related
 

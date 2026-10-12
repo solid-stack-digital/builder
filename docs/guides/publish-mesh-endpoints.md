@@ -5,8 +5,8 @@ An endpoint's `publicPort` makes it eligible for host publication. It does not p
 ```json
 {
   "services": {
-    "gateway": { "path": "../gateway", "publish": ["app.endpoints.http"] },
-    "backend": { "path": "../backend", "publish": [] }
+    "gateway": { "path": "./services/gateway", "publish": ["app.endpoints.http"] },
+    "backend": { "path": "./services/backend", "publish": [] }
   }
 }
 ```

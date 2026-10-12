@@ -1,0 +1,51 @@
+import { afterEach, expect, it } from 'vitest';
+import { cleanupFixtures, compileMesh, compileService, dep, env, fixture, meshFixture, ownerBundle } from './fixture.js';
+afterEach(cleanupFixtures);
+
+it('V210-002 preserves inherited healthcheck timing in E2E', () => {
+  const root = fixture({ app: {}, prod: { 'override-compose': 'prod.yml' }, e2e: { 'override-compose': 'e2e.yml' } }, {
+    'prod.yml': { services: { app: { healthcheck: { interval: '3s', timeout: '2s', retries: 7 } } } },
+    'e2e.yml': { services: { app: { healthcheck: { start_period: '20s' } } } },
+  });
+  expect(compileService('e2e', root).compose.services.app!.healthcheck).toEqual({ interval: '3s', timeout: '2s', retries: 7, start_period: '20s' });
+});
+
+it('V210-002 preserves inherited nested logging options', () => {
+  const root = fixture({ app: {}, prod: { 'override-compose': 'prod.yml' }, e2e: { 'override-compose': 'e2e.yml' } }, {
+    'prod.yml': { services: { app: { logging: { driver: 'json-file', options: { 'max-size': '20m', 'max-file': '5' } } } } },
+    'e2e.yml': { services: { app: { logging: { options: { 'max-size': '1m' } } } } },
+  });
+  expect(compileService('e2e', root).compose.services.app!.logging).toEqual({ driver: 'json-file', options: { 'max-size': '1m', 'max-file': '5' } });
+});
+
+it.each(['volumes', 'networks', 'configs', 'secrets'] as const)('V210-003 namespaces actual owned %s names', kind => {
+  const refs = kind === 'volumes' ? ['shared:/data'] : ['shared'];
+  const definition = { name: 'globally-shared', ...(['configs', 'secrets'].includes(kind) ? { file: './data.txt' } : {}) };
+  const bundle = { services: { owner: { image: 'alpine', healthcheck: { test: ['CMD', 'true'] }, [kind]: refs } }, [kind]: { shared: definition } };
+  const root = fixture({ app: {}, dependencies: { first: dep('first.yml'), second: dep('second.yml') } }, { 'first.yml': bundle, 'second.yml': bundle, 'data.txt': 'fixture' });
+  const result = compileService('prod', root);
+  const actual = Object.entries(result.compose[kind] ?? {}).map(([key, value]) => (value as any)?.name ?? `${result.projectName}_${key}`);
+  expect(new Set(actual).size).toBe(actual.length);
+});
+
+it.each([
+  ['volumes', ['missing:/data']], ['networks', ['missing']], ['configs', ['missing']], ['secrets', ['missing']],
+])('V210-004 rejects undefined app override %s', (kind, value) => {
+  const root = fixture({ app: {}, prod: { 'override-compose': 'override.yml' } }, { 'override.yml': { services: { app: { [kind as string]: value } } } });
+  expect(() => compileService('prod', root)).toThrow(/reference.*missing|missing.*definition/i);
+});
+
+it.each(['dev', 'prod', 'e2e'] as const)('V210-005 makes cross-service retained endpoint reachable in %s', stage => {
+  const root = meshFixture({ services: {
+    api: { path: 'api' }, client: { path: 'client', env: { DB_HOST: '${api.dependencies.db.endpoints.api.network_host}' } },
+  }, tester: { compose: 'tester.yml', service: 'runner' } }, {
+    api: { app: {}, dependencies: { db: dep('db.yml') } }, client: { app: {} },
+  }, { 'api/db.yml': ownerBundle(), 'tester.yml': { services: { runner: { image: 'alpine', command: ['true'] } } } });
+  const result = compileMesh(stage, root);
+  const host = env(result.compose.services.client).DB_HOST!;
+  expect(host).toBe(result.endpoints.dependencies.api!.db!.api!.networkHost);
+  const networks = (name: string) => Object.keys(result.compose.services[name]!.networks as object);
+  expect(networks('client').some(network => networks(host).includes(network))).toBe(true);
+  expect(result.compose.services.client!.depends_on ?? {}).not.toHaveProperty(host);
+  expect(result.compose.services[host]!.ports ?? []).toEqual([]);
+});

@@ -1,6 +1,7 @@
 import { rewriteBuildSecretReferences } from "./composeBuildResources.js";
 import { GeneratedComposeNameAllocator } from "./generatedNames.js";
 import { namespaceVolume } from "./composeVolumes.js";
+import { namespaceResourceDefinition } from "./namespaceResourceDefinition.js";
 import type { ComposeDocument, ComposeService } from "./types.js";
 export interface NamespaceDependencyOptions {dependencyKey:string;namespacePrefix:string;document:ComposeDocument;allocator?:GeneratedComposeNameAllocator;identityPrefix?:string;}
 const entries=(obj:unknown)=>obj&&typeof obj==="object"&&!Array.isArray(obj)?Object.entries(obj as Record<string,unknown>):[];
@@ -15,6 +16,7 @@ export function namespaceDependencyCompose(options:NamespaceDependencyOptions){
  const serviceNameMap=make("service",Object.keys(doc.services??{}));
  const volumeNameMap=make("volume",Object.keys(doc.volumes??{})),networkNameMap=make("network",Object.keys(doc.networks??{})),configNameMap=make("config",Object.keys(doc.configs??{})),secretNameMap=make("secret",Object.keys(doc.secrets??{}));
  const rewriteKeys=(obj:unknown,map:Map<string,string>)=>Object.fromEntries(entries(obj).map(([k,v])=>[map.get(k)??k,v]));
+ const rewriteResourceDefinitions=(obj:unknown,map:Map<string,string>)=>Object.fromEntries(entries(obj).map(([key,definition])=>[map.get(key)??key,namespaceResourceDefinition(key,definition)]));
  const addOriginalNetworkAliases=(name:string,svc:ComposeService):void=>{
   if(svc.network_mode!==undefined||svc.networks===undefined)return;
   const attached=Array.isArray(svc.networks)
@@ -42,6 +44,6 @@ export function namespaceDependencyCompose(options:NamespaceDependencyOptions){
  };
  for(const [name,svc] of Object.entries(originalServices))rewriteResourceRefs(svc,name);
  doc.services=rewriteKeys(doc.services,serviceNameMap) as Record<string,ComposeService>;
- if(doc.volumes)doc.volumes=rewriteKeys(doc.volumes,volumeNameMap);if(doc.networks)doc.networks=rewriteKeys(doc.networks,networkNameMap);if(doc.configs)doc.configs=rewriteKeys(doc.configs,configNameMap);if(doc.secrets)doc.secrets=rewriteKeys(doc.secrets,secretNameMap);
+ if(doc.volumes)doc.volumes=rewriteResourceDefinitions(doc.volumes,volumeNameMap);if(doc.networks)doc.networks=rewriteResourceDefinitions(doc.networks,networkNameMap);if(doc.configs)doc.configs=rewriteResourceDefinitions(doc.configs,configNameMap);if(doc.secrets)doc.secrets=rewriteResourceDefinitions(doc.secrets,secretNameMap);
  return {document:doc,serviceNameMap,volumeNameMap,networkNameMap,configNameMap,secretNameMap};
 }

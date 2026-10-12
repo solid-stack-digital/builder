@@ -246,10 +246,10 @@ Builder has four configuration overlays but five service commands for execution/
 | `builder service up dev --full` | `dev` | `dev` | Integrated | Development with local dependencies |
 | `builder service up prod` | `prod` | `prod` | Integrated | Production-style runtime |
 | `builder service up test-unit` | `test` | `test` | Isolated | Unit/integration test runner |
-| `builder service up test-e2e` | `e2e` | app=`prod`, tester=`test-e2e` | Integrated | Service-level E2E |
+| `builder service up test-e2e` | `base -> prod -> e2e` | app=`prod`, tester=`test-e2e` | Integrated | Service-level E2E |
 | `builder service up test` | `test` then `e2e` | test, then prod/test-e2e | As above | Unit tests first, then E2E |
 
-E2E is its own runtime configuration. It uses the production app image target, but it does **not** inherit `.env.prod` or the `prod` JSON overlay.
+E2E uses production-shaped structured configuration: `base -> prod -> e2e`. The app runs Docker target `prod` with `EXEC_MODE=prod` and `INFRA_MODE=integrated`, while its dotenv source remains `.env.e2e`. `.env.prod` is not merged into `.env.e2e`.
 
 ---
 
@@ -359,10 +359,10 @@ This makes it practical to keep databases, APIs, queues, and internal services p
 | `builder mesh up dev` | `dev` | `dev` | `dev` | Integrated unless substituted | No |
 | `builder mesh up prod` | `prod` | `prod` | `prod` | Integrated unless substituted | No |
 | `builder mesh up test-unit` | `test` | `test` | `test` | Isolated | No |
-| `builder mesh up test-e2e` | `e2e` | `e2e` | `prod` | Integrated unless substituted | Yes |
-| `builder mesh up test` | `test`, then `e2e` | as above | as above | as above | E2E phase only |
+| `builder mesh up test-e2e` | `base -> prod -> e2e` | `base -> prod -> e2e` | `prod` | Integrated unless substituted | Yes |
+| `builder mesh up test` | Phase 1: root service tests; Phase 2: `base -> prod -> e2e` | service lifecycle, then global E2E | `test`, then `prod` | Per phase | Global tester in Phase 2 |
 
-`mesh test` first runs isolated per-service unit tests. If they succeed, Builder runs one global E2E composition.
+`mesh test` has two phases. Phase 1 runs each root service’s complete standalone test lifecycle—unit/isolated tests followed by that service’s own E2E tester—sequentially with full teardown. Phase 2 starts a clean `base -> prod -> e2e` mesh and runs the global E2E tester. Stage-only mesh services are not Phase-1 members unless they also exist in root `services`. `mesh up test-unit` remains explicit `mesh.test` stage tooling; it is not canonical Phase 1.
 
 ---
 
@@ -390,7 +390,7 @@ A mesh can define a host-networked black-box tester:
 }
 ```
 
-Tester environment references must use `public_*` endpoint properties because the selected tester runner acts as a host-side client.
+Tester environment references must use `public_*` endpoint properties because the selected runner acts as a host-side client. The selected runner receives root `.env.e2e-tester`, `EXEC_MODE=e2e`, and no `INFRA_MODE`; it is host-networked and supplies the exit code. Helper services in the tester Compose implementation are preserved.
 
 Use:
 

@@ -5,6 +5,9 @@ Create a service project with `build.json`, `Dockerfile`, and `server.mjs`. `app
 ```json
 {
   "app": {
+    "env": {
+      "PUBLIC_URL": "${app.endpoints.http.public_url}"
+    },
     "endpoints": {
       "http": { "port": 3000, "publicPort": "AUTO", "primary": true, "scheme": "http" }
     }
@@ -60,7 +63,7 @@ builder check
 builder service up dev
 ```
 
-Read the resolved host URL from a Builder reference/export rather than assuming that host port 3000 was selected. Use Ctrl+C to stop a foreground run, or run `builder service down dev`. From a parent directory:
+`PUBLIC_URL` resolves to the host-facing URL because `app.env` explicitly references `app.endpoints.http.public_url`. Run `builder service export env dev` to write the resolved app environment, then read `PUBLIC_URL` from `.env.dev.resolved`. If `.env.dev.resolved` already exists, the command prompts to overwrite or choose another filename. `PORT` is the app's container port and is not the allocated host port. The export file may contain secrets; keep it out of version control. Use Ctrl+C to stop a foreground run, or run `builder service down dev`. From a parent directory:
 
 ```bash
 builder service up dev -C ./hello-service

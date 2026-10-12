@@ -138,7 +138,8 @@ describe("catalog 11: cross-feature orchestration and regression", () => {
     for (const [stage, key] of [["dev", "DEV"], ["prod", "PROD"], ["test", "TEST"], ["e2e", "E2E"]] as const) {
       const values = env(compileService(stage, root).compose.services.app);
       expect(values.BASE).toBe("yes"); expect(values[key]).toBe("yes");
-      for (const other of ["DEV", "PROD", "TEST", "E2E"].filter(x => x !== key)) expect(values[other]).toBeUndefined();
+      const inherited = stage === "e2e" ? ["PROD", "E2E"] : [key];
+      for (const other of ["DEV", "PROD", "TEST", "E2E"].filter(x => !inherited.includes(x))) expect(values[other]).toBeUndefined();
     }
   });
   it("SYS-023 rejects all documented legacy root and mesh fields", () => {

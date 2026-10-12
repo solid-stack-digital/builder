@@ -115,19 +115,21 @@ function ensureSignalHandlers(): void {
     if (isShuttingDown) return;
     isShuttingDown = true;
 
-    for (const item of activeComposeSet) {
-      try {
-        teardownCompose(item.yamlConfig, item.projectDir, {
-          removeVolumes: item.removeVolumes ?? false,
-        }).catch(() => {});
-      } catch {
-        // ignore cleanup errors during signal shutdown
-      }
-    }
-    activeComposeSet.clear();
-
     const signalNumber = os.constants.signals[signal] ?? 0;
-    process.exit(128 + signalNumber);
+    // Wait for cleanup before exiting so failures can be reported and retries finish.
+    // Sequential cleanup also keeps the teardown signal guard active for each project.
+    void (async () => {
+      for (const item of activeComposeSet) {
+        try {
+          await teardownCompose(item.yamlConfig, item.projectDir, {
+            removeVolumes: item.removeVolumes ?? false,
+          });
+          activeComposeSet.delete(item);
+        } catch (error) {
+          console.error("Compose cleanup failed during signal shutdown:", error);
+        }
+      }
+    })().finally(() => process.exit(128 + signalNumber));
   };
 
   const SIGNALS: NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGHUP"];

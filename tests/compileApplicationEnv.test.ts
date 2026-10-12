@@ -36,8 +36,8 @@ describe("application environment compilation", () => {
   });
 
   it("sends E2E overlay with prod app target and keeps tester settings separate", () => {
-    vi.mocked(spawnSync).mockReturnValue({status:0,pid:1,output:[],signal:null,stderr:"",stdout:JSON.stringify({services:{app:{environment:{EXEC_MODE:"e2e"}}}})});
-    expect(compileApplicationEnv("e2e",dir)).toEqual({EXEC_MODE:"e2e"});
+    vi.mocked(spawnSync).mockReturnValue({status:0,pid:1,output:[],signal:null,stderr:"",stdout:JSON.stringify({services:{app:{environment:{EXEC_MODE:"prod"}}}})});
+    expect(compileApplicationEnv("e2e",dir)).toEqual({EXEC_MODE:"prod"});
     const c=parse(vi.mocked(spawnSync).mock.lastCall![2]!.input as string);
     expect(c.services.app.build.target).toBe("prod");expect(c.services.app.env_file).toEqual([{path:".env.e2e",required:false}]);expect(c.services.app.environment.TESTER_ONLY).toBeUndefined();
   });

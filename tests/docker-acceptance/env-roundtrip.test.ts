@@ -36,7 +36,7 @@ describe("application environment compilation", () => {
 
   it("exports the app's prod environment during E2E and does not mix in tester settings", () => {
     const environment = compileApplicationEnv("e2e", dir);
-    expect(environment).toMatchObject({ EXEC_MODE: "e2e", INFRA_MODE: "integrated", STAGE_FILE: "e2e" });
+    expect(environment).toMatchObject({ EXEC_MODE: "prod", INFRA_MODE: "integrated", STAGE_FILE: "e2e" });
     expect(environment.TESTER_ONLY).toBeUndefined();
   });
 

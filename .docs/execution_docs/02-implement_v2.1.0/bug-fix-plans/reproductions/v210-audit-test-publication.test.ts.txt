@@ -1,0 +1,12 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { cleanupFixtures, http, meshFixture } from './fixture.js';
+import { runMeshTestUnit } from '../../src/core/mesh/runners/runMeshTestUnit.js';
+afterEach(() => { cleanupFixtures(); vi.restoreAllMocks(); });
+it('V210-007 resolves published app reference before explicit test-stage execution', async () => {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  const root = meshFixture({ services: { api: {
+    path: 'api', publish: ['app.endpoints.http'],
+    env: { SELF_URL: '${api.app.endpoints.http.public_url}' },
+  } } }, { api: { app: { endpoints: { http: http(3000, { publicPort: 54321 }) } } } });
+  await expect(runMeshTestUnit({ projectDir: root, dryRun: true })).resolves.toBe(0);
+});

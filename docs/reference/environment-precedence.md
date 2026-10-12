@@ -1,31 +1,73 @@
 # Environment precedence
 
-## Standalone app (low to high)
+The lists below run from low to high priority. Dotenv files are inputs to their selected stage; `.env.prod` is not merged into `.env.e2e`. E2E does inherit the structured `prod` overlays.
 
-1. `.env.<stage>` values provided to Compose.
-2. Base `build.json.app.env`.
-3. Active build-stage `app.env`.
-4. Active stage's `override-compose` app environment.
-5. Builder-owned runtime values (authoritative; conflicts fail).
+## Ordinary standalone app
 
-## Mesh app (low to high)
+```text
+.env.<stage>
+-> base app.env
+-> active-stage app.env
+-> active-stage override-compose app environment
+-> Builder internal base environment
+-> Builder internal active-stage environment
+```
 
-1. `.env.<stage>`.
-2. Base build app env.
-3. Active build-stage app env.
-4. Active build-stage override Compose env.
-5. Base mesh service `env`.
-6. Active mesh-stage service `env`.
-7. Builder-owned base values.
-8. Builder-owned active-stage values.
+## Ordinary mesh app
 
-## Dependencies and testers
+```text
+.env.<stage>
+-> base app.env
+-> active-stage app.env
+-> active-stage override-compose app environment
+-> mesh base service env
+-> active-stage mesh service env
+-> Builder internal base environment
+-> Builder internal active-stage environment
+```
 
-`dependencies.<name>.env` configures its local implementation when integrated. Substitution suppresses that implementation; the provider uses its own app env. Service tester env is `build.json.tester.env`; global tester env is `mesh.json.tester.env`. Both tester roles may reference only effectively published public endpoint properties.
+## Service E2E app
 
-## E2E selection
+```text
+.env.e2e
+-> base app.env
+-> prod app.env
+-> prod override-compose app environment
+-> e2e app.env
+-> e2e override-compose app environment
+-> Builder internal base environment
+-> Builder internal E2E environment
+```
 
-E2E runtime uses `.env.e2e`, build `e2e`, and mesh `e2e`. The app image is built from Dockerfile target `prod`. `.env.prod`, `prod.app.env`, and `mesh.prod` do not flow into E2E automatically.
+## Global E2E app
+
+```text
+.env.e2e
+-> base app.env
+-> prod app.env
+-> prod override-compose app environment
+-> e2e app.env
+-> e2e override-compose app environment
+-> mesh base service env
+-> mesh prod service env
+-> mesh e2e service env
+-> Builder internal base environment
+-> Builder internal E2E environment
+```
+
+## E2E tester
+
+```text
+.env.e2e-tester
+-> tester.env
+-> Builder internal tester environment
+```
+
+Service E2E app uses `EXEC_MODE=prod`, `INFRA_MODE=integrated`, and target `prod`. The service tester uses `EXEC_MODE=e2e` and no `INFRA_MODE`. Global mesh E2E follows the same app semantics; the root tester uses `EXEC_MODE=e2e`, no `INFRA_MODE`, and root `.env.e2e-tester`.
+
+## Dependencies and references
+
+`dependencies.<name>.env` configures every service in that local dependency implementation when materialized. Substitution suppresses the local implementation. Tester env maps may refer only to effectively published public endpoint properties.
 
 ## Related
 

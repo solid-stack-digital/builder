@@ -78,7 +78,7 @@ describe("catalog 10: global mesh E2E tester", () => {
   it("TST-024 does not select an unreferenced helper as runner", () => {
     const result = compiled(mesh());
     expect(result.testerServiceName).toContain("runner");
-    expect(Object.keys(result.compose.services).some(x => x.includes("helper"))).toBe(false);
+    expect(Object.keys(result.compose.services).some(x => x.includes("helper"))).toBe(true);
   });
   it("TST-025 resolves two published service URLs independently", () => {
     const root = meshFixture({ services: { gateway: { path: "gateway", publish: ["app.endpoints.http"] }, metrics: { path: "metrics", publish: ["app.endpoints.http"] } }, tester: t({ SYSTEM_URL: "${gateway.app.endpoints.http.public_url}", METRICS_URL: "${metrics.app.endpoints.http.public_url}" }) }, { gateway: app(), metrics: app() }, { "t.yml": runner });

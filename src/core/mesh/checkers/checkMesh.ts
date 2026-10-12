@@ -6,6 +6,7 @@ import { checkMeshTester } from "./checkMeshTester.js";
 
 export interface CheckMeshOptions {
   requireTester?: boolean | undefined;
+  includeTestStage?: boolean | undefined;
 }
 
 export function checkMesh(
@@ -15,7 +16,9 @@ export function checkMesh(
   const absMeshDir = resolveProjectDir(meshDir);
   const mesh = getMeshJson(absMeshDir);
 
-  checkMeshServices(mesh, absMeshDir);
+  checkMeshServices(mesh, absMeshDir, {
+    includeTestStage: Boolean(options.includeTestStage),
+  });
   checkMeshTester(mesh, absMeshDir, { required: Boolean(options.requireTester) });
 
   console.log(

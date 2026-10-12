@@ -6,6 +6,8 @@ Every dependency endpoint must name its exact Compose owner through `service`. E
 
 Allowed Compose features include image/build services, internal `depends_on`, internal networks, named volumes, configs, secrets, and companion services, subject to valid references and Builder namespacing. Builder rejects raw service `ports`, `network_mode: host`, `privileged: true`, fixed `container_name`, host-root bind mounts, dependency profiles, and dependency `extends`. The dependency file cannot use a root `include` escape hatch. Compose paths and local build contexts are interpreted relative to their source file and preserved when inlined.
 
+Builder scopes owned volumes, networks, configs, and secrets to its Compose project even if their source definitions set `name`. An owned volume that previously used a fixed global name will receive a new project-scoped name; existing data is not migrated automatically. To share an existing external resource intentionally, declare `external: true`. Builder preserves that resource's external name and never removes it as an owned resource.
+
 Do not use Builder-generated internal service/resource names in your configuration. Use endpoint references. Host publication is configured by endpoint `publicPort` and, in a mesh, `publish`; dependency Compose `ports` are forbidden.
 
 ## Related
