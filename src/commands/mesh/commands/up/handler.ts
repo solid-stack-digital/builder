@@ -21,7 +21,10 @@ export async function handleMeshUp(
   };
 
   if (["dev", "prod", "test-unit", "test-e2e", "test"].includes(stage) && !options.skipChecks) {
-    checkMesh(projectDir, { requireTester: stage === "test-e2e" || stage === "test" });
+    checkMesh(projectDir, {
+      requireTester: stage === "test-e2e" || stage === "test",
+      includeTestStage: stage === "test-unit",
+    });
   }
 
   switch (stage) {

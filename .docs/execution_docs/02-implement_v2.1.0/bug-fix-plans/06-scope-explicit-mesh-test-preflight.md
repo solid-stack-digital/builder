@@ -1,6 +1,6 @@
 # 06 — Do not apply optional isolated mesh test rules to ordinary commands
 
-**ID:** V210-006. **Priority:** High. **Status:** two reproduced cases. **Fix not applied.**
+**ID:** V210-006. **Priority:** High. **Status:** implemented and verified on 2026-10-12. The original red test and implementation plan are preserved below.
 
 ## Bug and user-visible behavior
 
@@ -163,3 +163,19 @@ Find existing tests of `checkMeshServices` with `rg -n 'checkMeshServices|includ
 Run the exact gate, mesh preflight regression suite, mesh runner/pipeline tests, and plan 00 final checks. The exact red tests exercise the default checker path after the change. A direct handler test must additionally prove flag propagation so CLI behavior is covered.
 
 Default check no longer claims semantic validation of the optional isolated mesh topology. Its JSON shape remains validated, ordinary compositions remain checked, and explicit tooling retains semantic validation. Document that scope if public CLI check documentation currently claims every optional topology is always validated.
+
+## Implementation record — 2026-10-12
+
+Both V210-006 regressions failed before the source change because `checkMeshServices` unconditionally evaluated the isolated `test` stage across all preflight runs, causing ordinary cross-service env references and retained dependency publications to be rejected under one-service isolated test rules. After the change, both regressions pass.
+
+`checkMeshServices` now takes an optional `CheckMeshServicesOptions` parameter where `includeTestStage` selects whether the isolated test stage is checked (`["dev", "prod", "test", "e2e"]` vs `["dev", "prod", "e2e"]`). `checkMesh` in `src/core/mesh/checkers/checkMesh.ts` accepts and forwards this option. `handleMeshUp` in `src/commands/mesh/commands/up/handler.ts` forwards `includeTestStage: stage === "test-unit"`, preserving isolated test validation for explicit `mesh up test-unit` while keeping canonical `test`, `dev`, and `prod` scoped to their appropriate stages.
+
+The permanent test suite `tests/conformance/v210-audit-preflight.test.ts` verifies:
+- Ordinary mesh cross-service environment references compile and pass preflight.
+- Retained dependency publications in root services pass ordinary preflight.
+- Explicit isolated test validation remains active when `includeTestStage: true` is provided.
+- Unknown endpoint references continue to be rejected during ordinary preflight.
+
+In addition, `tests/mesh-preflight-regression.test.ts` verifies routing and exact options passed across all stages (`dev`, `prod`, `test-unit`, `test-e2e`, `test`), failure propagation, and `--skip-checks` handling.
+
+Validation: 9 related preflight tests passed, 541 conformance tests in 21 files passed, 777 full-suite tests in 65 files passed, TypeScript check passed, and removed-V1-token check passed. Plan 07 remains separate work.

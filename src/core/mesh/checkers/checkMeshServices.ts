@@ -13,10 +13,21 @@ import { resolveMeshAppEnvironmentLayers } from "../v2/resolveMeshAppEnvironment
 import type { MeshEndpointRegistry } from "../v2/types.js";
 import type { MeshConfig } from "../types.js";
 
-export function checkMeshServices(mesh: MeshConfig, meshDir: string): void {
+export interface CheckMeshServicesOptions {
+  includeTestStage?: boolean | undefined;
+}
+
+export function checkMeshServices(
+  mesh: MeshConfig,
+  meshDir: string,
+  options: CheckMeshServicesOptions = {},
+): void {
   const root = resolveProjectDir(meshDir), meshPath = path.join(root,"mesh.json");
   const checked = new Set<string>();
-  for (const stage of ["dev","prod","test","e2e"] as const) {
+  const stages: Array<"dev" | "prod" | "test" | "e2e"> = options.includeTestStage
+    ? ["dev", "prod", "test", "e2e"]
+    : ["dev", "prod", "e2e"];
+  for (const stage of stages) {
     const effective = resolveMeshStage(mesh,stage,meshPath);
     const services = loadEffectiveMeshServices(root,effective,stage);
     if (stage === "test") validateMeshTestStage(services,root,meshPath,true);
