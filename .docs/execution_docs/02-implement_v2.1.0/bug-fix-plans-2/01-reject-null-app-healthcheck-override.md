@@ -1,5 +1,7 @@
 # 01 — Reject a null app healthcheck in a stage override
 
+**ID:** V211-001. **Priority:** Medium. **Status:** implemented and verified on 2026-10-12. The original red test and implementation plan are preserved below.
+
 ## Bug report
 
 **Bug.** A valid `build.json` can point its `prod.override-compose` to a Compose file containing `services.app.healthcheck: null`. `compileServiceComposition("prod", ...)` returns a composition with `app.healthcheck === null` and raises no `ConfigError`.
@@ -74,3 +76,17 @@ Do not make `null` mean “inherit.” V2 has no generic deletion syntax, and no
 4. Run `pnpm exec vitest run tests/conformance/v211-audit.test.ts tests/conformance/v210-compose-overlay-merge.test.ts tests/conformance/03-stages.test.ts` and `pnpm typecheck`.
 
 The fix is complete when the original invalid override fails before Docker and the permitted timing-only overlays retain their current behavior.
+
+## Implementation record — 2026-10-12
+
+The V211-001 regression failed before the source change because `validateAndPrepareAppOverride` only checked `app.healthcheck` when truthy, allowing `null`, array, and non-object values to bypass validation and corrupt the compiled Compose output. After the change, declaring `healthcheck` in an override requires a non-null mapping of timing fields.
+
+In `src/core/composition/validateOverrideCompose.ts`, `Object.hasOwn(app, "healthcheck")` now explicitly verifies that `app.healthcheck` is a non-null, non-array object before validating that its keys only contain allowed timing fields (`interval`, `timeout`, `retries`, `start_period`, `start_interval`).
+
+The test suite in `tests/conformance/v211-audit.test.ts` covers:
+- Rejection of `healthcheck: null`.
+- Acceptance of valid timing-only overrides (e.g. `{ interval: "5s" }`).
+- Rejection of array, string, and disable flag healthchecks.
+- Preservation of timing field merging across `prod` and `e2e` stages.
+
+Validation: All V211-001 tests passed, and stage/overlay conformance suites passed.

@@ -1,5 +1,7 @@
 # 02 — Reject internal dependency Compose lifecycle cycles in standalone service compilation
 
+**ID:** V211-002. **Priority:** High. **Status:** implemented and verified on 2026-10-12. The original red test and implementation plan are preserved below.
+
 ## Bug report
 
 **Bug.** A materialized dependency implementation may contain `owner depends_on helper` and `helper depends_on owner`. Both services exist, the endpoint owner has a healthcheck, and `compileServiceComposition("prod", ...)` succeeds. Docker Compose rejects that exact relation as a dependency cycle.
@@ -95,3 +97,17 @@ Although an endpoint-less dependency is inert, its declared Compose file is curr
 5. Run `pnpm exec vitest run tests/conformance/v211-audit.test.ts tests/conformance/04-dependencies.test.ts tests/conformance/05-lifecycle-wiring.test.ts` and `pnpm typecheck`.
 
 After 02 is green, keep the shared checker available for plan 03. The cycle check is a validation addition; it should not rewrite `depends_on`, change readiness conditions, or require Docker during tests.
+
+## Implementation record — 2026-10-12
+
+The V211-002 regression failed before the change because `validateDependencyCompose` checked only service existence and endpoint health without validating that the internal `depends_on` relations were acyclic, allowing circular dependencies inside dependency bundles to compile.
+
+A reusable validator `src/core/composition/assertComposeLifecycleAcyclic.ts` was introduced to convert Compose `depends_on` maps/arrays into a `LifecycleGraph` and enforce acyclicity with `assertAcyclicGraph`. This validator is now called in `src/core/composition/validateDependencyCompose.ts` after individual service validation and before endpoint-less returns.
+
+The test suite in `tests/conformance/v211-audit.test.ts` covers:
+- Circular dependency rejection for short-form arrays.
+- Circular dependency rejection for long-form map `depends_on`.
+- Rejection of self-edges with source Compose file diagnostic context.
+- Acceptance of acyclic multi-service dependency bundles.
+
+Validation: All V211-002 tests passed, and dependency/lifecycle conformance suites passed.

@@ -35,7 +35,32 @@ export function validateAndPrepareAppOverride(document:ComposeDocument,context:A
  validateComposeResourceReferences(document,{sourceFile:context.file,stage:context.stage,composition:"service"});
  const app=structuredClone(document.services.app!);
  for(const k of ["ports","depends_on","network_mode","container_name","privileged","profiles","extends","env_file"] as const)if(app[k]!==undefined)fail(`services.app.${k}`,"override cannot own endpoint or lifecycle behavior");
- if(app.healthcheck&&typeof app.healthcheck==="object"){const health=app.healthcheck as Record<string,unknown>;for(const key of Object.keys(health))if(!["interval","timeout","retries","start_period","start_interval"].includes(key))fail(`services.app.healthcheck.${key}`,"override may set only healthcheck timing fields");}
+ if (Object.hasOwn(app, "healthcheck")) {
+  const healthcheck = app.healthcheck;
+  if (
+    healthcheck === null ||
+    typeof healthcheck !== "object" ||
+    Array.isArray(healthcheck)
+  ) {
+    fail(
+      "services.app.healthcheck",
+      "override healthcheck must be a mapping of timing fields",
+      healthcheck,
+    );
+  }
+
+  const allowedTiming = new Set([
+    "interval", "timeout", "retries", "start_period", "start_interval",
+  ]);
+  for (const key of Object.keys(healthcheck as Record<string, unknown>)) {
+    if (!allowedTiming.has(key)) {
+      fail(
+        `services.app.healthcheck.${key}`,
+        "override may set only healthcheck timing fields",
+      );
+    }
+  }
+ }
 
  if (typeof app.build === "string") {
   fail("services.app.build", "override cannot replace Builder-owned app build context; use object-form build.args for build arguments", app.build);

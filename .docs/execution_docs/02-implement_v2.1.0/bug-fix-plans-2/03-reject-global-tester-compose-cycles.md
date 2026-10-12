@@ -65,3 +65,18 @@ assertComposeLifecycleAcyclic(raw.services, {
 4. Run `pnpm exec vitest run tests/conformance/v211-audit.test.ts tests/conformance/10-global-tester.test.ts tests/conformance/11-system-orchestration.test.ts` and `pnpm typecheck`.
 
 This plan is complete when invalid tester cycles fail in Builder compilation, while valid helper ordering and the existing global E2E readiness gates remain unchanged.
+
+## Implementation record — 2026-10-12
+
+The V211-003 regression failed before the change because `compileMeshComposition` ran cycle validation on the top-level app/dependency graph before merging the global tester Compose fragment, while `compileMeshTester` validated service references without checking for dependency cycles within `tester.compose`. As a result, circular dependencies between the test runner and helper services bypassed compilation checks.
+
+In `src/core/mesh/v2/compileMeshTester.ts`, `assertComposeLifecycleAcyclic(raw.services, { sourceFile: file, stage, composition: "mesh" })` is now called immediately after `validateServiceReferences(raw, file, stage)` on the raw tester services. This guarantees internal `depends_on` cycles are caught fail-fast while preserving the tester source filename and original service names in `ConfigError` diagnostics.
+
+The test suite in `tests/conformance/v211-audit.test.ts` covers:
+- Circular dependency rejection for short-form arrays (`runner` <-> `helper`).
+- Circular dependency rejection for long-form map `depends_on`.
+- Rejection of self-edges with source `tester.yml` diagnostic context.
+- Acceptance of acyclic tester topologies with helper dependencies and injected `service_healthy` conditions for apps.
+
+Validation: All V211-003 tests passed, and global tester / orchestration conformance suites passed.
+

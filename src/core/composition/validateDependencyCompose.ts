@@ -1,4 +1,5 @@
 import { validateComposeResourceReferences } from "./validateComposeResourceReferences.js";
+import { assertComposeLifecycleAcyclic } from "./assertComposeLifecycleAcyclic.js";
 import { assertNoServiceBuildContexts } from "./composeBuildResources.js";
 import { isEnabledValidComposeHealthcheck } from "./composeHealthcheck.js";
 import { parseVolume, isHostFilesystemRoot } from "./composeVolumes.js";
@@ -29,6 +30,11 @@ export function validateDependencyCompose(dependencyKey:string,dependency:Effect
   for (const key of ["ipc", "pid"] as const) if (typeof svc[key] === "string" && svc[key].startsWith("service:")) internalRefs.push([key, svc[key].slice(8)]);
   for(const [property,target] of internalRefs)if(!services[target])fail(`services.${name}.${property}`,`internal service reference "${target}" does not exist in this dependency Compose bundle`,target);
  }
+ assertComposeLifecycleAcyclic(services, {
+  sourceFile: context.composePath,
+  stage: context.stage,
+  composition: "service",
+ });
  if(!Object.keys(dependency.endpoints).length)return;
  if(!Object.keys(services).length)fail("services","endpoint-bearing dependency Compose must define services");
  const owners=new Set<string>();

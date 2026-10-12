@@ -8,6 +8,7 @@ import { namespaceDependencyCompose } from "../../composition/namespaceDependenc
 import { normalizeComposeDependsOn } from "../../composition/composeDependsOn.js";
 import { normalizeComposeEnvironment } from "../../composition/composeEnvironment.js";
 import { validateComposeResourceReferences } from "../../composition/validateComposeResourceReferences.js";
+import { assertComposeLifecycleAcyclic } from "../../composition/assertComposeLifecycleAcyclic.js";
 import { assertNoServiceBuildContexts } from "../../composition/composeBuildResources.js";
 import { rebaseComposePaths } from "../../composition/composePaths.js";
 import type { ComposeDocument, ComposeService } from "../../composition/types.js";
@@ -44,6 +45,11 @@ export function compileMeshTester(meshDir:string,tester:MeshTesterConfig,endpoin
  if(!raw.services||!raw.services[tester.service])throw new ConfigError({sourceFile:meshPath,configPath:"tester.service",stage,composition:"mesh",value:tester.service,reason:"Selected tester service does not exist in tester Compose"});
  validateComposeResourceReferences(raw,{sourceFile:file,stage,composition:"mesh"});
  validateServiceReferences(raw,file,stage);
+ assertComposeLifecycleAcyclic(raw.services, {
+  sourceFile: file,
+  stage,
+  composition: "mesh",
+ });
  for(const [serviceName,service] of Object.entries(raw.services)){
   if(service.extends!==undefined)throw new ConfigError({sourceFile:file,configPath:`services.${serviceName}.extends`,stage,composition:"mesh",reason:"Tester Compose extends is unsupported until effective Compose inheritance can be validated safely"});
   assertNoServiceBuildContexts(service,`services.${serviceName}`,file);

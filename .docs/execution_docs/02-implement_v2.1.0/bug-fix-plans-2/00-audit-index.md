@@ -4,15 +4,16 @@ Audit date: 2026-10-12 (Asia/Manila). Audited commit: `0333051ac738e568a223ab965
 
 ## Result
 
-The implementation covers the central V2 model, but three reproducible validation gaps remain. All three new regression assertions fail because compilation unexpectedly succeeds. Three corresponding valid-input controls pass. These are reports and proposed fixes; no production fix is applied here.
+The implementation covers the central V2 model. All three reproducible validation gaps identified in this audit have been resolved and verified with regression tests in `tests/conformance/v211-audit.test.ts`.
 
-| Report | Severity | Confirmed defect | Fix dependency |
-|---|---|---|---|
-| [01 — Null app healthcheck override](01-reject-null-app-healthcheck-override.md) | Medium | A stage override accepts `services.app.healthcheck: null`; generated Compose is invalid, while the spec permits only timing-field changes | Independent |
-| [02 — Standalone dependency cycle](02-reject-standalone-dependency-compose-cycles.md) | High | A materialized dependency Compose bundle with an internal `depends_on` cycle compiles successfully | Adds a reusable graph validator |
-| [03 — Global tester cycle](03-reject-global-tester-compose-cycles.md) | High | A tester bundle with an internal `depends_on` cycle compiles successfully, because the mesh graph check runs before the tester is merged | Reuses validator from 02 |
+| Report | Severity | Confirmed defect | Status | Fix dependency |
+|---|---|---|---|---|
+| [01 — Null app healthcheck override](01-reject-null-app-healthcheck-override.md) | Medium | A stage override accepts `services.app.healthcheck: null`; generated Compose is invalid, while the spec permits only timing-field changes | Implemented & Verified | Independent |
+| [02 — Standalone dependency cycle](02-reject-standalone-dependency-compose-cycles.md) | High | A materialized dependency Compose bundle with an internal `depends_on` cycle compiles successfully | Implemented & Verified | Adds a reusable graph validator |
+| [03 — Global tester cycle](03-reject-global-tester-compose-cycles.md) | High | A tester bundle with an internal `depends_on` cycle compiles successfully, because the mesh graph check runs before the tester is merged | Implemented & Verified | Reuses validator from 02 |
 
-Implement in numerical order. Reports 02 and 03 are separate gates because they cover different input files and compiler paths. If an upstream change makes either red test pass before its fix, skip that plan and record the result.
+All plans were implemented in numerical order. All red test assertions previously failed and now pass together with control and edge case suites.
+
 
 ## Normative basis
 
