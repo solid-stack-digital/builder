@@ -1,6 +1,6 @@
 # 05 — Make retained dependency endpoints reachable across the mesh
 
-**ID:** V210-005. **Priority:** High. **Status:** reproduced in dev, prod, and E2E. **Fix not applied.**
+**ID:** V210-005. **Priority:** High. **Status:** implemented and verified on 2026-10-12. The original red test and implementation plan are preserved below.
 
 ## Bug and trigger
 
@@ -109,3 +109,13 @@ For production tests, prefer locating helper names through compiler metadata if 
 Run the gate, mesh composition/substitution/lifecycle tests, and plan 00's final checks. A later Docker acceptance test should start a disposable dependency HTTP server and a second app that calls the resolved host, with zero host ports. Assert successful connection and absence of automatically generated lifecycle edges.
 
 The audit establishes the absent shared network. A successful socket request is a recommended runtime acceptance check after implementation, not an already observed audit result. The change broadens mesh-internal reachability for logical endpoint owners only; it does not expose helper-only services or host ports.
+
+## Implementation record — 2026-10-12
+
+All three V210-005 regressions failed before the source change because endpoint-owning dependency services were attached only to `mesh--<service>` and not to the shared `mesh` network, making resolved hosts unreachable from other mesh services. After the change, all three stages (dev, prod, e2e) pass.
+
+In `src/core/mesh/v2/compileMeshComposition.ts`, the dependency endpoint owner attachment loop now calls `attachNetworkIfCompatible(ownerService, "mesh")` in addition to the private network. Helper-only implementation services remain attached strictly to `mesh--<service>` and do not receive mesh membership. No host ports are exposed and no depends_on edges are generated.
+
+The permanent test suite `tests/conformance/v210-retained-endpoints.test.ts` covers the three stage regressions, helper privacy preservation, distinct hosts and absence of shared-network aliases for collision candidates, idempotent multi-endpoint attachment, preservation of custom namespaced dependency networks and aliases, substituted dependency resolution, and consumer private network preservation.
+
+Validation: 150 related tests passed, 537 conformance tests passed, 773 full-suite tests passed, TypeScript check passed, and removed-V1-token check passed. No live Docker acceptance run was performed. Plans 06–07 remain separate work.

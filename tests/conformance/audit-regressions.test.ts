@@ -324,5 +324,5 @@ it("AUDIT-B10 adds original dependency service aliases only to dependency-owned 
  const attached=owner.networks as Record<string,any>;
  expect(attached[dependencyDefault].aliases).toContain("owner");
  expect(attached["mesh--api"]).toBeNull();
- expect(attached["mesh"]).toBeUndefined();
+ expect(attached["mesh"]).toBeNull();
 });
