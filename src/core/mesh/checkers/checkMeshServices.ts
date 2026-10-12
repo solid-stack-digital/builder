@@ -9,6 +9,7 @@ import { compileMeshComposition } from "../v2/compileMeshComposition.js";
 import { validateMeshTestStage } from "../v2/validateMeshTestStage.js";
 import { loadEffectiveMeshServices } from "../v2/loadMeshServices.js";
 import { resolveMeshEnvMap,resolveServiceBuildEnvThroughMesh,type MeshReferenceContext } from "../v2/meshReferences.js";
+import { resolveMeshAppEnvironmentLayers } from "../v2/resolveMeshAppEnvironment.js";
 import type { MeshEndpointRegistry } from "../v2/types.js";
 import type { MeshConfig } from "../types.js";
 
@@ -28,7 +29,7 @@ export function checkMeshServices(mesh: MeshConfig, meshDir: string): void {
         for (const key of ["EXEC_MODE","INFRA_MODE",...(Object.values(svc.effectiveBuild.app.endpoints).some(ep=>ep.primary)?["PORT"]:[])]) {
           if (key in svc.meshEnv) throw new ConfigError({sourceFile:meshPath,configPath:`services.${name}.env.${key}`,stage:"test",composition:"mesh",reason:"Mesh service env cannot set Builder-owned environment"});
         }
-        resolveServiceBuildEnvThroughMesh(name,fragment.buildJsonAppEnvironment??{},ctx,`services.${name}.app.env`);
+        resolveMeshAppEnvironmentLayers(name,fragment.appEnvironmentLayers,ctx);
         for (const [depName,depEnv] of Object.entries(fragment.dependencyEnvironments??{})) resolveServiceBuildEnvThroughMesh(name,depEnv,ctx,`services.${name}.dependencies.${depName}.env`);
         resolveMeshEnvMap(svc.meshEnv,ctx,`services.${name}.env`);
       }

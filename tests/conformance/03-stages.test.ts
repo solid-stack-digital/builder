@@ -54,11 +54,16 @@ describe("catalog 03: stages, Dockerfile, and override Compose", () => {
     const result = compileService("e2e", root);
     for (const [name, value] of Object.entries(result.compose.services)) if (name !== "app" && name !== "tester") expect(env(value)).toMatchObject({ A: "1", B: "2", C: "2" });
   });
-  it("STG-009 replaces dependency Compose as an atomic bundle", () => {
-    const root = fixture({ app: {}, dependencies: { db: dep("a.yml", "owner") }, e2e: { dependencies: { db: { compose: "b.yml" } } } }, { "a.yml": ownerBundle({ helperA: { image: "alpine" } }), "b.yml": ownerBundle({ helperB: { image: "alpine" } }) });
-    expect(Object.keys(compileService("prod", root).compose.services)).toContain("dep--db--helperA");
-    expect(Object.keys(compileService("e2e", root).compose.services)).toContain("dep--db--helperB");
-    expect(Object.keys(compileService("e2e", root).compose.services)).not.toContain("dep--db--helperA");
+  it("STG-009 rejects replacing an inherited dependency Compose implementation", () => {
+    expect(() => resolveBuildStage({ app: {}, dependencies: { db: dep("a.yml", "owner") }, e2e: { dependencies: { db: { compose: "b.yml" } } } } as any, "e2e", "build.json")).toThrow(/e2e\.dependencies\.db\.compose|inherited|replace/i);
+  });
+  it("allows compose when a stage introduces a new dependency", () => {
+    const result=resolveBuildStage({app:{},e2e:{dependencies:{mailpit:{compose:"mailpit.yml",endpoints:{smtp:{service:"mailpit",port:1025,primary:true,scheme:"smtp"}}}}}} as any,"e2e","build.json");
+    expect(result.dependencies.mailpit?.compose).toBe("mailpit.yml");
+  });
+  it("rejects e2e replacement of a dependency introduced by prod", () => {
+    const config:any={app:{},prod:{dependencies:{db:{compose:"prod-db.yml",endpoints:{api:{service:"db",port:5432,primary:true}}}}},e2e:{dependencies:{db:{compose:"other.yml"}}}};
+    expect(()=>resolveBuildStage(config,"e2e","build.json")).toThrow(/e2e\.dependencies\.db\.compose|inherited|replace/i);
   });
   it("STG-010 union-merges build dependsOn base-first", () => {
     const d = (dependsOn: string[] = []) => ({ ...dep(), dependsOn });
@@ -102,31 +107,40 @@ describe("catalog 03: stages, Dockerfile, and override Compose", () => {
     expect(env(result.compose.services.app)).toMatchObject({ EXEC_MODE: "test", INFRA_MODE: "isolated" });
     expect(Object.keys(result.compose.services)).toEqual(["app"]);
   });
-  it("STG-018 uses prod image target with E2E runtime overlay", () => {
+  it("STG-018 uses production execution for E2E apps", () => {
     const root = fixture({ app: {}, prod: { app: { env: { MARK: "prod" } } }, e2e: { app: { env: { MARK: "e2e" } } } });
     const result = compileService("e2e", root);
     expect((result.compose.services.app?.build as any).target).toBe("prod");
-    expect(env(result.compose.services.app)).toMatchObject({ MARK: "e2e", EXEC_MODE: "e2e" });
+    expect(env(result.compose.services.app)).toMatchObject({ MARK: "e2e", EXEC_MODE: "prod", INFRA_MODE: "integrated" });
   });
   it("STG-019 uses .env.e2e rather than .env.prod", () => {
     const root = fixture({ app: {} }, { ".env.prod": "MARK=prod\n", ".env.e2e": "MARK=e2e\n" });
     expect(compileService("e2e", root).compose.services.app?.env_file).toEqual([{ path: ".env.e2e", required: false }]);
     expect(compileService("prod", root).compose.services.app?.env_file).toEqual([{ path: ".env.prod", required: false }]);
   });
-  it("STG-020 excludes prod.app.env from E2E", () => {
+  it("STG-020 inherits prod.app.env before e2e.app.env", () => {
     const root = fixture({ app: { env: { BASE: "yes" } }, prod: { app: { env: { PROD: "yes" } } }, e2e: { app: { env: { E2E: "yes" } } } });
-    expect(env(compileService("e2e", root).compose.services.app)).toMatchObject({ BASE: "yes", E2E: "yes" });
-    expect(env(compileService("e2e", root).compose.services.app).PROD).toBeUndefined();
+    expect(env(compileService("e2e", root).compose.services.app)).toMatchObject({ BASE: "yes", PROD: "yes", E2E: "yes" });
   });
-  it("STG-021 excludes mesh.prod overlay from E2E", () => {
+  it("STG-021 inherits mesh.prod overlay before E2E", () => {
     const root = meshFixture({ services: { api: { path: "api" } }, prod: { services: { api: { env: { MARK: "prod" } } } }, e2e: { services: { api: { env: { MARK: "e2e" } } } }, tester: { compose: "t.yml", service: "runner" } }, { api: { app: {} } }, { "t.yml": { services: { runner: { image: "alpine" } } } });
     const result = compileMesh("e2e", root);
-    expect(env(result.compose.services.api).MARK).toBe("e2e");
+    expect(env(result.compose.services.api)).toMatchObject({ MARK: "e2e" });
+    expect(env(result.compose.services.api).EXEC_MODE).toBe("prod");
     expect((result.compose.services.api?.build as any).target).toBe("prod");
   });
   it("STG-022 accepts override app environment at higher precedence", () => {
     const root = fixture({ app: { env: { A: "base" } }, dev: { "override-compose": "o.yml" } }, { "o.yml": { services: { app: { environment: { A: "override", B: "new" } } } } });
     expect(env(compileService("dev", root).compose.services.app)).toMatchObject({ A: "override", B: "new" });
+  });
+  it("E2E preserves prod override then e2e JSON then e2e override ordering", () => {
+    const root=fixture({app:{env:{VALUE:"base-json"}},prod:{app:{env:{VALUE:"prod-json"}},"override-compose":"prod.yml"},e2e:{app:{env:{VALUE:"e2e-json"}},"override-compose":"e2e.yml"}}, {"prod.yml":{services:{app:{environment:{VALUE:"prod-override",PROD_OVERRIDE:"yes"}}}},"e2e.yml":{services:{app:{environment:{VALUE:"e2e-override",E2E_OVERRIDE:"yes"}}}}});
+    const compiled=compileService("e2e",root);
+    expect(env(compiled.compose.services.app)).toMatchObject({VALUE:"e2e-override",PROD_OVERRIDE:"yes",E2E_OVERRIDE:"yes"});
+  });
+  it("E2E JSON env beats prod override when e2e override omits the key", () => {
+    const root=fixture({app:{env:{VALUE:"base-json"}},prod:{app:{env:{VALUE:"prod-json"}},"override-compose":"prod.yml"},e2e:{app:{env:{VALUE:"e2e-json"}},"override-compose":"e2e.yml"}}, {"prod.yml":{services:{app:{environment:{VALUE:"prod-override"}}}},"e2e.yml":{services:{app:{environment:{E2E_OVERRIDE:"yes"}}}}});
+    expect(env(compileService("e2e",root).compose.services.app).VALUE).toBe("e2e-json");
   });
   it("STG-023 accepts app development volumes in override", () => {
     const root = fixture({ app: {}, dev: { "override-compose": "o.yml" } }, { "o.yml": { services: { app: { volumes: ["./src:/src:ro", "/app/node_modules"] } } } });

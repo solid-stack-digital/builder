@@ -1,9 +1,10 @@
-import type { AppEndpoint, BuildJson, DependencyConfig, DependencyEndpoint } from "../../types/index.js";
+import type { AppEndpoint, BuildJson, DependencyConfig, DependencyEndpoint, Environment } from "../../types/index.js";
 import type { MeshConfig, MeshServiceConfig } from "../mesh/types.js";
+export interface EffectiveBuildLayer { stage: "base" | Environment; appEnv: Record<string, string>; overrideCompose?: string; }
 export interface EffectiveBuildConfig extends Omit<BuildJson, "dev" | "prod" | "test" | "e2e" | "dependencies" | "app"> {
   app: { env: Record<string, string>; endpoints: Record<string, AppEndpoint> };
   dependencies: Record<string, Omit<DependencyConfig, "env" | "endpoints" | "dependsOn"> & { env: Record<string, string>; endpoints: Record<string, DependencyEndpoint>; dependsOn: string[] }>;
-  tester?: { env: Record<string, string> }; overrideCompose?: string;
+  tester?: { env: Record<string, string> }; layers: EffectiveBuildLayer[];
 }
 export interface EffectiveMeshConfig extends Omit<MeshConfig, "dev" | "prod" | "test" | "e2e" | "services"> {
   services: Record<string, Omit<MeshServiceConfig, "env" | "dependencies" | "dependsOn" | "publish"> & { env: Record<string, string>; dependencies: Record<string, string>; dependsOn: string[]; publish: string[] }>;

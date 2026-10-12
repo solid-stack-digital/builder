@@ -113,10 +113,10 @@ describe("catalog 09: mesh overlays and environment precedence", () => {
     const root = one({ tester }, build, { "api/.env.prod": "PROD_FILE=yes\n", "api/.env.e2e": "E2E_FILE=yes\n" });
     expect(compileMesh("e2e", root).compose.services.api?.env_file).toEqual([{ path: "api/.env.e2e", required: false }]);
   });
-  it("MEN-023 excludes mesh.prod env from E2E", () => {
+  it("MEN-023 inherits mesh.prod env into E2E", () => {
     const root = one({ tester, prod: { services: { api: { env: { ONLY_PROD: "yes" } } } }, e2e: { services: { api: { env: { ONLY_E2E: "yes" } } } } });
     const result = compileMesh("e2e", root);
-    expect(env(result.compose.services.api).ONLY_E2E).toBe("yes"); expect(env(result.compose.services.api).ONLY_PROD).toBeUndefined();
+    expect(env(result.compose.services.api)).toMatchObject({ ONLY_E2E: "yes", ONLY_PROD: "yes" });
     expect((result.compose.services.api?.build as any).target).toBe("prod");
   });
   it("MEN-024 applies E2E overlay over base env", () => {
@@ -146,7 +146,7 @@ describe("catalog 09: mesh overlays and environment precedence", () => {
     const root = one({ tester }, { app: {}, dependencies: { db: dep("d.yml") }, e2e: { app: { env: { STAGE: "e2e" } } } }, { "api/d.yml": ownerBundle() });
     const result = compileMesh("e2e", root);
     expect((result.compose.services.api?.build as any).target).toBe("prod");
-    expect(env(result.compose.services.api)).toMatchObject({ EXEC_MODE: "e2e", INFRA_MODE: "integrated", STAGE: "e2e" });
+    expect(env(result.compose.services.api)).toMatchObject({ EXEC_MODE: "prod", INFRA_MODE: "integrated", STAGE: "e2e" });
     expect(result.testerServiceName).toBeDefined();
   });
   it("MEN-029 validates bad E2E effective stage while prod passes", () => {

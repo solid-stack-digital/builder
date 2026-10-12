@@ -24,6 +24,7 @@ const serviceNameJsonSchema = {
   ],
 };
 const root = (meshJsonSchema as any).definitions.MeshJsonV2;
+root.properties.services.minProperties = 1;
 for (const object of [root, ...["dev", "prod", "test", "e2e"].map(stage => root.properties[stage])]) {
   const services = object.properties.services;
   services.propertyNames = serviceNameJsonSchema;

@@ -167,7 +167,7 @@ describe("catalog 05: health and lifecycle", () => {
     const root = bound(); write(root, "mesh.json", { services: { frontend: { path: "frontend", dependencies: { backend: "backend" } }, backend: { path: "backend" } }, tester: { compose: "t.yml", service: "runner" } }); write(root, "t.yml", { services: { runner: { image: "alpine" } } });
     const result = compileMesh("e2e", root);
     expect((result.compose.services.backend?.build as any).target).toBe("prod");
-    expect(env(result.compose.services.backend).EXEC_MODE).toBe("e2e");
+    expect(env(result.compose.services.backend).EXEC_MODE).toBe("prod");
     expect(edges(result.compose.services.frontend).backend).toEqual({ condition: "service_healthy" });
     expect(result.testerServiceName).toBeDefined();
   });
