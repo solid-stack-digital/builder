@@ -17,6 +17,8 @@ Root `mesh.json.tester` selects a Compose implementation and its exact runner se
 
 `tester.compose` points directly to the tester Compose file; `tester.service` selects the finite runner and exit-code source. The file may include setup and helper services, which remain part of the tester implementation. Builder host-networks only the selected runner. The selected runner receives the root `.env.e2e-tester`, `tester.env`, and Builder-owned `EXEC_MODE=e2e`; it receives no `INFRA_MODE`.
 
+During global E2E compilation, file-backed tester configs and secrets must point to existing regular files. Local build contexts for the runner and helpers must be existing directories, with an existing Dockerfile unless `dockerfile_inline` is used. These relative paths resolve from the tester Compose file's directory; remote build contexts are not checked as local files.
+
 Tester env may use only effectively published public endpoint properties, so publish every service endpoint the external runner needs. The root tester is required for global mesh E2E and `mesh up test`; `builder mesh check` permits it to be absent unless `--require-tester` is supplied.
 
 ```bash

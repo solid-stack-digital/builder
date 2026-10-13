@@ -9,7 +9,7 @@ function volumeShort(v:string,base:string,out:string):string {
  if(mount?.type !== "bind" || !mount.source || /^(?:[\\/]|~|[a-z]:)/i.test(mount.source)) return v;
  return rewriteVolumeSource(v,rebase(mount.source,base,out)) as string;
 }
-function isRemoteBuildContext(value:string):boolean {
+export function isRemoteBuildContext(value:string):boolean {
  return /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value) || /^[^/@\s]+@[^:\s]+:.+/.test(value);
 }
 function rebaseAdditionalContext(value:string,base:string,out:string):string {

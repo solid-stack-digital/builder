@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { compileMeshComposition } from "../../src/core/mesh/v2/compileMeshComposition.js";
 import { cleanupMeshes, createMesh } from "./meshFixture.js";
+import { writeFileSync } from "node:fs";
+import path from "node:path";
 afterEach(cleanupMeshes);
 describe("global mesh tester", () => {
   it("preserves complete tester Compose and selects the explicit runner", () => {
@@ -62,6 +64,7 @@ describe("global mesh tester", () => {
   });
   it("forces build-backed selected runner to test-e2e while preserving build settings",()=>{
     const root=createMesh({tester:{compose:"e2e.yml",service:"runner"},services:{api:{path:"api"}}},{api:{app:{}}},{"e2e.yml":"services:\n  runner:\n    build:\n      context: .\n      dockerfile: Dockerfile\n      target: old\n"});
+    writeFileSync(path.join(root,"Dockerfile"),"FROM alpine:latest\n");
     const c=compileMeshComposition("e2e",root);expect(c.compose.services[c.testerServiceName!]?.build).toMatchObject({target:"test-e2e",dockerfile:"Dockerfile"});
   });
   it("leaves image-only selected runner image-only",()=>{

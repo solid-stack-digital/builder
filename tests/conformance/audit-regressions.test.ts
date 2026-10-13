@@ -160,6 +160,7 @@ it('audit gate A12: rewrites dependency build secrets',()=>{
 // exact pre-fix behavior described in the audit plan.
 it('audit gate A12: includes tester build-only secrets',()=>{
  const root=meshFixture({services:{gateway:{path:'gateway'}},tester:{compose:'t.yml',service:'runner'}},{gateway:{app:{}}},{'t.yml':{services:{runner:{build:{context:'.',secrets:['token']}}},secrets:{token:{file:'./token.txt'}}},'token.txt':'secret'});
+ write(root, 'Dockerfile', 'FROM alpine:latest\n');
  const result=compileMesh('e2e',root);const names=Object.keys(result.compose.secrets??{});
  expect(names).toHaveLength(1);expect((result.compose.services[result.testerServiceName!]!.build as any).secrets).toEqual(names);
 });

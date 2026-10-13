@@ -91,6 +91,7 @@ describe("catalog 10: global mesh E2E tester", () => {
   });
   it("TST-027 preserves tester Compose build implementation", () => {
     const root = mesh(t(), ["app.endpoints.http"], app(), { services: { runner: { build: { context: "./e2e", dockerfile: "Runnerfile" } } } });
+    write(root, "e2e/Runnerfile", "FROM alpine:latest\n");
     const value = testerService(root)?.build as any;
     expect(value.context).toContain("e2e"); expect(value.dockerfile).toBe("Runnerfile");
   });

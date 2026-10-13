@@ -11,6 +11,8 @@ import { validateComposeResourceReferences } from "../../composition/validateCom
 import { assertComposeLifecycleAcyclic } from "../../composition/assertComposeLifecycleAcyclic.js";
 import { assertNoServiceBuildContexts } from "../../composition/composeBuildResources.js";
 import { rebaseComposePaths } from "../../composition/composePaths.js";
+import { validateMaterializedComposeFiles } from "../../composition/validateMaterializedComposeFiles.js";
+import { validateMaterializedComposeBuildInputs } from "../../composition/validateMaterializedComposeBuildInputs.js";
 import type { ComposeDocument, ComposeService } from "../../composition/types.js";
 import type { MeshTesterConfig } from "../types.js";
 import type { MeshEndpointRegistry } from "./types.js";
@@ -41,7 +43,9 @@ function applyTesterBuildTarget(service:ComposeService):void{
 }
 
 export function compileMeshTester(meshDir:string,tester:MeshTesterConfig,endpointRegistry:MeshEndpointRegistry,effectiveTopLevelApps:string[],stage:"e2e",referenceContext?:MeshReferenceContext,nameAllocator=new GeneratedComposeNameAllocator(effectiveTopLevelApps)):CompiledMeshTester{
- const meshPath=path.join(meshDir,"mesh.json"),file=resolveInsideProject(meshDir,tester.compose,{sourceFile:meshPath,configPath:"tester.compose",stage}),raw=rebaseComposePaths(loadComposeDocument(file,{sourceFile:meshPath,configPath:"tester.compose",stage,composition:"mesh"}),file,meshDir);
+ const meshPath=path.join(meshDir,"mesh.json"),file=resolveInsideProject(meshDir,tester.compose,{sourceFile:meshPath,configPath:"tester.compose",stage});
+ const sourceDocument=loadComposeDocument(file,{sourceFile:meshPath,configPath:"tester.compose",stage,composition:"mesh"});
+ const raw=rebaseComposePaths(sourceDocument,file,meshDir);
  if(!raw.services||!raw.services[tester.service])throw new ConfigError({sourceFile:meshPath,configPath:"tester.service",stage,composition:"mesh",value:tester.service,reason:"Selected tester service does not exist in tester Compose"});
  validateComposeResourceReferences(raw,{sourceFile:file,stage,composition:"mesh"});
  validateServiceReferences(raw,file,stage);
@@ -58,6 +62,8 @@ export function compileMeshTester(meshDir:string,tester:MeshTesterConfig,endpoin
  if(selectedRaw.network_mode!==undefined&&selectedRaw.network_mode!=="host")throw new ConfigError({sourceFile:file,configPath:`services.${tester.service}.network_mode`,stage,composition:"mesh",reason:"Selected tester runner must be compatible with host networking"});
  if(selectedRaw.networks!==undefined)throw new ConfigError({sourceFile:file,configPath:`services.${tester.service}.networks`,stage,composition:"mesh",reason:"Selected host-network tester runner cannot declare Compose networks"});
  if(selectedRaw.ports!==undefined)throw new ConfigError({sourceFile:file,configPath:`services.${tester.service}.ports`,stage,composition:"mesh",reason:"Selected host-network tester runner cannot define ports"});
+ validateMaterializedComposeFiles(sourceDocument,file,stage,{composition:"mesh"});
+ validateMaterializedComposeBuildInputs(sourceDocument,file,stage,"mesh");
 
  const meshCtx:MeshReferenceContext=referenceContext??{services:{},bindings:new Map(),endpoints:endpointRegistry,stage,meshJsonPath:meshPath};
  const testerBuilderKeys=[EXEC_MODE_KEY,INFRA_MODE_KEY] as const,rawRunnerEnvironment=normalizeComposeEnvironment(selectedRaw.environment,"tester runner environment");

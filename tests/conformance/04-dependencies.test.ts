@@ -71,6 +71,7 @@ describe("catalog 04: atomic dependency Compose and namespacing", () => {
   });
   it("DEP-009 rebases a dependency build context", () => {
     const root = standalone(dep(), { services: { owner: { build: "./mock-api", healthcheck: healthy.healthcheck } } });
+    write(root, "mock-api/Dockerfile", "FROM alpine:latest\n");
     const result = compileService("prod", root);
     expect(String(result.compose.services[owner(root)!]?.build)).toContain("mock-api");
   });
