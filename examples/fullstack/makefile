@@ -12,7 +12,3 @@ test:
 
 test-e2e: 
 	pnpm builder mesh up test-e2e
-
-test-unit:
-	
-	pnpm builder mesh up test-unit

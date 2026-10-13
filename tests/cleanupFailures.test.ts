@@ -6,7 +6,6 @@ import { runCompose } from '../src/core/runCompose.js';
 import { teardownCompose } from '../src/core/teardownCompose.js';
 import { runTestUnit } from '../src/core/runners/runTestUnit.js';
 import { runTestE2e } from '../src/core/runners/runTestE2e.js';
-import { runMeshTestUnit } from '../src/core/mesh/runners/runMeshTestUnit.js';
 import { runMeshTestE2e } from '../src/core/mesh/runners/runMeshTestE2e.js';
 import { handleServiceDown } from '../src/commands/service/commands/down/handler.js';
 import { handleMeshDown } from '../src/commands/mesh/commands/down/handler.js';
@@ -27,7 +26,6 @@ afterEach(() => { vi.restoreAllMocks(); cleanupFixtures(); });
 const runners = [
   { name: 'service unit', run: runTestUnit, childState: false },
   { name: 'service E2E', run: runTestE2e, childState: false },
-  { name: 'mesh unit', run: runMeshTestUnit, childState: true },
   { name: 'mesh E2E', run: runMeshTestE2e, childState: false },
 ];
 function project() {

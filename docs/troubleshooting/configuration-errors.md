@@ -1,5 +1,7 @@
 # Fix configuration errors
 
+**`mesh.json.test is no longer supported`:** remove the root field, including an empty `test: {}`. Put isolated service settings in `build.json.test` and global E2E topology settings in `mesh.json.e2e` as appropriate. `--skip-checks` cannot bypass this guard. See [migration](../migration/v2.1-to-v2.2.md).
+
 | Symptom | Cause and correction |
 |---|---|
 | Unknown or legacy field | V2 schemas are strict and do not translate old fields. Remove it or use the replacement in the [migration guide](../migration/v1-to-v2.md). |

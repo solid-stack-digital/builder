@@ -1,5 +1,7 @@
 # Configure global mesh E2E
 
+Put global E2E topology changes in `mesh.json.e2e`, which inherits `prod`. Root `mesh.json.test` is rejected. Phase 1 uses each service’s own standalone test configuration. See [migration](../migration/v2.1-to-v2.2.md).
+
 Root `mesh.json.tester` selects a Compose implementation and its exact runner service:
 
 ```json

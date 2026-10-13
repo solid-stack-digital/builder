@@ -64,7 +64,11 @@ Default files are `.env.dev.resolved`, `.env.prod.resolved`, `.env.test.resolved
 
 `builder mesh check [-C, --project-dir <dir>] [--require-tester]` validates mesh/services; `--require-tester` requires root `mesh.json.tester`.
 
-`builder mesh up [stage]` defaults to `dev`; accepts `dev`, `prod`, `test`, `test-unit`, `test-e2e`. `test-unit` explicitly exercises the effective mesh `test` overlay in isolated runs; it is not canonical Phase 1. `test-e2e` starts the effective `base -> prod -> e2e` mesh and global tester. `test` runs each root service's standalone unit and service-E2E lifecycle sequentially with teardown, then starts a fresh global E2E mesh.
+`builder mesh up [stage]` defaults to `dev`; accepts `dev`, `prod`, `test`, `test-e2e`. Mesh configuration has only `dev`, `prod`, and `e2e` overlays; `test` is a pipeline command.
+
+`test-e2e` starts the effective `base -> prod -> e2e` mesh and global tester.
+
+`test` runs each root service's standalone unit and service-E2E lifecycle sequentially with teardown, then starts a fresh global E2E mesh.
 
 | Flag | Meaning / scope | Example |
 |---|---|---|
@@ -75,13 +79,15 @@ Default files are `.env.dev.resolved`, `.env.prod.resolved`, `.env.test.resolved
 | `--silence-warnings` | Accepted by CLI help, but current mesh command does not forward it to execution; it has no observable warning-suppression effect. | `builder mesh up dev --silence-warnings` |
 | `-C, --project-dir <dir>` | Mesh project containing `mesh.json`; default cwd. | `builder mesh up dev -C ./system` |
 
-`builder mesh down [stage]` defaults to `dev`. Runtime accepts `dev`, `prod`, `test`, `test-unit`, and `test-e2e`; current help text omits `test-unit`, but the handler accepts it.
+`builder mesh down [stage]` defaults to `dev`. Accepted commands are `dev`, `prod`, `test`, and `test-e2e`. `test` cleans each root service’s standalone test projects, then the global E2E project.
 
 | Flag | Meaning |
 |---|---|
 | `-v, --volumes` | Remove mesh-declared named volumes; persistent data may be destroyed. |
 | `-C, --project-dir <dir>` | Mesh project directory; default cwd. |
 | `--debug` | Print compiled YAML where available. |
+
+`mesh up test-unit` and `mesh down test-unit` were removed. Use the corresponding `builder service up/down test-unit -C <service>` command. Root `mesh.json.test` is rejected even with `--skip-checks`; see [migration](../migration/v2.1-to-v2.2.md).
 
 ## `builder prune`
 
@@ -106,12 +112,10 @@ builder mesh check -C ./system
 builder mesh check --require-tester -C ./system
 builder mesh up dev -C ./system
 builder mesh up prod -C ./system
-builder mesh up test-unit -C ./system
 builder mesh up test-e2e -C ./system
 builder mesh up test -C ./system
 builder mesh down dev -C ./system
 builder mesh down test -C ./system
-builder mesh down test-unit -C ./system
 builder prune
 builder prune --volumes
 ```

@@ -1,6 +1,6 @@
 # Stage execution matrix
 
-Configuration overlay names are `dev`, `prod`, `test`, and `e2e`. CLI `test-unit` maps to `test`; CLI `test-e2e` maps to `e2e`. E2E structured configuration inherits `prod` before applying `e2e`.
+Build overlay names are `dev`, `prod`, `test`, and `e2e`; mesh overlays are `dev`, `prod`, and `e2e`. Service CLI `test-unit` maps to build `test`; CLI `test-e2e` maps to `e2e`. E2E structured configuration inherits `prod` before applying `e2e`.
 
 ## Service commands
 
@@ -20,7 +20,6 @@ Configuration overlay names are `dev`, `prod`, `test`, and `e2e`. CLI `test-unit
 |---|---|---|---|---|---|
 | `mesh up dev` | `base -> dev` | `dev` / `dev` | `integrated` | each service `.env.dev` | — |
 | `mesh up prod` | `base -> prod` | `prod` / `prod` | `integrated` | each service `.env.prod` | — |
-| `mesh up test-unit` | `base -> test` | `test` / `test` | `isolated` | each service `.env.test` | — |
 | `mesh up test-e2e` | `base -> prod -> e2e` | `prod` / `prod` | `integrated` | each service `.env.e2e` | global `test-e2e` runner, `EXEC_MODE=e2e`, no `INFRA_MODE`, root `.env.e2e-tester` |
 
 Global E2E apps use production runtime semantics. The tester is a separate finite host-side process.
@@ -30,6 +29,6 @@ Global E2E apps use production runtime semantics. The tester is a separate finit
 1. For every root `mesh.json.services` entry, sequentially run its standalone unit/isolated lifecycle, its service E2E lifecycle, and full teardown.
 2. Start a fresh `base -> prod -> e2e` mesh with production-mode apps, run the global tester, and fully tear it down.
 
-Stage-only mesh services participate in Phase 2 when effective, but not Phase 1 unless also declared at root. The explicit `mesh up test-unit` command is mesh `test` stage tooling and is not Phase 1 of the canonical pipeline.
+Stage-only mesh services participate in Phase 2 when effective, but not Phase 1 unless also declared at root. `mesh.json` supports `dev`, `prod`, and `e2e` overlays only. A root `test` field is rejected, including an empty object and when `--skip-checks` is used. `build.json.test` remains supported.
 
 See [environment precedence](environment-precedence.md) for source-by-source ordering.

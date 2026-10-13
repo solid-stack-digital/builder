@@ -1,5 +1,7 @@
 # Validate before running
 
+A root `mesh.json.test` field fails during configuration loading, even with `--skip-checks`. Mesh preflight still validates each service’s own `build.json.test` through standalone service checks.
+
 Use `builder check` for a service project and `builder mesh check` for a mesh. Add `builder mesh check --require-tester` when the mesh must be ready for global E2E.
 
 Checks cover configuration shape and effective stages, Dockerfile requirements, dependency Compose validity, endpoint ownership/readiness, mesh contracts/bindings, and tester contracts. Errors identify the relevant config path and reason where available.

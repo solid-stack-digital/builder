@@ -22,7 +22,9 @@ fresh base -> prod -> e2e mesh
   full teardown
 ```
 
-Any failure stops subsequent work. Each finite composition is torn down, so Phase 1 state does not leak into Phase 2. Services added only by a stage are not Phase-1 members unless they also appear in root `services`. `mesh up test-unit` remains an explicit mesh `test` stage operation, not canonical Phase 1.
+Any failure stops subsequent work. Each finite composition is torn down, so Phase 1 state does not leak into Phase 2. Services added only by a stage are not Phase-1 members unless they also appear in root `services`. `mesh.json` supports `dev`, `prod`, and `e2e` overlays only. A root `test` field is rejected, including an empty object and when `--skip-checks` is used. `build.json.test` remains supported.
+
+Phase 1 uses each root service's original path. Mesh service env, stage overlays, dependency bindings, lifecycle edges, and publication selections are not applied to either standalone test phase.
 
 Testers are host-side clients and may use only effectively published `public_*` endpoint properties. E2E applications run as production code; only tester processes use `EXEC_MODE=e2e`.
 

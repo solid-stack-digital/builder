@@ -1,3 +1,8 @@
+import path from "node:path";
+import { getMeshJson } from "../../../../core/mesh/getMeshJson.js";
+import { resolveInsideProject } from "../../../../core/config/pathSafety.js";
+import { MESH_COMMAND_STAGES } from "../../../../core/mesh/types.js";
+import { handleServiceDown } from "../../../service/commands/down/handler.js";
 import pc from "picocolors";
 import { compileMeshEnvironment } from "../../../../core/mesh/compileMeshEnvironment.js";
 import type { MeshDownOptions } from "../../../../core/mesh/MeshRunOptions.js";
@@ -11,6 +16,23 @@ import {
   readRunState,
 } from "../../../../utils/runState.js";
 
+function rootServiceDirsForCleanup(meshDir: string): string[] {
+  try {
+    const mesh = getMeshJson(meshDir);
+    const dirs = Object.entries(mesh.services)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, service]) => resolveInsideProject(meshDir, service.path, {
+        sourceFile: path.join(meshDir, "mesh.json"),
+        configPath: `services.${name}.path`,
+      }));
+    return [...new Set(dirs)];
+  } catch {
+    // Do not parse legacy config with a permissive fallback.
+    // Invalid config can still be recovered at the mesh root by saved state.
+    return [];
+  }
+}
+
 export async function handleMeshDown(
   rawStage: string = "dev",
   options: MeshDownOptions = {}
@@ -18,10 +40,16 @@ export async function handleMeshDown(
   const stage = (rawStage || "dev").toLowerCase();
   const meshDir = resolveProjectDir(options.projectDir);
 
-  const validStages = ["dev", "prod", "test", "test-unit", "test-e2e"];
-  if (!validStages.includes(stage)) {
+  if (stage === "test-unit") {
     throw new ScriptError(
-      `Unknown mesh stage: "${rawStage}". Supported stages: dev, prod, test, test-unit, test-e2e`
+      "mesh down test-unit is no longer supported because meshes have no test topology. " +
+      "Use builder service down test-unit -C <service> for service recovery, " +
+      "or builder mesh down test for the complete test pipeline.",
+    );
+  }
+  if (!(MESH_COMMAND_STAGES as readonly string[]).includes(stage)) {
+    throw new ScriptError(
+      `Unknown mesh stage: "${rawStage}". Supported stages: ${MESH_COMMAND_STAGES.join(", ")}`
     );
   }
 
@@ -31,7 +59,7 @@ export async function handleMeshDown(
 
   if (options.debug) {
     try {
-      const mode = stage === "dev" ? "dev" : stage === "test-e2e" ? "e2e" : "prod";
+      const mode = stage === "dev" ? "dev" : stage === "test" || stage === "test-e2e" ? "e2e" : "prod";
       const { yaml } = compileMeshEnvironment(mode, meshDir, { validateWithDocker: false });
       console.log(
         pc.yellow("\nFinal merged Mesh YAML configuration:\n"),
@@ -39,6 +67,17 @@ export async function handleMeshDown(
       );
     } catch {
       // Non-critical if YAML compilation fails during down --debug
+    }
+  }
+
+  if (stage === "test") {
+    for (const serviceDir of rootServiceDirsForCleanup(meshDir)) {
+      const status = await handleServiceDown("test", {
+        projectDir: serviceDir,
+        volumes: Boolean(options.volumes),
+        debug: Boolean(options.debug),
+      });
+      if (status !== 0) return status;
     }
   }
 

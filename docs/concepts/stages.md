@@ -1,13 +1,21 @@
 # Stages and overlays
 
-JSON configuration has exactly four overlay names: `dev`, `prod`, `test`, and `e2e`. CLI execution additionally accepts `test-unit` and `test-e2e`; these are commands, not JSON overlay names. `test-unit` uses the `test` overlay. `test-e2e` uses `e2e`.
+`build.json` has four overlays: `dev`, `prod`, `test`, and `e2e`. `mesh.json` has three: `dev`, `prod`, and `e2e`. Service CLI `test-unit` uses the build `test` overlay; CLI `test-e2e` uses `e2e`. The mesh `test` command runs the two-phase pipeline; it is not an overlay. A root `mesh.json.test` field is rejected.
 
-The inheritance chains are:
+Build inheritance chains:
 
 ```text
 dev  = base -> dev
 prod = base -> prod
 test = base -> test
+e2e  = base -> prod -> e2e
+```
+
+Mesh inheritance chains:
+
+```text
+dev  = base -> dev
+prod = base -> prod
 e2e  = base -> prod -> e2e
 ```
 

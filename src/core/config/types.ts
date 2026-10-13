@@ -6,7 +6,7 @@ export interface EffectiveBuildConfig extends Omit<BuildJson, "dev" | "prod" | "
   dependencies: Record<string, Omit<DependencyConfig, "env" | "endpoints" | "dependsOn"> & { env: Record<string, string>; endpoints: Record<string, DependencyEndpoint>; dependsOn: string[] }>;
   tester?: { env: Record<string, string> }; layers: EffectiveBuildLayer[];
 }
-export interface EffectiveMeshConfig extends Omit<MeshConfig, "dev" | "prod" | "test" | "e2e" | "services"> {
+export interface EffectiveMeshConfig extends Omit<MeshConfig, "dev" | "prod" | "e2e" | "services"> {
   services: Record<string, Omit<MeshServiceConfig, "env" | "dependencies" | "dependsOn" | "publish"> & { env: Record<string, string>; dependencies: Record<string, string>; dependsOn: string[]; publish: string[] }>;
 }
 export interface ResolvedEndpoint { logicalPath: string; networkHost: string; networkPort: number; scheme?: string; publicHost?: string; publicPort?: number; effectivelyPublished: boolean; }

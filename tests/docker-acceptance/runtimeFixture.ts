@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { stringify } from "yaml";
+import type { BuildStageConfig } from "../../src/types/index.js";
 import type { ComposeDocument } from "../../src/core/composition/types.js";
 import { compileServiceComposition } from "../../src/core/composition/compileServiceComposition.js";
 import { compileMeshComposition } from "../../src/core/mesh/v2/compileMeshComposition.js";
@@ -14,7 +15,8 @@ if(delay>=0)setTimeout(()=>{ready=true;console.log('APP_READY')},delay);
 http.createServer((req,res)=>{if(req.url==='/health'){res.statusCode=ready?200:503;res.end(ready?'ready':'waiting');return}
  if(req.url==='/env'){res.setHeader('content-type','application/json');res.end(JSON.stringify(process.env));return}
  res.statusCode=ready?200:503;res.end(ready?'ok':'waiting')}).listen(port,'0.0.0.0',()=>console.log('APP_STARTED'));
-if(process.env.EXEC_MODE==='prod'&&(process.env.INFRA_MODE!=='integrated'||process.env.E2E_FILE!=='yes'||process.env.PROD_FILE!==undefined)){console.error('invalid E2E app environment');process.exit(44)}
+if(process.env.EXEC_MODE==='prod'&&process.env.INFRA_MODE!=='integrated'){console.error('invalid production app environment');process.exit(44)}
+if(process.env.EXPECT_E2E_ENV==='yes'&&(process.env.EXEC_MODE!=='prod'||process.env.INFRA_MODE!=='integrated'||process.env.E2E_FILE!=='yes'||process.env.PROD_FILE!==undefined)){console.error('invalid E2E app environment');process.exit(44)}
 if(process.env.PROBE_URL){fetch(process.env.PROBE_URL+'/health').then(r=>console.log(r.ok?'PROBE_OK':'PROBE_BAD')).catch(e=>console.log('PROBE_FAILED',e.message))}
 `;
 export const testerScript = `const url=process.env.APP_URL||process.env.SYSTEM_URL;
@@ -47,10 +49,26 @@ ${health}
 CMD ["node","app.mjs"]
 `;
 
+// The same app fixture is used for ordinary prod and E2E. Only E2E should
+// require its dedicated dotenv file and reject the production dotenv file.
+function withE2eExpectation(config: Record<string, unknown>): Record<string, unknown> {
+  const e2e = (config.e2e ?? {}) as BuildStageConfig;
+  return {
+    ...config,
+    e2e: {
+      ...e2e,
+      app: {
+        ...e2e.app,
+        env: { ...e2e.app?.env, EXPECT_E2E_ENV: "yes" },
+      },
+    },
+  };
+}
+
 export function runtimeService(config: Record<string, unknown> = {}): string {
   const suppliedTester=(config.tester&&typeof config.tester==="object"?config.tester as Record<string,unknown>:{}),suppliedTesterEnv=(suppliedTester.env&&typeof suppliedTester.env==="object"?suppliedTester.env as Record<string,string>:{});
   const {tester:_ignored,...otherConfig}=config;
-  return fixture({ app: { endpoints: { http: { port: 3000, primary: true, scheme: "http", publicPort: "AUTO" } } }, ...otherConfig, tester: { ...suppliedTester, env: { APP_URL: "${app.endpoints.http.public_url}", TESTER_JSON_ONLY:"yes", TESTER_VALUE:"json", ...suppliedTesterEnv } } }, { Dockerfile: dockerfile, "app.mjs": appScript, "unit.mjs": unitScript, "tester.mjs": testerScript, "dep.mjs": depScript, ".env.e2e":"E2E_FILE=yes\n", ".env.prod":"PROD_FILE=yes\n", ".env.e2e-tester":"TESTER_FILE_ONLY=yes\nTESTER_VALUE=file\n" });
+  return fixture({ app: { endpoints: { http: { port: 3000, primary: true, scheme: "http", publicPort: "AUTO" } } }, ...withE2eExpectation(otherConfig), tester: { ...suppliedTester, env: { APP_URL: "${app.endpoints.http.public_url}", TESTER_JSON_ONLY:"yes", TESTER_VALUE:"json", ...suppliedTesterEnv } } }, { Dockerfile: dockerfile, "app.mjs": appScript, "unit.mjs": unitScript, "tester.mjs": testerScript, "dep.mjs": depScript, ".env.e2e":"E2E_FILE=yes\n", ".env.prod":"PROD_FILE=yes\n", ".env.e2e-tester":"TESTER_FILE_ONLY=yes\nTESTER_VALUE=file\n" });
 }
 export function dependencyBundle(delayMs: number): object {
   return { services: { owner: { image: "node:22-alpine", working_dir: "/app", command: ["node", "dep.mjs"], environment: { READY_AFTER_MS: String(delayMs) }, volumes: ["./dep.mjs:/app/dep.mjs:ro"], healthcheck: { test: ["CMD-SHELL", "test -f /tmp/ready"], interval: "500ms", timeout: "1s", retries: 12 } } } };
@@ -68,7 +86,7 @@ export function runtimeMesh(mesh: Record<string, unknown>, builds: Record<string
     const endpoints={...(appConfig.endpoints??{})};if(endpoints.http)endpoints.http={...endpoints.http,...(endpoints.http.publicPort===undefined?{publicPort:"AUTO"}:{})};
     const buildWithPublicApp={...originalBuild,app:{...appConfig,...(appConfig.endpoints?{endpoints}:{})}};
     const hasHttp=Boolean(endpoints.http);
-    write(root,`${name}/build.json`,{...buildWithPublicApp,tester:{...existingTester,env:{...(hasHttp?{APP_URL:"${app.endpoints.http.public_url}"}:{}),TESTER_JSON_ONLY:"yes",TESTER_VALUE:"json",...existingEnv}}});
+    write(root,`${name}/build.json`,{...withE2eExpectation(buildWithPublicApp),tester:{...existingTester,env:{...(hasHttp?{APP_URL:"${app.endpoints.http.public_url}"}:{}),TESTER_JSON_ONLY:"yes",TESTER_VALUE:"json",...existingEnv}}});
     write(root, `${name}/Dockerfile`, dockerfile);
     write(root, `${name}/app.mjs`, appScript);
     write(root, `${name}/unit.mjs`, unitScript);

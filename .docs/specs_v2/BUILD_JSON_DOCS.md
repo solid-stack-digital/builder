@@ -415,7 +415,7 @@ When this service is run inside global E2E, low to high:
 
 The production structured stage is inherited; the env-file source remains E2E-specific.
 
-Mesh service env is an intentional composition-level override and may override service-level app env.
+Mesh service env is an intentional composition-level override and may override service-level app env. It does not apply during standalone service tests in global test Phase 1.
 
 ### Builder-owned keys
 
@@ -1228,7 +1228,7 @@ Builder does not inject `INFRA_MODE` into the tester.
 
 # 9. Stage fields
 
-Builder supports:
+`build.json` supports:
 
 ```text
 dev

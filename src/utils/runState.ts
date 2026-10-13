@@ -4,7 +4,6 @@ import { getMeshJson } from "../core/mesh/getMeshJson.js";
 import { getBuildJson } from "./getBuildJson.js";
 import { resolveProjectDir } from "./paths.js";
 import { deriveProjectName } from "./projectName.js";
-import { resolveMeshStage } from "../core/config/resolveMeshStage.js";
 
 export interface RunState {
   projectName: string;
@@ -99,36 +98,17 @@ export function projectNamesForServiceStage(
   return [deriveProjectName(rawName, s)];
 }
 
-export function projectNamesForMeshStage(
-  meshDir: string,
-  stage: string
-): string[] {
+export function projectNamesForMeshStage(meshDir: string, stage: string): string[] {
   const absDir = resolveProjectDir(meshDir);
-  let rawMeshName: string;
-  let serviceNames: string[] = [];
+  let rawMeshName = path.basename(absDir);
   try {
-    const mesh = getMeshJson(absDir);
-    rawMeshName = mesh.name || path.basename(absDir);
-    serviceNames = Object.keys(resolveMeshStage(mesh,"test",path.join(absDir,"mesh.json")).services);
+    rawMeshName = getMeshJson(absDir).name || rawMeshName;
   } catch {
-    rawMeshName = path.basename(absDir);
+    // Recovery can still use saved state and directory-derived identity.
   }
-
   const s = stage.toLowerCase();
-  if (s === "dev") {
-    return [deriveProjectName(rawMeshName, "dev")];
-  }
-  if (s === "prod") {
-    return [deriveProjectName(rawMeshName, "prod")];
-  }
-  if (s === "test-e2e") {
+  if (s === "test" || s === "test-e2e") {
     return [deriveProjectName(rawMeshName, "e2e")];
-  }
-  if (s === "test-unit") {
-    return serviceNames.map(name => `${deriveProjectName(rawMeshName,"dev")}-${name}-test`);
-  }
-  if (s === "test") {
-    return [...serviceNames.map(name => `${deriveProjectName(rawMeshName,"dev")}-${name}-test`),deriveProjectName(rawMeshName,"e2e")];
   }
   return [deriveProjectName(rawMeshName, s)];
 }

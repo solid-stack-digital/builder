@@ -35,7 +35,7 @@ Removed fields: root `dependencies`; `services.<name>.port`, `.preservePort`, `.
 2. Move local dependencies to Compose declarations.
 3. Move dependency service/port data into named endpoints with explicit owners.
 4. Replace injected values with endpoint references in the consumer's env.
-5. Move stage behavior to `dev`, `prod`, `test`, or `e2e` overlays.
+5. Move build stage behavior to `dev`, `prod`, `test`, or `e2e` overlays; mesh overlays support only `dev`, `prod`, and `e2e`. See [v2.2 migration](v2.1-to-v2.2.md) for removed mesh test behavior.
 6. Run `builder check` and service tests.
 7. List mesh services with paths and add provider bindings.
 8. Select host endpoints explicitly in mesh `publish`.

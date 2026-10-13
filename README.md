@@ -358,11 +358,10 @@ This makes it practical to keep databases, APIs, queues, and internal services p
 |---|---|---|---|---|---|
 | `builder mesh up dev` | `dev` | `dev` | `dev` | Integrated unless substituted | No |
 | `builder mesh up prod` | `prod` | `prod` | `prod` | Integrated unless substituted | No |
-| `builder mesh up test-unit` | `test` | `test` | `test` | Isolated | No |
 | `builder mesh up test-e2e` | `base -> prod -> e2e` | `base -> prod -> e2e` | `prod` | Integrated unless substituted | Yes |
 | `builder mesh up test` | Phase 1: root service tests; Phase 2: `base -> prod -> e2e` | service lifecycle, then global E2E | `test`, then `prod` | Per phase | Global tester in Phase 2 |
 
-`mesh test` has two phases. Phase 1 runs each root service’s complete standalone test lifecycle—unit/isolated tests followed by that service’s own E2E tester—sequentially with full teardown. Phase 2 starts a clean `base -> prod -> e2e` mesh and runs the global E2E tester. Stage-only mesh services are not Phase-1 members unless they also exist in root `services`. `mesh up test-unit` remains explicit `mesh.test` stage tooling; it is not canonical Phase 1.
+`mesh test` has two phases. Phase 1 runs each root service’s complete standalone test lifecycle—unit/isolated tests followed by that service’s own E2E tester—sequentially with full teardown. Phase 2 starts a clean `base -> prod -> e2e` mesh and runs the global E2E tester. Stage-only mesh services are not Phase-1 members unless they also exist in root `services`. `mesh.json` supports `dev`, `prod`, and `e2e` overlays only. A root `test` field is rejected, including an empty object and when `--skip-checks` is used. `build.json.test` remains supported. See [v2.2 migration](docs/migration/v2.1-to-v2.2.md).
 
 ---
 
@@ -492,7 +491,7 @@ Options:
 ## Run a mesh
 
 ```bash
-builder mesh up [dev|prod|test|test-unit|test-e2e] [options]
+builder mesh up [dev|prod|test|test-e2e] [options]
 ```
 
 Options:
@@ -509,7 +508,7 @@ Options:
 ## Stop a mesh
 
 ```bash
-builder mesh down [dev|prod|test|test-unit|test-e2e] [options]
+builder mesh down [dev|prod|test|test-e2e] [options]
 ```
 
 Options:
@@ -589,9 +588,9 @@ Dependency implementations are namespaced when Builder composes them. Always ref
 
 The current repository includes the normative V2 references:
 
-- [`docs/BUILD_JSON_DOCS.md`](docs/BUILD_JSON_DOCS.md) — complete `build.json` field reference.
-- [`docs/MESH_JSON_DOCS.md`](docs/MESH_JSON_DOCS.md) — complete `mesh.json` field reference.
-- [`docs/SPECS_V2.md`](docs/SPECS_V2.md) — cross-file V2 behavior and invariants.
+- [`.docs/specs_v2/BUILD_JSON_DOCS.md`](.docs/specs_v2/BUILD_JSON_DOCS.md) — complete `build.json` field reference.
+- [`.docs/specs_v2/MESH_JSON_DOCS.md`](.docs/specs_v2/MESH_JSON_DOCS.md) — complete `mesh.json` field reference.
+- [`.docs/specs_v2/SPECS_V2.md`](.docs/specs_v2/SPECS_V2.md) — cross-file V2 behavior and invariants.
 - [`schemas/build-schema.json`](schemas/build-schema.json) — generated `build.json` JSON Schema.
 - [`schemas/mesh-schema.json`](schemas/mesh-schema.json) — generated `mesh.json` JSON Schema.
 

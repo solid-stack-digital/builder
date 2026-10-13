@@ -49,7 +49,7 @@ describe("catalog 10: global mesh E2E tester", () => {
     expect(value).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/); expect(value).not.toContain("AUTO");
   });
   it("TST-016 rejects stage-specific tester overlay", () => {
-    for (const stage of ["dev", "prod", "test", "e2e"]) expect(meshSchema.safeParse({ services: { gateway: { path: "gateway" } }, [stage]: { tester: t() } }).success).toBe(false);
+    for (const stage of ["dev", "prod", "e2e"]) expect(meshSchema.safeParse({ services: { gateway: { path: "gateway" } }, [stage]: { tester: t() } }).success).toBe(false);
   });
   it("TST-017 rejects legacy tester.path", () => expect(meshSchema.safeParse({ services: { gateway: { path: "gateway" } }, tester: { ...t(), path: "old" } }).success).toBe(false));
   it("TST-018 rejects legacy tester.dockerfile", () => expect(meshSchema.safeParse({ services: { gateway: { path: "gateway" } }, tester: { ...t(), dockerfile: "Dockerfile" } }).success).toBe(false));

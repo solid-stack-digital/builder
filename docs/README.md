@@ -38,3 +38,5 @@ Start with [service and mesh responsibilities](concepts/service-and-mesh-model.m
 - [Installation](getting-started/installation.md)
 - [CLI reference](reference/cli.md)
 - [Troubleshooting](troubleshooting/configuration-errors.md)
+
+See [Migrate from v2.1 to v2.2](migration/v2.1-to-v2.2.md) for removal of the mesh test topology.

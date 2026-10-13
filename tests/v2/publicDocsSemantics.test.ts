@@ -14,6 +14,9 @@ describe("public documentation architecture", () => {
   it("does not state superseded E2E or mesh test semantics", () => {
     const files = [path.resolve("README.md"), ...markdownFiles(path.resolve("docs"))];
     const forbidden: Array<[RegExp, string]> = [
+      [/remains (?:an? )?explicit[^\n]*mesh[^\n]*test[^\n]*stage/i, "mesh test topology was removed"],
+      [/test-unit[^\n]*explicitly exercises[^\n]*mesh[^\n]*test[^\n]*overlay/i, "mesh test topology was removed"],
+      [/test-unit uses mesh\/build test/i, "mesh test topology was removed"],
       [/E2E[^\n]*does not inherit[^\n]*prod[^\n]*(JSON|overlay)/i, "E2E inherits the prod structured overlay"],
       [/mesh[^\n]*test[^\n]*(only|first runs)[^\n]*unit[^\n]*then[^\n]*global E2E/i, "canonical mesh test includes service E2E in Phase 1"],
       [/E2E\s+(?:app|application)[^.;\n]*EXEC_MODE[^.;\n]*\be2e\b/i, "E2E apps use EXEC_MODE=prod; testers use e2e"],

@@ -27,7 +27,7 @@
 - **Published endpoint** — endpoint effectively exposed to the host.
 - **Service project** — directory containing one service's `build.json`.
 - **Service-level E2E** — one app with its local dependencies and its `test-e2e` runner.
-- **Stage** — one of the JSON overlays `dev`, `prod`, `test`, or `e2e`; CLI stages also include `test-unit` and `test-e2e`.
+- **Stage** — a configuration overlay: `dev`, `prod`, `test`, or `e2e` in `build.json`, and `dev`, `prod`, or `e2e` in `mesh.json`. The mesh `test` command is a pipeline; service CLI also supports `test-unit`, and both CLIs support `test-e2e`.
 - **Tester** — finite host-side E2E client configured by service tester env or root mesh tester.
 
 ## Related

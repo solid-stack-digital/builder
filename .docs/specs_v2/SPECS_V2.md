@@ -163,6 +163,7 @@ run semantic equivalent of that service's own make test
 Rules:
 
 - services are never tested concurrently;
+- phase 1 uses each root service's original path. Mesh service env, stage overlays, dependency bindings, lifecycle edges, and publication selections are not applied to either standalone test phase.
 - any failure stops the pipeline;
 - after each service, its application, dependencies, tester, networks, host ports, and temporary runtime state are torn down;
 - services introduced only by stage overlays are not Phase-1 members unless they also exist in root `services`.
@@ -570,12 +571,20 @@ Union order is inherited entries first, then stage entries, exact duplicates rem
 
 No generic deletion syntax exists in V2.
 
-Stage chains:
+Build stage chains:
 
 ```text
 dev  = base -> dev
 prod = base -> prod
 test = base -> test
+e2e  = base -> prod -> e2e
+```
+
+Mesh stage chains:
+
+```text
+dev  = base -> dev
+prod = base -> prod
 e2e  = base -> prod -> e2e
 ```
 
@@ -890,7 +899,6 @@ Canonical shape:
 
   "dev": {},
   "prod": {},
-  "test": {},
   "e2e": {}
 }
 ```
@@ -1030,9 +1038,9 @@ E2E may add services, override provider bindings, add lifecycle edges, and publi
 
 The global tester is then executed.
 
-## Test
+## Test command (no mesh overlay)
 
-`mesh.json.test` remains a structured mesh stage for explicit Builder test-stage tooling, but canonical global `make test` does not replace service-owned test behavior with a separate integrated mesh-test topology.
+`mesh.json` supports `dev`, `prod`, and `e2e` overlays only. A root `test` field is rejected, including an empty object and when `--skip-checks` is used. `build.json.test` remains supported.
 
 Canonical global test behavior is the two-phase process in Section 2.5.
 
@@ -1212,6 +1220,8 @@ tester.env
 No legacy field is silently translated.
 
 ---
+
+Root `mesh.json.test` was removed in V2.2. Move service-owned isolated settings to `build.json.test` and global E2E topology settings to `mesh.json.e2e` as appropriate. No automatic translation is performed.
 
 # 33. Canonical E2E model
 

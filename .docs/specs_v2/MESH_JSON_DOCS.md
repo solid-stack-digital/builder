@@ -23,7 +23,6 @@ type MeshJsonV2 = {
 
   dev?: MeshStage;
   prod?: MeshStage;
-  test?: MeshStage;
   e2e?: MeshStage;
 };
 
@@ -650,7 +649,7 @@ Mesh env remains intentionally available for composition-specific configuration,
 
 ## 5.2 `<stage>.services.<name>.env`
 
-Stage service env is also allowed.
+Stage service env is also allowed for `dev`, `prod`, and `e2e`.
 
 It keywise-merges over base mesh service env.
 
@@ -957,7 +956,6 @@ Mesh supports:
 ```text
 dev
 prod
-test
 e2e
 ```
 
@@ -1053,11 +1051,11 @@ Example:
 
 ---
 
-## 7.3 `test`
+## 7.3 Test command (no mesh overlay)
 
 ### Purpose
 
-A structured mesh test-stage namespace retained for explicit Builder test-stage tooling.
+`mesh.json` supports `dev`, `prod`, and `e2e` overlays only. A root `test` field is rejected, including an empty object and when `--skip-checks` is used. `build.json.test` remains supported.
 
 ### Important global-test rule
 
@@ -1149,6 +1147,8 @@ This supports inspection/test infrastructure and controlled substitutes while ap
 ---
 
 # 8. Stage service overlays
+
+`<stage>` means `dev`, `prod`, or `e2e`.
 
 ## 8.1 `<stage>.services`
 
@@ -1493,6 +1493,8 @@ Rules:
 
 Stage-only services are not Phase-1 members unless they also exist in root `services`.
 
+Phase 1 uses each root service's original path. Mesh service env, stage overlays, dependency bindings, lifecycle edges, and publication selections are not applied to either standalone test phase.
+
 ## Phase 2 — Global E2E
 
 Start a clean effective mesh:
@@ -1659,6 +1661,8 @@ The E2E provider override is intentional and allowed even though the topology be
 Builder performs no automatic legacy translation.
 
 ---
+
+Root `mesh.json.test` was removed in V2.2. Move service-owned isolated settings to `build.json.test` and global E2E topology settings to `mesh.json.e2e` as appropriate. No automatic translation is performed.
 
 # 15. Summary
 

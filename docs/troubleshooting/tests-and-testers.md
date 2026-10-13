@@ -1,5 +1,7 @@
 # Troubleshoot tests and testers
 
+**Removed mesh unit command:** `mesh up test-unit` and `mesh down test-unit` are no longer supported. Use `builder service up test-unit -C <service>` for isolated tests, or `builder mesh up test` for the full pipeline. `build.json.test` and `.env.test` remain supported; see [migration](../migration/v2.1-to-v2.2.md).
+
 - **`mesh test-e2e` says tester is missing:** configure root `mesh.json.tester.compose` and `tester.service`; the `mesh up test` pipeline also needs it.
 - **`mesh check --require-tester` fails:** root global tester is absent or invalid; this option intentionally makes it required.
 - **Tester service not found:** `tester.service` must exactly match a service key in tester Compose; Builder does not infer a runner.

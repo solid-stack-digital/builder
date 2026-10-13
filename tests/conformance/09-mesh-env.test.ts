@@ -1,4 +1,4 @@
-import { runMeshTestUnit } from "../../src/core/mesh/runners/runMeshTestUnit.js";
+import { getMeshJson } from "../../src/core/mesh/getMeshJson.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { meshSchema } from "../../src/core/mesh/meshSchema.js";
 import { resolveMeshStage } from "../../src/core/config/resolveMeshStage.js";
@@ -13,7 +13,7 @@ const merged = (mesh: any, stage: "dev" | "prod" | "e2e") => resolveMeshStage(me
 
 describe("catalog 09: mesh overlays and environment precedence", () => {
   it("MEN-001 permits only services under mesh stage", () => {
-    for (const stage of ["dev", "prod", "test", "e2e"]) for (const key of ["tester", "dependencies", "publish"]) expect(meshSchema.safeParse({ services: { api: { path: "api" } }, [stage]: { [key]: {} } }).success).toBe(false);
+    for (const stage of ["dev", "prod", "e2e"]) for (const key of ["tester", "dependencies", "publish"]) expect(meshSchema.safeParse({ services: { api: { path: "api" } }, [stage]: { [key]: {} } }).success).toBe(false);
   });
   it("MEN-002 deep-merges stage service env", () => {
     const mesh: any = { services: { api: { path: "api", env: { A: "base", B: "base" } } }, dev: { services: { api: { env: { B: "dev", C: "dev" } } } } };
@@ -135,7 +135,7 @@ describe("catalog 09: mesh overlays and environment precedence", () => {
     expect(env(result.compose.services.api)).toMatchObject({ EXEC_MODE: "prod", INFRA_MODE: "integrated", STAGE: "prod" });
     expect(Object.keys(result.compose.services).some(x => x.includes("dep--db--"))).toBe(true);
   });
-  it("MEN-027 compiles each mesh unit service in isolated test mode", () => {
+  it("MEN-027 compiles a standalone service unit runner in isolated test mode", () => {
     const root = one({}, { app: {}, dependencies: { db: dep("d.yml") } }, { "api/d.yml": ownerBundle() });
     const result = compileService("test", `${root}/api`);
     expect((result.compose.services.app?.build as any).target).toBe("test");
@@ -164,83 +164,25 @@ describe("catalog 09: mesh overlays and environment precedence", () => {
     expect(env(result.compose.services[result.endpoints.dependencies.api?.db?.api?.networkHost!]).DB_MODE).toBe("local");
   });
 
-  it("regression: isolated mesh test-unit rejects cross-service environment references", async () => {
-    const root = meshFixture({
-      services: {
-        frontend: { path: "frontend", env: { FRONTEND_EXTERNAL_URL: "${gateway.app.endpoints.http.public_url}/web" } },
-        gateway: { path: "gateway", publish: ["app.endpoints.http"] },
-      },
-      test: {},
-    }, {
-      frontend: { app: {} },
-      gateway: { app: { endpoints: { http: http(3000, { publicPort: "AUTO" }) } } },
-    });
-    await expect(runMeshTestUnit({ projectDir: root, dryRun: true }))
-      .rejects.toThrow(/Unknown mesh service reference "gateway"/);
-  });
-
-  it("regression: test overlay can replace integrated cross-service URL with isolated literal", async () => {
-    const root = meshFixture({
-      services: {
-        frontend: { path: "frontend", env: { FRONTEND_EXTERNAL_URL: "${gateway.app.endpoints.http.public_url}/web" } },
-        gateway: { path: "gateway", publish: ["app.endpoints.http"] },
-      },
-      test: { services: { frontend: { env: { FRONTEND_EXTERNAL_URL: "http://127.0.0.1:3000/web" } } } },
-    }, {
-      frontend: { app: {} },
-      gateway: { app: { endpoints: { http: http(3000, { publicPort: "AUTO" }) } } },
-    });
-    await expect(runMeshTestUnit({ projectDir: root, dryRun: true })).resolves.toBe(0);
+  it("rejects the removed test overlay before resolving cross-service env", () => {
+    const root = one({ test: {} });
+    expect(() => getMeshJson(root)).toThrow(/mesh.json.test is no longer supported/);
   });
 });
 
-it("AUDIT-B02 rejects unknown logical dependency binding in mesh.test", async () => {
-  const root = meshFixture(
-    {
-      services: { consumer: { path: "consumer" }, provider: { path: "provider" } },
-      test: { services: { consumer: { dependencies: { "missing-slot": "provider" } } } },
-    },
-    { consumer: { app: {} }, provider: { app: {} } },
-  );
-  await expect(runMeshTestUnit({ projectDir: root, dryRun: true }))
-    .rejects.toThrow(/missing-slot|Unknown logical dependency slot/i);
+it("rejects unknown logical bindings in mesh.prod", () => {
+  const root = meshFixture({ services: { consumer: { path: "consumer" }, provider: { path: "provider" } },
+    prod: { services: { consumer: { dependencies: { "missing-slot": "provider" } } } } },
+    { consumer: { app: {} }, provider: { app: {} } });
+  expect(() => compileMesh("prod", root)).toThrow(/missing-slot|Unknown logical dependency slot/i);
 });
-
-it("AUDIT-B02 rejects nonexistent provider binding in mesh.test", async () => {
-  const root = meshFixture(
-    {
-      services: { consumer: { path: "consumer" } },
-      test: { services: { consumer: { dependencies: { db: "missing-provider" } } } },
-    },
-    { consumer: { app: {}, dependencies: { db: dep("d.yml") } } },
-    { "consumer/d.yml": ownerBundle() },
-  );
-  await expect(runMeshTestUnit({ projectDir: root, dryRun: true }))
-    .rejects.toThrow(/missing-provider|provider/i);
+it("rejects nonexistent providers in mesh.prod", () => {
+  const root = meshFixture({ services: { consumer: { path: "consumer" } },
+    prod: { services: { consumer: { dependencies: { db: "missing-provider" } } } } },
+    { consumer: { app: {}, dependencies: { db: dep("d.yml") } } }, { "consumer/d.yml": ownerBundle() });
+  expect(() => compileMesh("prod", root)).toThrow(/missing-provider|provider/i);
 });
-
-it("AUDIT-B03 validates publish declarations in mesh.test", async () => {
-  const root = meshFixture(
-    {
-      services: { api: { path: "api" } },
-      test: { services: { api: { publish: ["app.endpoints.missing"] } } },
-    },
-    { api: { app: { endpoints: { http: http(3000, { publicPort: "AUTO" }) } } } },
-  );
-  await expect(runMeshTestUnit({ projectDir: root, dryRun: true }))
-    .rejects.toThrow(/missing|Published app endpoint does not exist/i);
-});
-
-it("AUDIT-B03 permits sequential mesh.test fixed app publications with same port", async () => {
-  const root = meshFixture(
-    {
-      services: { a: { path: "a" }, b: { path: "b" } },
-      test: { services: { a: { publish: ["app.endpoints.http"] }, b: { publish: ["app.endpoints.http"] } } },
-    },
-    {
-      a: { app: { endpoints: { http: http(3000, { publicPort: 34001 }) } } },
-      b: { app: { endpoints: { http: http(3000, { publicPort: 34001 }) } } },
-    },
-  );
-  await expect(runMeshTestUnit({ projectDir: root, dryRun: true })).resolves.toBe(0);
+it("validates publication in mesh.prod", () => {
+  const root = one({ prod: { services: { api: { publish: ["app.endpoints.missing"] } } } });
+  expect(() => compileMesh("prod", root)).toThrow(/missing|Published app endpoint does not exist/i);
 });

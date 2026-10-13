@@ -5,7 +5,7 @@ export const registerMeshUpCommand = (cmd: Command): void => {
   cmd
     .command("up [stage]")
     .description(
-      "Start, build, or test the mesh environment (dev, prod, test, test-unit, test-e2e)"
+      "Start, build, or test the mesh environment (dev, prod, test, test-e2e)"
     )
     .option("--debug", "Output the merged Docker Compose YAML configuration")
     .option("-d, --detach", "Run containers in the background")
@@ -31,12 +31,11 @@ export const registerMeshUpCommand = (cmd: Command): void => {
   $ builder mesh up dev
   $ builder mesh up prod
   $ builder mesh up test
-  $ builder mesh up test-unit
   $ builder mesh up test-e2e
 
-JSON overlays: test-unit uses mesh/build test; test-e2e uses mesh/build e2e.
+Mesh JSON overlays: dev, prod, e2e. test-e2e uses base -> prod -> e2e.
 The test command runs each root service test lifecycle (unit, then service E2E) before global E2E.
-The explicit test-unit stage exercises mesh.json.test overlays only.`
+For a service’s isolated tests: builder service up test-unit -C <service>.`
     )
     .action(
       async (stage: string = "dev", options: Record<string, any> = {}) => {

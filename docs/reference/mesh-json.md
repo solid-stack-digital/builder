@@ -9,13 +9,15 @@ type MeshJson = {
   $schema?: string; name?: string;
   tester?: { compose: string; service: string; env?: Record<string, string> };
   services: Record<string, MeshService>;
-  dev?: MeshStage; prod?: MeshStage; test?: MeshStage; e2e?: MeshStage;
+  dev?: MeshStage; prod?: MeshStage; e2e?: MeshStage;
 };
 type MeshService = {
   path: string; env?: Record<string, string>; dependencies?: Record<string, string>;
   dependsOn?: string[]; publish?: string[];
 };
 ```
+
+`mesh.json` supports `dev`, `prod`, and `e2e` overlays only. A root `test` field is rejected, including an empty object and when `--skip-checks` is used. `build.json.test` remains supported. See [v2.2 migration](../migration/v2.1-to-v2.2.md).
 
 ## Root fields
 
@@ -25,7 +27,7 @@ type MeshService = {
 | `name` | string | No | Base mesh project identity; runtime stages use separate Compose project identities to keep resources distinct. |
 | `tester` | object | No generally | Required for global E2E and `mesh up test`; `mesh check --require-tester` enforces it. |
 | `services` | service map | **Yes** | Must contain at least one root service; each effective service needs a path. Stage additions do not satisfy the root minimum. |
-| `dev`, `prod`, `test`, `e2e` | stage object | No | Stage-specific service overlays only. |
+| `dev`, `prod`, `e2e` | stage object | No | Stage-specific service overlays only. |
 
 ## Base mesh service fields
 
@@ -53,7 +55,7 @@ The selected tester runner is a host-side E2E client. It uses root `.env.e2e-tes
 
 ## Stage overlays
 
-Each root stage (`dev`, `prod`, `test`, `e2e`) contains only `services`. Each `<stage>.services.<name>` supports:
+Each root stage (`dev`, `prod`, `e2e`) contains only `services`. Each `<stage>.services.<name>` supports:
 
 | Path | Type | Required? | Merge behavior |
 |---|---|---:|---|
@@ -64,7 +66,7 @@ Each root stage (`dev`, `prod`, `test`, `e2e`) contains only `services`. Each `<
 | `<stage>.services.<name>.dependsOn` | string array | No | Stable union, base order then stage order. |
 | `<stage>.services.<name>.publish` | string array | No | Stable union, base order then stage order. |
 
-No deletion syntax exists. Every active binding, reference, dependency path, readiness edge, and publication is validated against effective stage configuration. Inheritance is `dev=base->dev`, `prod=base->prod`, `test=base->test`, and `e2e=base->prod->e2e`; mesh env, paths, bindings, dependencies, lifecycle edges, and publications inherit in that order.
+No deletion syntax exists. Every active binding, reference, dependency path, readiness edge, and publication is validated against effective stage configuration. Inheritance is `dev=base->dev`, `prod=base->prod`, and `e2e=base->prod->e2e`; mesh env, paths, bindings, dependencies, lifecycle edges, and publications inherit in that order.
 
 ## Complete example
 
@@ -102,7 +104,6 @@ mesh-project/
   },
   "dev": { "services": { "gateway": { "env": { "LOG_LEVEL": "debug" } } } },
   "prod": { "services": { "gateway": { "env": { "LOG_LEVEL": "info" } } } },
-  "test": { "services": { "frontend": { "env": { "TEST_MODE": "true" } } } },
   "e2e": {
     "services": {
       "fake-payments": { "path": "./services/fake-payments", "publish": ["app.endpoints.http"] },

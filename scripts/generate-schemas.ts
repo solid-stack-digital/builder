@@ -1,3 +1,4 @@
+import { MESH_CONFIG_STAGES } from "../src/core/mesh/types.js";
 import fs from "node:fs";
 import path from "node:path";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -25,7 +26,7 @@ const serviceNameJsonSchema = {
 };
 const root = (meshJsonSchema as any).definitions.MeshJsonV2;
 root.properties.services.minProperties = 1;
-for (const object of [root, ...["dev", "prod", "test", "e2e"].map(stage => root.properties[stage])]) {
+for (const object of [root, ...MESH_CONFIG_STAGES.map(stage => root.properties[stage])]) {
   const services = object.properties.services;
   services.propertyNames = serviceNameJsonSchema;
   const service = services.additionalProperties;
