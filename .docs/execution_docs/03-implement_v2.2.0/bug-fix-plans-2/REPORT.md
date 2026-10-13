@@ -1,0 +1,25 @@
+# V2 audit 2: confirmed bug report
+
+Audit basis: `.docs/specs_v2/SPECS_V2.md`, `.docs/specs_v2/MESH_JSON_DOCS.md`, `.docs/specs_v2/BUILD_JSON_DOCS.md`, and `.docs/EXECUTION_MODEL.md`, compared with the current compiler, validators, runners, and tests. The existing unit suite is green (`pnpm test`: 79 files, 897 tests), but it has no regression for the three gaps below. This report and its companion `PLAN.md` are documentation only; no product source or tests were changed by this audit.
+
+The normative common rule is `SPECS_V2.md` §4: invalid or unresolved declarations, including missing files, fail before runtime whenever possible. The specific supported inputs are dependency Compose `build` (§17 and `BUILD_JSON_DOCS.md` §5.2), app stage override Compose (`SPECS_V2.md` §21 and `BUILD_JSON_DOCS.md` §10.1), and global tester Compose with helper services (`SPECS_V2.md` §28 and `MESH_JSON_DOCS.md` §§6.2–6.3). This audit does not challenge the V2.2 rule that `mesh.json.test` is rejected or the all-`service_healthy` compiled-edge rule.
+
+| ID | Bug and current behavior | Why it is a bug | Proposed red test | Expected behavior | Fix |
+| --- | --- | --- | --- | --- | --- |
+| B2-01 | A global tester Compose `configs.<name>.file` or `secrets.<name>.file` may name a missing payload. `compileMeshComposition('e2e', …)` succeeds and emits the resource. | The tester bundle is materialized during global E2E; Docker must read its file-backed resource. The dependency bundle received this validation in bug-fix-plans-1, but `compileMeshTester.ts` does not call it. | Build a mesh with `tester.compose: e2e/tester.yml`, a selected image-only runner using `secrets: [token]`, and `secrets.token.file: ./missing-token.txt`; expect a contextual `ConfigError`. The assertion fails today because compilation succeeds. | E2E compilation fails with the source tester YAML and `secrets.token.file`; an existing regular file succeeds, and mesh dev/prod does not require E2E-only tester payloads. | Reuse a generalized file-resource validator on the **source** tester Compose document before namespace/merge, resolving payloads relative to the tester Compose file. |
+| B2-02 | A materialized app stage override may declare a file-backed config/secret whose payload is absent. `compileServiceComposition('prod', …)` succeeds. | Override Compose explicitly supports `configs` and `secrets`; a referenced file is needed when the app override is applied. The existing file check runs only for dependency bundles. | Create `prod.override-compose: overrides/prod.yml`, have its only `app` service consume `configs: [settings]`, and declare `configs.settings.file: ./missing-settings.txt`; expect a contextual `ConfigError`. The assertion fails today because compilation succeeds. | The active stage fails before runtime with `configs.settings.file`; files present under the service project root succeed; an inactive stage's override is not materialized or checked. | Validate file resources after the override contract is checked and before merge. Resolve override resource paths from the service project directory, matching `rebaseAppOverridePaths`, rather than from the nested override YAML directory. |
+| B2-03 | Materialized dependency and global tester Compose services may use a missing **local** `build.context` directory or missing Dockerfile. Both compilers succeed. | These bundles explicitly support `build:`; Docker cannot build a local context or Dockerfile that does not exist. The compiler rebases paths but does not check the build inputs. | Add a dependency owner with `build.context: ./missing-context`, then a selected tester runner with the same missing context; expect `ConfigError`. Add an existing context with `dockerfile: missing.Dockerfile` for the file case. All three missing-input assertions fail today because compilation succeeds. | Active local builds reject missing/non-directory contexts and missing/non-regular Dockerfiles before runtime. Suppressed/inert bundles and remote build contexts are not incorrectly rejected. | Introduce a materialized local-build-input validator and call it after dependency suppression and in `compileMeshTester`. Check build-string/object forms, default `Dockerfile`, explicit `dockerfile`, and `dockerfile_inline` correctly. |
+
+## Direct reproduction evidence
+
+Read-only compiler probes used temporary fixtures and removed them afterward:
+
+```text
+TESTER_COMPILED [ 'mesh-tester--secret--token' ]
+OVERRIDE_COMPILED [ 'app-override--prod--config--settings' ]
+DEPENDENCY_BUILD_COMPILED { context: './missing-context' }
+TESTER_BUILD_COMPILED { context: './missing-context', target: 'test-e2e' }
+MISSING_DOCKERFILE_COMPILED { context: '.', dockerfile: 'missing.Dockerfile' }
+```
+
+These observations identify the current behavior; they do not replace the exact red tests and gate required by `PLAN.md`. If a proposed test passes on the unmodified implementation, do not implement or claim that item until the fixture and assertion are audited and the defect is reproduced.
