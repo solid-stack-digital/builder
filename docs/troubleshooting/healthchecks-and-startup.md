@@ -1,6 +1,7 @@
 # Troubleshoot healthchecks and startup
 
 - **Dependency endpoint owner rejected:** every distinct service named by dependency endpoint `service` needs a valid enabled Compose healthcheck.
+- **Helper never becomes ready:** every generated `depends_on` edge uses `service_healthy`. Give a helper targeted by `depends_on` a working healthcheck, or remove that lifecycle edge if the helper is a finite job.
 - **App dev/prod rejected:** those Dockerfile targets need valid effective healthchecks; finite test targets do not.
 - **Healthcheck probes wrong port:** use Builder-provided `PORT` for the app primary endpoint rather than an unrelated hardcoded port.
 - **dependsOn target missing:** use exact `dependencies.<logical-name>` syntax for dependency lifecycle, or exact mesh service keys for top-level lifecycle.

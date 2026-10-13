@@ -821,6 +821,8 @@ The selected tester runner's effective execution target is `test-e2e`.
 
 Tester Compose may include helper services.
 
+All tester Compose `depends_on` edges compile with `condition: service_healthy`; a helper targeted by such an edge must become healthy.
+
 ---
 
 ## 6.3 `tester.service`

@@ -46,6 +46,7 @@ describe("catalog 11: cross-feature orchestration and regression", () => {
   it("SYS-003 namespaces repeated service/resource names across twelve consumers", () => {
     const names = Array.from({ length: 12 }, (_, i) => `service-${i}`);
     const root = meshFixture({ services: Object.fromEntries(names.map(n => [n, { path: n }])) }, Object.fromEntries(names.map(n => [n, { app: {}, dependencies: { db: dep("d.yml", "db") } }])), Object.fromEntries(names.map(n => [`${n}/d.yml`, { services: { db: healthy, helper: { image: "alpine" } }, volumes: { data: {} }, configs: { config: { file: "./config.txt" } } }])));
+    for (const name of names) write(root, `${name}/config.txt`, "present");
     const c = compileMesh("prod", root);
     expect(Object.keys(c.compose.services)).toHaveLength(36);
     expect(Object.keys(c.compose.volumes!)).toHaveLength(12);

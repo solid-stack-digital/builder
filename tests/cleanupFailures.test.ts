@@ -34,7 +34,7 @@ function project() {
     'api/build.json': { app: {} },
   });
 }
-describe.each(runners)('$name cleanup failures', ({ run, childState }) => {
+describe.each(runners)('$name cleanup failures', ({ name, run, childState }) => {
   it('retains saved state and aborts before execution when initial cleanup fails', async () => {
     const root = project(), stateDir = childState ? path.join(root, 'api') : root;
     state.writeRunState(stateDir, { projectName: 'previous', projectDir: stateDir, stage: 'test-unit' });
@@ -56,7 +56,7 @@ describe.each(runners)('$name cleanup failures', ({ run, childState }) => {
     const error = new Error('final teardown failed');
     vi.mocked(teardownCompose).mockResolvedValueOnce(undefined).mockRejectedValueOnce(error);
     await expect(run({ projectDir: root, debug: false, detach: false })).rejects.toBe(error);
-    expect(runCompose).toHaveBeenCalledOnce();
+    expect(runCompose).toHaveBeenCalledTimes(name === 'service unit' ? 1 : 3);
     expect(clear).not.toHaveBeenCalled();
     expect(state.readRunState(stateDir)).toMatchObject({ projectDir: stateDir });
   });

@@ -173,7 +173,10 @@ describe("Teardown and Cleanup lifecycle verification", () => {
       });
 
       expect(status).toBe(0);
-      expect(runComposeSpy).toHaveBeenCalledTimes(1);
+      expect(runComposeSpy).toHaveBeenCalledTimes(3);
+      expect(runComposeSpy.mock.calls[0]?.[0]).toEqual(["up", "--build", "--detach"]);
+      expect(runComposeSpy.mock.calls[1]?.[0]).toEqual(["wait", "tester"]);
+      expect(runComposeSpy.mock.calls[2]?.[0]).toEqual(["logs", "--no-color"]);
       expect(teardownSpy).toHaveBeenCalledTimes(2);
       expect(teardownSpy).toHaveBeenNthCalledWith(
         1,

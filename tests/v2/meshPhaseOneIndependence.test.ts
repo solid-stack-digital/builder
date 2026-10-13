@@ -24,8 +24,8 @@ beforeEach(() => {
   events.length = 0;
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
-  vi.mocked(runCompose).mockReset().mockImplementation(async (_args, yaml) => {
-    events.push(`up:${parse(yaml).name}`); return 0;
+  vi.mocked(runCompose).mockReset().mockImplementation(async (args, yaml) => {
+    events.push(`${args[0]}:${parse(yaml).name}`); return 0;
   });
   vi.mocked(teardownCompose).mockReset().mockImplementation(async (yaml, _dir, options) => {
     events.push(`${options?.silent ? "stale" : "cleanup"}:${parse(yaml).name}`);
@@ -55,17 +55,20 @@ function project() {
   return root;
 }
 const names = ["independent-alpha-test", "independent-alpha-e2e", "independent-beta-test", "independent-beta-e2e", "system-e2e"];
+const executionEvents = (selected: string[]) => selected.flatMap(name =>
+  name.endsWith("-test") ? [`up:${name}`] : [`up:${name}`, `wait:${name}`, `logs:${name}`],
+);
 it("runs real standalone configurations with teardown before a production-shaped global mesh", async () => {
   const root = project();
   expect(await runMeshTest({ projectDir: root })).toBe(0);
-  expect(events).toEqual(names.flatMap(name => [`stale:${name}`, `up:${name}`, `cleanup:${name}`]));
+  expect(events).toEqual(names.flatMap(name => [`stale:${name}`, ...executionEvents([name]), `cleanup:${name}`]));
   const calls = vi.mocked(runCompose).mock.calls;
-  expect(calls.map(([, , dir]) => dir)).toEqual([path.join(root, "alpha"), path.join(root, "alpha"), path.join(root, "beta"), path.join(root, "beta"), root]);
+  expect(calls.map(([, , dir]) => dir)).toEqual([path.join(root, "alpha"), path.join(root, "alpha"), path.join(root, "alpha"), path.join(root, "alpha"), path.join(root, "beta"), path.join(root, "beta"), path.join(root, "beta"), path.join(root, "beta"), root, root, root]);
   const documents = calls.map(([, yaml]) => parse(yaml) as ComposeDocument);
-  for (const [index, service, stage] of [[0, "alpha", "test"], [1, "alpha", "e2e"], [2, "beta", "test"], [3, "beta", "e2e"]] as const) {
+  for (const [index, service, stage] of [[0, "alpha", "test"], [1, "alpha", "e2e"], [4, "beta", "test"], [5, "beta", "e2e"]] as const) {
     expect(documents[index]).toEqual(compileServiceComposition(stage, path.join(root, service), { validationMode: true }).compose);
   }
-  const unit = documents[0]!, service = documents[1]!, global = documents[4]!;
+  const unit = documents[0]!, service = documents[1]!, global = documents[8]!;
   expect(Object.keys(unit.services)).toEqual(["app"]);
   expect(unit.services.app?.build).toMatchObject({ target: "test" });
   expect(env(unit.services.app)).toMatchObject({ OWNER: "build-test", DB_URL: "in-process", EXEC_MODE: "test", INFRA_MODE: "isolated" });
@@ -90,9 +93,10 @@ it("runs real standalone configurations with teardown before a production-shaped
 });
 it.each(names)("does not proceed after runner failure at %s", async failed => {
   const root = project();
-  vi.mocked(runCompose).mockImplementation(async (_args, yaml) => { const name = parse(yaml).name; events.push(`up:${name}`); return name === failed ? 7 : 0; });
+  vi.mocked(runCompose).mockImplementation(async (args, yaml) => { const name = parse(yaml).name; const command=args[0]; events.push(`${command}:${name}`); return name === failed && (name.endsWith("-test") || command === "wait") ? 7 : 0; });
   expect(await runMeshTest({ projectDir: root })).toBe(7);
   expect(events.filter(e => e.startsWith("up:"))).toEqual(names.slice(0, names.indexOf(failed) + 1).map(n => `up:${n}`));
+  expect(events.filter(e => e.startsWith("wait:"))).toEqual(executionEvents(names.slice(0, names.indexOf(failed) + 1)).filter(e => e.startsWith("wait:")));
   expect(events.at(-1)).toBe(`cleanup:${failed}`);
 });
 it.each(names)("does not proceed after cleanup failure at %s", async failed => {
@@ -102,7 +106,7 @@ it.each(names)("does not proceed after cleanup failure at %s", async failed => {
     if (!options?.silent && name === failed) throw new Error("cleanup failed");
   });
   await expect(runMeshTest({ projectDir: root })).rejects.toThrow("cleanup failed");
-  expect(events).toEqual(names.slice(0, names.indexOf(failed) + 1).map(n => `up:${n}`));
+  expect(events).toEqual(executionEvents(names.slice(0, names.indexOf(failed) + 1)));
   const dir = failed.startsWith("independent-alpha") ? path.join(root, "alpha") : failed.startsWith("independent-beta") ? path.join(root, "beta") : root;
   expect(readRunState(dir)?.projectName).toBe(failed);
 });

@@ -38,11 +38,11 @@ describe("catalog 04: atomic dependency Compose and namespacing", () => {
     expect((result.compose.services.app?.depends_on as any)[host!]).toEqual({ condition: "service_healthy" });
   });
   it("DEP-004 materializes every companion but gates app only on owner", () => {
-    const root = standalone(dep(), { services: { owner: { ...healthy, depends_on: { helper: { condition: "service_started" } } }, helper: { image: "alpine" }, seed: { image: "alpine" } } });
+    const root = standalone(dep(), { services: { owner: { ...healthy, depends_on: { helper: { condition: "service_started" } } }, helper: { image: "alpine", healthcheck: healthy.healthcheck }, seed: { image: "alpine" } } });
     const result = compileService("prod", root);
     expect(Object.keys(result.compose.services).filter(x => x !== "app")).toHaveLength(3);
     expect(Object.keys(result.compose.services.app?.depends_on as object)).toEqual([result.endpoints.dependencies.db?.api?.networkHost]);
-    expect((result.compose.services[owner(root)!]?.depends_on as any)["dep--db--helper"]).toEqual({ condition: "service_started" });
+    expect((result.compose.services[owner(root)!]?.depends_on as any)["dep--db--helper"]).toEqual({ condition: "service_healthy" });
   });
   it("DEP-005 resolves two owners independently and gates on both", () => {
     const root = standalone({ compose: "dependency.yml", endpoints: { api: { service: "owner", port: 3000, primary: true }, metrics: { service: "metrics", port: 9000 } } }, { services: { owner: healthy, metrics: healthy, init: { image: "alpine" } } });
@@ -101,10 +101,10 @@ describe("catalog 04: atomic dependency Compose and namespacing", () => {
     expect(a.services["a--owner"]?.networks).toHaveProperty("a--network--backplane");
     expect(a.services["a--worker"]?.networks).toHaveProperty("a--network--backplane");
   });
-  it("DEP-014 rewrites internal depends_on while preserving condition", () => {
-    const root = standalone(dep(), { services: { owner: { ...healthy, depends_on: { helper: { condition: "service_completed_successfully" } } }, helper: { image: "alpine" } } });
+  it("DEP-014 rewrites internal depends_on and compiles healthy condition", () => {
+    const root = standalone(dep(), { services: { owner: { ...healthy, depends_on: { helper: { condition: "service_completed_successfully" } } }, helper: { image: "alpine", healthcheck: healthy.healthcheck } } });
     const result = compileService("prod", root);
-    expect((result.compose.services[owner(root)!]?.depends_on as any)["dep--db--helper"]).toEqual({ condition: "service_completed_successfully" });
+    expect((result.compose.services[owner(root)!]?.depends_on as any)["dep--db--helper"]).toEqual({ condition: "service_healthy" });
   });
   it("DEP-015 rewrites internal links to local peer", () => {
     const root = standalone(dep(), { services: { owner: { ...healthy, links: ["helper:alias"] }, helper: { image: "alpine" } } });

@@ -232,7 +232,7 @@ Examples:
 
 Errors should identify the source file, logical path, offending value/reference, active composition, and reason where applicable.
 
-Builder-created readiness edges use `service_healthy`; there is no `service_started` fallback.
+All `depends_on` edges in Builder-generated Compose use `service_healthy`; there is no `service_started` fallback.
 
 ---
 
@@ -726,6 +726,8 @@ A materialized dependency Compose file:
 - must not hardcode globally conflicting `container_name`;
 - must not mount the host root filesystem.
 
+File-backed configs and secrets in a materialized dependency require existing regular files.
+
 Host publication belongs to Builder endpoints, never dependency Compose `ports`.
 
 Builder namespaces dependency-owned services/resources and rewrites supported internal references.
@@ -797,7 +799,7 @@ Rules:
 - lifecycle does not create env;
 - env references do not create lifecycle.
 
-Builder-generated edges use `service_healthy`.
+All edges in Builder-generated Compose use `service_healthy`.
 
 ## 20.3 Mesh service lifecycle
 

@@ -5,7 +5,7 @@ import { checkHostPortCollisions, extractHostPorts } from "../../utils/checkPort
 import { redactYamlSecrets } from "../../utils/redactSecrets.js";
 import { clearRunState, writeRunState } from "../../utils/runState.js";
 import { compileEnvironment } from "../compileEnvironment.js";
-import { runCompose } from "../runCompose.js";
+import { runFiniteTester } from "./runFiniteTester.js";
 import type { RunOptions } from "../RunOptions.js";
 import { teardownCompose } from "../teardownCompose.js";
 
@@ -49,18 +49,7 @@ export const runTestE2e = async (options: RunOptions): Promise<number> => {
   });
 
   const status = await runWithCleanup(
-    () => runCompose(
-      [
-        "up",
-        "--build",
-        "--abort-on-container-exit",
-        "--exit-code-from",
-        "tester",
-      ],
-      finalYamlConfig,
-      options.projectDir,
-      { removeVolumes: true }
-    ),
+    () => runFiniteTester(finalYamlConfig, options.projectDir, "tester"),
     async () => {
       await teardownCompose(finalYamlConfig, options.projectDir, { removeVolumes: true });
       clearRunState(options.projectDir);

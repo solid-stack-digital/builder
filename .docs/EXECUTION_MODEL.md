@@ -125,6 +125,8 @@ Application `.env.e2e` and tester `.env.e2e-tester` are separate and are never i
 
 Global testing has exactly two phases.
 
+A root `test` field is rejected in `mesh.json`; isolated test settings belong in `build.json.test`.
+
 ### Phase 1 — Independent Service Tests
 
 For every service declared in root `mesh.json.services`, sequentially run the semantic equivalent of that service's own `make test`:

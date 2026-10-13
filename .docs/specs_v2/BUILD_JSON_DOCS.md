@@ -903,6 +903,8 @@ Every endpoint owner service must exist in the dependency Compose file.
 
 Every distinct endpoint owner service must define a valid Compose healthcheck.
 
+Every service targeted by a materialized Compose `depends_on` edge must become healthy. Builder compiles all such edges with `condition: service_healthy`.
+
 When materialized, the app automatically health-depends on all distinct endpoint-owning services.
 
 ### Primary invariant

@@ -1,7 +1,26 @@
-/** Preserve user short-syntax semantics; only Builder-owned edges require health. */
+import type { ComposeDocument } from "./types.js";
+
+/** Every dependency in generated Compose is gated by health. */
 export function normalizeComposeDependsOn(value: unknown): Record<string, unknown> {
-  if (Array.isArray(value)) {
-    return Object.fromEntries(value.filter((item): item is string => typeof item === "string").map(name => [name, {}]));
+  const entries = Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+        .map((name) => [name, {}] as const)
+    : value && typeof value === "object"
+      ? Object.entries(value as Record<string, unknown>)
+      : [];
+  return Object.fromEntries(entries.map(([name, options]) => [
+    name,
+    {
+      ...(options && typeof options === "object" && !Array.isArray(options)
+        ? options as Record<string, unknown> : {}),
+      condition: "service_healthy",
+    },
+  ]));
+}
+
+export function enforceHealthyDependsOn(document: ComposeDocument): void {
+  for (const service of Object.values(document.services ?? {})) {
+    if (service.depends_on === undefined) continue;
+    service.depends_on = normalizeComposeDependsOn(service.depends_on);
   }
-  return value && typeof value === "object" ? { ...value as Record<string, unknown> } : {};
 }
