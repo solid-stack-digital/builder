@@ -6,6 +6,10 @@ import type { MeshTestRuntimeAdapters } from "../../src/core/mesh/runners/runMes
 import { compileMeshComposition } from "../../src/core/mesh/compileMeshComposition.js";
 import { compileServiceComposition } from "../../src/core/composition/compileServiceComposition.js";
 import { nodeId } from "../../src/core/config/types.js";
+import { checkMeshServices } from "../../src/core/mesh/checkers/checkMeshServices.js";
+import { resolveMeshStage } from "../../src/core/config/resolveMeshStage.js";
+import { loadMeshSources } from "../../src/core/mesh/loadMeshSources.js";
+import { ConfigError } from "../../src/errors/ConfigError.js";
 import { fixtureDir } from "./support/fixtures.js";
 
 function setup(){const root=fixtureDir("mesh-flow");fs.cpSync("docs/examples/docs-mesh",root,{recursive:true});const file=path.join(root,"mesh.json"),mesh=JSON.parse(fs.readFileSync(file,"utf8"));return {root,mesh,save:()=>fs.writeFileSync(file,JSON.stringify(mesh))};}
@@ -17,6 +21,8 @@ function fake(trace:string[],unitStatus=0,sourceE2eStatus=0,globalStatus=0):Mesh
 }
 afterEach(()=>vi.restoreAllMocks());
 describe("V3 mesh workflow",()=>{
+ it("[MSH16] policy checks stage-added source directories",()=>{const {root,mesh,save}=setup(),extra=path.join(root,"services/extra");fs.cpSync(path.join(root,"services/backend"),extra,{recursive:true});mesh.dev={services:{extra:{source:"./services/extra"}}};save();const checked:string[]=[];checkMeshServices(mesh,root,(_build,dir)=>{checked.push(dir);});expect(checked).toContain(extra);expect(new Set(checked).size).toBe(checked.length);});
+ it("[MSH17] stage-added source escape reports overlay path",()=>{const root=fixtureDir("mesh-source-path"),file=path.join(root,"mesh.json"),mesh:any={name:"mesh-source-path",services:{tester:{compose:"e2e.yml",service:"runner"}},dev:{services:{inspector:{source:"../../../outside"}}}};const effective=resolveMeshStage(mesh,"dev",file);try{loadMeshSources(effective,"dev");throw new Error("Expected path escape");}catch(error){expect(error).toBeInstanceOf(ConfigError);expect((error as ConfigError).context.configPath).toBe("dev.services.inspector.source");}});
  it("[MSH01] dev and prod materialize integrated roots without source testers",()=>{const {root}=setup();for(const stage of ["dev","prod"] as const){const x=compileMeshComposition(stage,root,{validationMode:true});expect([...x.mainServiceNames.values()].sort()).toEqual(["backend","frontend"]);expect(x.testerServiceName).toBeUndefined();expect(x.graph.roots).toHaveLength(2);for(const name of x.runtimeServiceNames)expect(name).not.toContain("tester");}});
  it("[LIF19] source testers remain excluded from every mesh profile",()=>{const {root}=setup();for(const stage of ["dev","prod","e2e"] as const){const x=compileMeshComposition(stage,root,{validationMode:true});const names=Object.keys(x.compose.services);expect(names.some(name=>name.includes("e2e-runner"))).toBe(false);expect(x.testerServiceNames.length).toBe(stage==="e2e"?1:0);if(stage==="e2e")expect(x.testerServiceName).toContain("global-runner");}});
  it("[GRF21] cross-root requirement back edge is legal with one ordering edge",()=>{const {root,mesh,save}=setup();mesh.services.backend.extends={main:{requisites:{frontend:"requirement"}}};save();const x=compileMeshComposition("prod",root,{validationMode:true});expect(x.graph.edges).toEqual(expect.arrayContaining([expect.objectContaining({consumer:nodeId("frontend","main"),target:nodeId("backend","main"),kind:"dependency"}),expect.objectContaining({consumer:nodeId("backend","main"),target:nodeId("frontend","main"),kind:"requirement"})]));expect(x.graph.closures.get(nodeId("backend","main"))?.has(nodeId("frontend","main"))).toBe(true);});

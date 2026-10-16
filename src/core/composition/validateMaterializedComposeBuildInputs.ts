@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ConfigError } from "../../errors/ConfigError.js";
 import { isRemoteBuildContext } from "./composePaths.js";
+import { assertNoServiceBuildContexts } from "./composeBuildResources.js";
 import type { ComposeDocument } from "./types.js";
 
 /** Check local build inputs only for Compose bundles that will be materialized. */
@@ -15,6 +16,7 @@ export function validateMaterializedComposeBuildInputs(
   for (const [name, service] of Object.entries(document.services ?? {})) {
     const build = service.build;
     if (build === undefined) continue;
+    assertNoServiceBuildContexts(service, `services.${name}`, sourceFile);
 
     const objectBuild = build && typeof build === "object" && !Array.isArray(build)
       ? build as Record<string, unknown>

@@ -121,7 +121,8 @@ export function compileGraphComposition(input:GraphCompileInput):CompiledComposi
   const endpoints=new Map<NodeId,Record<string,ResolvedEndpoint>>();
   for(const [id,node] of graph.nodes){const records:Record<string,ResolvedEndpoint>={};for(const [name,definition] of Object.entries(node.declaration.endpoints)){const owner=node.kind==="main"?mainServiceNames.get(id)!:modules.get(id)!.endpointOwnerMap.get(name)!;records[name]={logicalPath:portKey(id,name),networkHost:owner,networkPort:definition.port,...(definition.scheme?{scheme:definition.scheme}:{}),effectivelyPublished:false};}endpoints.set(id,records);}
   const publish=input.mesh?new Map(Object.entries(input.mesh.services).map(([root,entry])=>[root,entry.publish])):undefined;
-  const intents=resolvePublicationIntent(graph,input.stage,input.composition,publish,input.mesh?.sourceFile);
+  const publishOrigins=input.mesh?new Map(Object.entries(input.mesh.services).flatMap(([root,entry])=>entry.publishOrigin?[[root,entry.publishOrigin] as const]:[])):undefined;
+  const intents=resolvePublicationIntent(graph,input.stage,input.composition,publish,input.mesh?.sourceFile,publishOrigins);
   for(const item of intents){const record=endpoints.get(item.nodeId)![item.endpoint]!;record.effectivelyPublished=true;record.publicHost="127.0.0.1";record.publicPort=1;}
   // Validate only winning Builder JSON references before any AUTO allocation.
   for(const [id,node] of graph.nodes){const override=mainOverrideEnv.get(id)??{};const shadowed=new Set(node.kind==="main"?Object.keys(override).filter(key=>node.envOrigins.get(key)?.scope!=="mesh"):[]);validateJsonEnv(node,graph,endpoints,input.stage,input.composition,shadowed);}

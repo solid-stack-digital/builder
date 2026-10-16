@@ -15,7 +15,7 @@ export function resolveMeshStage(mesh: MeshConfig, stage: MeshConfigStage, sourc
   testerLayers.push({ stage: "base", services: { tester: structuredClone(tester) as unknown as Record<string,unknown> }, origin: originFor(sourceFile, "services.tester", "base") });
   for (const name of baseSources) {
     const entry = mesh.services[name] as MeshSourceService;
-    sources[name] = { source: entry.source, publish: [...(entry.publish ?? [])], extendsLayers: entry.extends ? [{ layer: "base", patches: structuredClone(entry.extends) as Record<string,Record<string,unknown>>, origin: originFor(sourceFile, `services.${name}.extends`, "base") }] : [], origin: originFor(sourceFile, `services.${name}`, "base") };
+    sources[name] = { source: entry.source, publish: [...(entry.publish ?? [])], publishOrigin: originFor(sourceFile, `services.${name}.publish`, "base"), extendsLayers: entry.extends ? [{ layer: "base", patches: structuredClone(entry.extends) as Record<string,Record<string,unknown>>, origin: originFor(sourceFile, `services.${name}.extends`, "base") }] : [], origin: originFor(sourceFile, `services.${name}`, "base") };
   }
   for (const layer of meshStageOverlayChain(stage)) for (const [name, patch] of Object.entries(mesh[layer]?.services ?? {}).sort(([a],[b]) => a.localeCompare(b))) {
     if (name === "tester") {
@@ -29,8 +29,8 @@ export function resolveMeshStage(mesh: MeshConfig, stage: MeshConfigStage, sourc
     const old = sources[name];
     if (old && next.source !== undefined && next.source !== old.source) throw new ConfigError({ sourceFile, configPath: `${layer}.services.${name}.source`, stage, composition: "mesh", reason: `source is immutable; previous ${old.origin.configPath}.source`, value: next.source });
     if (!old && (!next.source || !next.source.trim())) throw new ConfigError({ sourceFile, configPath: `${layer}.services.${name}.source`, stage, composition: "mesh", reason: "Stage-introduced source requires source" });
-    const entry: EffectiveMeshSource = old ?? { source: next.source!, publish: [], extendsLayers: [], origin: originFor(sourceFile, `${layer}.services.${name}`, layer) };
-    if (next.publish !== undefined) entry.publish = structuredClone(next.publish);
+    const entry: EffectiveMeshSource = old ?? { source: next.source!, publish: [], publishOrigin: originFor(sourceFile, `${layer}.services.${name}.publish`, layer), extendsLayers: [], origin: originFor(sourceFile, `${layer}.services.${name}`, layer) };
+    if (next.publish !== undefined) { entry.publish = structuredClone(next.publish); entry.publishOrigin = originFor(sourceFile, `${layer}.services.${name}.publish`, layer); }
     if (next.extends) entry.extendsLayers.push({ layer, patches: structuredClone(next.extends) as Record<string,Record<string,unknown>>, origin: originFor(sourceFile, `${layer}.services.${name}.extends`, layer) });
     sources[name] = entry;
   }

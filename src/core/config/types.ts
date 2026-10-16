@@ -10,7 +10,7 @@ export type EffectiveOrdinary = OrdinaryService & { kind: "ordinary"; env: Recor
 export type EffectiveService = EffectiveMain | EffectiveOrdinary;
 export interface EffectiveBuildLayer { stage: "base" | Environment; services: Record<string, Record<string,unknown>>; origin: Origin }
 export interface EffectiveBuildConfig { name: string; services: Record<string, EffectiveService | TesterService>; layers: EffectiveBuildLayer[]; origins: Map<string, Origin>; envOrigins: Map<string, Map<string, Origin>>; requisiteOrigins: Map<string, Map<string, Origin>>; sourceFile: string; projectDir: string }
-export interface EffectiveMeshSource { source: string; publish: string[]; extendsLayers: Array<{ layer: "base" | ConfigStage; patches: Record<string, Record<string,unknown>>; origin: Origin }>; origin: Origin }
+export interface EffectiveMeshSource { source: string; publish: string[]; publishOrigin?: Origin; extendsLayers: Array<{ layer: "base" | ConfigStage; patches: Record<string, Record<string,unknown>>; origin: Origin }>; origin: Origin }
 export interface EffectiveMeshConfig { name: string; services: Record<string, EffectiveMeshSource>; tester: TesterService; testerLayers: EffectiveBuildLayer[]; sourceFile: string; projectDir: string; baseSources: string[]; raw: MeshConfig }
 export interface GraphNode { id: NodeId; kind: "main" | "ordinary"; projectDir: string; sourceService: string; meshRoot?: string; declaration: EffectiveService; envLayers: EnvironmentLayer[]; origin: Origin; envOrigins: Map<string,Origin>; requisiteOrigins: Map<string,Origin> }
 export interface EnvironmentLayer { kind: "dotenv" | "compose-default" | "build" | "override-compose" | "mesh" | "internal"; values: Record<string, Located<string | null>> }

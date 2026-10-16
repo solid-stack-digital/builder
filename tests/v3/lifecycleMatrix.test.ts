@@ -6,12 +6,14 @@ import { inspectRequiredHealth } from "../../src/core/composition/inspectRequire
 import { assertMainDockerfileContract } from "../../src/core/checkers/checkDockerfileContract.js";
 import { assertComposeLifecycleAcyclic } from "../../src/core/composition/assertComposeLifecycleAcyclic.js";
 import { ConfigError } from "../../src/errors/ConfigError.js";
+import { isEnabledValidComposeHealthcheck } from "../../src/core/composition/composeHealthcheck.js";
 import { nodeId } from "../../src/core/config/types.js";
 import { basicBuild,writeBasic } from "./support/fixtures.js";
 const save=(root:string,b:unknown)=>fs.writeFileSync(path.join(root,"build.json"),JSON.stringify(b));
 const ordinary=(root:string,name:string,body:string)=>fs.writeFileSync(path.join(root,`${name}.yml`),body);
 const conditions=(service:any)=>service.depends_on??{};
 describe("V3 lifecycle materialization",()=>{
+ it("[LIF25] string NONE disables Compose healthcheck",()=>{for(const value of ["NONE","none","  NONE  "])expect(isEnabledValidComposeHealthcheck({test:value})).toBe(false);expect(isEnabledValidComposeHealthcheck({test:"curl -f http://localhost/"})).toBe(true);});
  it("[LIF23] flagged FROM instructions retain required stage aliases",()=>{const root=writeBasic();fs.writeFileSync(path.join(root,"Dockerfile"),'FROM --platform=linux/amd64 alpine:3 AS dev\nCMD ["echo"]\nHEALTHCHECK CMD true\nFROM --platform=$BUILDPLATFORM dev AS test\nCMD ["echo"]\nFROM --platform=linux/amd64 dev AS prod\nCMD ["echo"]\n');for(const stage of ["dev","test","prod"] as const)expect(()=>assertMainDockerfileContract(root,stage)).not.toThrow();});
  it("[LIF24] Compose cycle diagnostics name depends_on",()=>{try{assertComposeLifecycleAcyclic({runner:{image:"node:22-alpine",depends_on:["helper"]},helper:{image:"node:22-alpine",depends_on:["runner"]}},{sourceFile:"compose.yml",stage:"e2e",composition:"service"});throw new Error("Expected lifecycle cycle");}catch(error){expect(error).toBeInstanceOf(ConfigError);expect((error as ConfigError).context.configPath).toBe("services.depends_on");}});
  it("[LIF01] requirement includes a module without health ordering",()=>{const b=basicBuild();b.services.main.requisites={mail:"requirement"};b.services.mail={compose:"mail.yml",service:"mail"};const root=writeBasic(b);ordinary(root,"mail",'services:\n  mail:\n    image: node:22-alpine\n');const x=compileServiceComposition("prod",root,{validationMode:true});expect(x.modules.has(nodeId(undefined,"mail"))).toBe(true);expect(conditions(x.compose.services.main)).toEqual({});});

@@ -32,6 +32,13 @@ export function buildV3Catalog():V3Case[]{
     ["CLI11","Application environment requests a live port","Export uses the cached available port"],
     ["CMP25","Ordinary service owner mismatch in JSON or mesh overlay","Diagnostic identifies the declaring JSON file"],
   ])descriptions.set(id!,{setup:setup!,action:"Run the focused V3 regression fixture",expected:expected!});
+  for(const [id,setup,expected] of [
+    ["LIF25","String-form NONE healthcheck","Required health rejects the disabled command"],
+    ["MSH16","Mesh source is introduced by a stage overlay","Policy checks its Dockerfile once"],
+    ["MSH17","Stage-added mesh source escapes the project","Diagnostic identifies the overlay source path"],
+    ["PUB21","Overlay publication selector is invalid","Diagnostic identifies the overlay publish path"],
+    ["CMP26","Materialized Compose build uses a service context","Compilation rejects the hidden build dependency"],
+  ])descriptions.set(id!,{setup:setup!,action:"Run the focused V3 regression fixture",expected:expected!});
   const sections=new Map<string,Set<string>>(),invariants=new Map<string,Set<number>>();
   const mapping=fs.readFileSync(path.join(planRoot,files[2]!),"utf8");
   for(const line of mapping.split("\n")){
