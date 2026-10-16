@@ -23,14 +23,17 @@ export function assertMainDockerfileContract(projectDir:string,activeStage:"dev"
   const fail=(reason:string):never=>{throw new ConfigError({sourceFile:file,configPath:`Dockerfile.${activeStage}`,stage:activeStage,composition:"service",reason});};
   for(const name of ["dev","test","prod"])if(!stages.has(name))fail(`Missing required Dockerfile target ${name}`);
   const visited=new Set<string>();let cursor=stages.get(activeStage),runtime=false,health:string|undefined;
+  let effectiveCmd:string|undefined,effectiveEntrypoint:string|undefined;
   while(cursor){if(visited.has(cursor.name))fail(`Dockerfile stage inheritance cycle at ${cursor.name}`);visited.add(cursor.name);
     runtime ||= Boolean(cursor.command||cursor.entrypoint);
+    if(effectiveCmd===undefined&&cursor.command!==undefined)effectiveCmd=cursor.command;
+    if(effectiveEntrypoint===undefined&&cursor.entrypoint!==undefined)effectiveEntrypoint=cursor.entrypoint;
     if(health===undefined&&cursor.health!==undefined)health=cursor.health;
     cursor=stages.get(cursor.parent);
   }
   if(!runtime)fail(`${activeStage} requires an effective CMD or ENTRYPOINT`);
-  if(activeStage!=="test"&&(!health||/^NONE$/i.test(health.trim())||/\bNONE\b/i.test(health)))fail(`${activeStage} requires a valid healthcheck`);
-  if(activeStage==="dev"&&lines.some(line=>/^(CMD|ENTRYPOINT)\s+.*(?:nohup|&\s*$|--daemon)/i.test(line.trim())))fail("dev runtime must remain in foreground");
+  if(activeStage!=="test"&&(!health||/^NONE$/i.test(health.trim())))fail(`${activeStage} requires a valid healthcheck`);
+  if(activeStage==="dev"&&[effectiveEntrypoint,effectiveCmd].some(instruction=>instruction!==undefined&&/(?:nohup|&\s*$|--daemon)/i.test(instruction)))fail("dev runtime must remain in foreground");
 }
 
 export function checkDockerfileContract(build: BuildJson, projectDir: string): void {

@@ -57,6 +57,10 @@ export function resolveBuildStage(build: BuildJson, stage: Environment, sourceFi
     assertPrimaryEndpointInvariant(endpoints, { sourceFile, stage, configPath: `services.${name}.endpoints` });
     if (name !== "main" && (typeof value.compose !== "string" || !value.compose.trim())) fail(sourceFile, stage, `services.${name}.compose`, "Effective ordinary service requires compose");
     if (name !== "main" && Object.keys(endpoints).length === 0 && (typeof value.service !== "string" || !value.service.trim())) fail(sourceFile, stage, `services.${name}.service`, "endpoint-less service requires service");
+    if (name !== "main" && Object.keys(endpoints).length > 0 && typeof value.service === "string") {
+      const primary = Object.values(endpoints).find(endpoint => endpoint.primary);
+      if (primary?.service && value.service !== primary.service) fail(sourceFile, stage, `services.${name}.service`, "top-level service must equal primary endpoint owner", value.service);
+    }
     value.env ??= {}; value.endpoints ??= {}; value.requisites ??= {};
     value.kind = name === "main" ? "main" : "ordinary";
   }

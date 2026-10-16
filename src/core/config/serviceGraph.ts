@@ -11,8 +11,9 @@ export function buildDeclaredGraph(input: EffectiveComposition): DeclaredGraph {
     let target: NodeId;
     if (key.startsWith("@mesh:")) target = nodeId(key.slice(6), "main");
     else target = nodeId(node.meshRoot, key);
-    if (key === "tester" || key === "@mesh:tester") fail(origin,input.stage,"tester cannot be a requisite target",key);
-    if (!input.nodes.has(target)) fail(origin,input.stage,"Unknown requisite target",key);
+    const displayKey=key.replace(/^@mesh:/,"");
+    if (key === "tester" || key === "@mesh:tester") fail(origin,input.stage,"tester cannot be a requisite target",displayKey);
+    if (!input.nodes.has(target)) fail(origin,input.stage,"Unknown requisite target",displayKey);
     edges.push({ consumer: node.id, target, kind: kind as RequisiteKind, origin });
   }
   edges.sort((a,b) => `${a.consumer}:${a.target}:${a.kind}`.localeCompare(`${b.consumer}:${b.target}:${b.kind}`));

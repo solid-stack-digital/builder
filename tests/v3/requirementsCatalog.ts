@@ -17,6 +17,13 @@ export function buildV3Catalog():V3Case[]{
   const descriptions=new Map<string,{setup:string;expected:string;action:string}>();
   for(const file of files){const source=fs.readFileSync(path.join(planRoot,file),"utf8");for(const match of source.matchAll(casePattern)){if(descriptions.has(match[1]!))throw new Error(`Duplicate V3 catalog ID ${match[1]}`);descriptions.set(match[1]!,{setup:match[2]!.trim(),expected:match[3]!.trim(),action:match[4]!.trim()});}}
   for(const id of ["DOC01","DOC02","DOC03"])descriptions.set(id,{setup:`Real Docker acceptance batch ${id}`,action:"Run Builder against the prepared local fixture image and inspect owned resources",expected:"Batch passes and all owned resources are removed"});
+  for(const [id,setup,expected] of [
+    ["FIX01","Healthcheck command contains None","Dockerfile contract accepts an enabled healthcheck"],
+    ["FIX02","Unrelated Dockerfile stage runs a background command","Dev foreground check inspects only dev stage lineage"],
+    ["FIX03","Mesh publish selector is invalid","Diagnostic identifies mesh.json and the publish path"],
+    ["FIX04","Mesh requisite target is invalid","Diagnostic displays the authored target without compiler prefix"],
+    ["FIX05","Dormant ordinary service owner differs from primary endpoint","Isolated dev rejects the mismatch at build.json service path"],
+  ])descriptions.set(id!,{setup:setup!,action:"Compile the focused V3 regression fixture",expected:expected!});
   const sections=new Map<string,Set<string>>(),invariants=new Map<string,Set<number>>();
   const mapping=fs.readFileSync(path.join(planRoot,files[2]!),"utf8");
   for(const line of mapping.split("\n")){
