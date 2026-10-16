@@ -27,13 +27,13 @@ function command(label:string,executable:string,args:string[],durations:Array<[s
 }
 const started=Date.now(),durations:Array<[string,number]>=[];
 try {
-  prerequisite();
   command("fast tests","pnpm",["test:v3:fast"],durations);
   command("typecheck","pnpm",["typecheck"],durations);
   command("Builder build","pnpm",["build"],durations);
   command("built CLI version","node",["dist/bin.js","--version"],durations);
   command("built API import","node",["--input-type=module","-e","await import('./dist/index.js')"],durations);
   command("legacy gate","pnpm",["check:v3-no-legacy"],durations);
+  prerequisite();
   command("Docker batches","pnpm",["test:v3:docker"],durations);
   command("all-case coverage","pnpm",["exec","tsx","scripts/check-v3-coverage.ts","all",".builder/v3-fast-report.json",".builder/v3-docker-report.json"],durations);
   const elapsed=Date.now()-started;console.log(`V3 verification total: ${elapsed}ms`);

@@ -25,7 +25,7 @@
     "build:schemas": "tsx scripts/generate-schemas.ts",
     "build": "pnpm build:schemas && tsx scripts/build.ts",
     "dev": "tsup --watch",
-    "test": "pnpm test:v3:fast",
+    "test": "pnpm test:v3",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",

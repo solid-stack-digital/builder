@@ -8,6 +8,10 @@ The source package declares version 3.0.0. This checkout does not imply that ver
 
 [Upgrade from Builder 2.2.0](docs/migration/v2.2-to-v3.0.md)
 
+## Tests
+
+Run `pnpm test` for the complete V3 verification suite. It runs non-Docker tests, typechecking, build and API checks first, then the three Docker acceptance tests. Docker tests require a prepared local fixture image; run `pnpm test:v3:prepare` once when the fixture is missing or stale. For a quick run without Docker, use `pnpm test:v3:fast`.
+
 ## A service
 
 `build.json` (complete minimal configuration):
