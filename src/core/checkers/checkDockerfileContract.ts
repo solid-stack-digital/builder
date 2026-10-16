@@ -33,7 +33,7 @@ export function assertMainDockerfileContract(projectDir:string,activeStage:"dev"
   }
   if(!runtime)fail(`${activeStage} requires an effective CMD or ENTRYPOINT`);
   if(activeStage!=="test"&&(!health||/^NONE$/i.test(health.trim())))fail(`${activeStage} requires a valid healthcheck`);
-  if(activeStage==="dev"&&[effectiveEntrypoint,effectiveCmd].some(instruction=>instruction!==undefined&&/(?:nohup|&\s*$|--daemon)/i.test(instruction)))fail("dev runtime must remain in foreground");
+  if(activeStage==="dev"&&[effectiveEntrypoint,effectiveCmd].some(instruction=>instruction!==undefined&&/(?:nohup|&\s*(?:["']?\s*\]|\s*$)|--daemon)/i.test(instruction)))fail("dev runtime must remain in foreground");
 }
 
 export function checkDockerfileContract(build: BuildJson, projectDir: string): void {

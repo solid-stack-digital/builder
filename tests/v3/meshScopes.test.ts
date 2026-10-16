@@ -4,6 +4,7 @@ import { describe,expect,it } from "vitest";
 import { compileMeshComposition } from "../../src/core/mesh/compileMeshComposition.js";
 import { nodeId } from "../../src/core/config/types.js";
 import { basicBuild,fixtureDir,writeBasic } from "./support/fixtures.js";
+import { ConfigError } from "../../src/errors/ConfigError.js";
 function meshFixture(){
  const root=fixtureDir("mesh");
  const backend=writeBasic(),frontend=writeBasic();
@@ -15,6 +16,7 @@ function meshFixture(){
  return root;
 }
 describe("V3 mesh lexical scopes",()=>{
+ it("[MSH18] mesh override error path does not duplicate service name",()=>{const root=meshFixture(),meshFile=path.join(root,"mesh.json");fs.writeFileSync(meshFile,JSON.stringify({name:"override-origin",services:{tester:{compose:"tester.yml",service:"runner"},backend:{source:"backend",extends:{main:{"override-compose":"missing.yml"}}}}}));try{compileMeshComposition("prod",root,{validationMode:true});throw new Error("Expected missing override");}catch(error){expect(error).toBeInstanceOf(ConfigError);expect((error as ConfigError).context).toMatchObject({sourceFile:meshFile,configPath:"services.backend.extends.main.override-compose"});}});
  it("[MER15] prunes a local mock and reaches a fellow source main",()=>{
   const root=meshFixture();const mesh={name:"scope-test",services:{tester:{compose:"tester.yml",service:"runner"},backend:{source:"backend"},frontend:{source:"frontend",extends:{main:{requisites:{"source.backend":false,backend:"dependency"},env:{BACKEND_URL:"${backend.source.main.endpoints.http.network_url}"}}}}}};
   fs.writeFileSync(path.join(root,"mesh.json"),JSON.stringify(mesh));

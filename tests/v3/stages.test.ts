@@ -6,8 +6,10 @@ import { mergeEffectiveObject } from "../../src/core/config/stageMerge.js";
 import type { BuildJson } from "../../src/types/index.js";
 import type { MeshConfig } from "../../src/core/mesh/types.js";
 import { basicBuild } from "./support/fixtures.js";
+import { ConfigError } from "../../src/errors/ConfigError.js";
 const source=path.resolve(".builder/test-tmp/stages/build.json"),meshFile=path.resolve(".builder/test-tmp/stages/mesh.json");
 describe("V3 effective overlays",()=>{
+ it("[STG08] stage-introduced service error identifies the declaring stage",()=>{const b=basicBuild();b.dev={services:{worker:{compose:"worker.yml"}}};try{resolveBuildStage(b,"dev",source);throw new Error("Expected service validation failure");}catch(error){expect(error).toBeInstanceOf(ConfigError);expect((error as ConfigError).context.configPath).toBe("dev.services.worker.service");}});
  it("[MER01] merges env by key without mutating source",()=>{const b=basicBuild();b.services.main.env={A:"base",B:"keep"};b.prod={services:{main:{env:{A:"prod",C:"new"}}}};const frozen=structuredClone(b);const x=resolveBuildStage(b,"prod",source);expect((x.services.main as any).env).toEqual({A:"prod",B:"keep",C:"new"});expect(b).toEqual(frozen);});
  it("[MER02] recursively merges endpoint siblings",()=>{const b=basicBuild();b.prod={services:{main:{endpoints:{http:{publicPort:15555}}}}};const x=resolveBuildStage(b,"prod",source);expect((x.services.main as any).endpoints.http).toEqual({port:3100,publicPort:15555,primary:true,scheme:"http"});});
  it("[MER06] e2e inherits prod then e2e",()=>{const b=basicBuild();b.services.main.env={A:"base"};b.dev={services:{main:{env:{A:"dev"}}}};b.test={services:{main:{env:{A:"test"}}}};b.prod={services:{main:{env:{A:"prod",B:"from-prod"}}}};b.e2e={services:{main:{env:{A:"e2e"}}}};for(const [stage,a,bValue] of [["dev","dev",undefined],["test","test",undefined],["prod","prod","from-prod"],["e2e","e2e","from-prod"]] as const){const env=(resolveBuildStage(b,stage,source).services.main as any).env;expect(env.A).toBe(a);expect(env.B).toBe(bValue);}});

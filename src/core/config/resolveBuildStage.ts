@@ -45,21 +45,22 @@ export function resolveBuildStage(build: BuildJson, stage: Environment, sourceFi
   }
   for(const deleted of deletedRequisiteTargets)if(!(deleted.target in services))fail(sourceFile,stage,deleted.path,"Unknown requisite target",deleted.target);
   for (const [name, value] of Object.entries(services)) {
+    const originPath = origins.get(name)?.configPath ?? `services.${name}`;
     if (name === "tester") {
-      if (typeof value.compose !== "string" || typeof value.service !== "string") fail(sourceFile, stage, `services.${name}`, "Effective tester requires compose and service");
+      if (typeof value.compose !== "string" || typeof value.service !== "string") fail(sourceFile, stage, originPath, "Effective tester requires compose and service");
       continue;
     }
     const endpoints = (value.endpoints ?? {}) as Record<string, { port?: number; service?: string; primary?: boolean }>;
     for (const [endpointName, endpoint] of Object.entries(endpoints)) {
-      if (!Number.isInteger(endpoint.port) || endpoint.port! < 1 || endpoint.port! > 65535) fail(sourceFile, stage, `services.${name}.endpoints.${endpointName}.port`, "Effective endpoint requires port in 1..65535", endpoint.port);
-      if (name !== "main" && (typeof endpoint.service !== "string" || !endpoint.service.trim())) fail(sourceFile, stage, `services.${name}.endpoints.${endpointName}.service`, "Effective ordinary endpoint requires service");
+      if (!Number.isInteger(endpoint.port) || endpoint.port! < 1 || endpoint.port! > 65535) fail(sourceFile, stage, `${originPath}.endpoints.${endpointName}.port`, "Effective endpoint requires port in 1..65535", endpoint.port);
+      if (name !== "main" && (typeof endpoint.service !== "string" || !endpoint.service.trim())) fail(sourceFile, stage, `${originPath}.endpoints.${endpointName}.service`, "Effective ordinary endpoint requires service");
     }
-    assertPrimaryEndpointInvariant(endpoints, { sourceFile, stage, configPath: `services.${name}.endpoints` });
-    if (name !== "main" && (typeof value.compose !== "string" || !value.compose.trim())) fail(sourceFile, stage, `services.${name}.compose`, "Effective ordinary service requires compose");
-    if (name !== "main" && Object.keys(endpoints).length === 0 && (typeof value.service !== "string" || !value.service.trim())) fail(sourceFile, stage, `services.${name}.service`, "endpoint-less service requires service");
+    assertPrimaryEndpointInvariant(endpoints, { sourceFile, stage, configPath: `${originPath}.endpoints` });
+    if (name !== "main" && (typeof value.compose !== "string" || !value.compose.trim())) fail(sourceFile, stage, `${originPath}.compose`, "Effective ordinary service requires compose");
+    if (name !== "main" && Object.keys(endpoints).length === 0 && (typeof value.service !== "string" || !value.service.trim())) fail(sourceFile, stage, `${originPath}.service`, "endpoint-less service requires service");
     if (name !== "main" && Object.keys(endpoints).length > 0 && typeof value.service === "string") {
       const primary = Object.values(endpoints).find(endpoint => endpoint.primary);
-      if (primary?.service && value.service !== primary.service) fail(sourceFile, stage, `services.${name}.service`, "top-level service must equal primary endpoint owner", value.service);
+      if (primary?.service && value.service !== primary.service) fail(sourceFile, stage, `${originPath}.service`, "top-level service must equal primary endpoint owner", value.service);
     }
     value.env ??= {}; value.endpoints ??= {}; value.requisites ??= {};
     value.kind = name === "main" ? "main" : "ordinary";

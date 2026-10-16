@@ -56,7 +56,7 @@ function withBuilderNetwork(service:ComposeService):void{if(service.network_mode
 function markOwned(value:Record<string,unknown>):void {const current=value.labels;const labels=Array.isArray(current)?Object.fromEntries(current.filter((item):item is string=>typeof item==="string").map(item=>{const index=item.indexOf("=");return index<0?[item,""]:[item.slice(0,index),item.slice(index+1)];})):current&&typeof current==="object"?{...current as Record<string,unknown>}:{ };labels[BUILDER_OWNER_LABEL]="true";value.labels=labels;}
 function selectedOverride(build:EffectiveBuildConfig,name:string):{path:string;origin:Origin}|undefined {
   let result:{path:string;origin:Origin}|undefined;
-  for(const layer of build.layers){const patch=layer.services[name];const value=patch?.["override-compose"];if(typeof value==="string")result={path:value,origin:{...layer.origin,configPath:`${layer.origin.configPath}.${name}.override-compose`}};}
+  for(const layer of build.layers){const patch=layer.services[name];const value=patch?.["override-compose"];if(typeof value==="string"){const base=layer.origin.configPath.endsWith(`.${name}`)?layer.origin.configPath:`${layer.origin.configPath}.${name}`;result={path:value,origin:{...layer.origin,configPath:`${base}.override-compose`}};}}
   return result;
 }
 function mainSeed(stage:Environment):ComposeService {

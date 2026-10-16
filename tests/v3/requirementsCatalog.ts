@@ -46,6 +46,13 @@ export function buildV3Catalog():V3Case[]{
     ["LIF27","Lowercase array healthcheck command","Healthcheck is recognized as enabled"],
     ["PUB22","Publication selects a nonexistent endpoint","Diagnostic distinguishes missing endpoint from missing publicPort"],
   ])descriptions.set(id!,{setup:setup!,action:"Run the focused V3 regression fixture",expected:expected!});
+  for(const [id,setup,expected] of [
+    ["STG08","Stage-introduced service lacks an owner","Diagnostic identifies the declaring stage"],
+    ["MSH18","Mesh-authored main override is missing","Diagnostic names the mesh field once"],
+    ["CMP29","Referenced Compose file is missing","Diagnostic identifies the declaring build.json"],
+    ["LIF28","Exec-form dev command backgrounds its process","Dockerfile contract rejects the command"],
+    ["CHK05","Declared YAML file is missing","Diagnostic uses the canonical build.json path"],
+  ])descriptions.set(id!,{setup:setup!,action:"Run the focused V3 regression fixture",expected:expected!});
   const sections=new Map<string,Set<string>>(),invariants=new Map<string,Set<number>>();
   const mapping=fs.readFileSync(path.join(planRoot,files[2]!),"utf8");
   for(const line of mapping.split("\n")){
