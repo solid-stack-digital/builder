@@ -13,7 +13,7 @@ const sourceFile=path.resolve(".builder/test-tmp/graph/build.json");
 function graph(configure:(build:BuildJson)=>void,infraMode:"integrated"|"isolated"="integrated"){
  const build=basicBuild();configure(build);const effective=resolveBuildStage(build,"prod",sourceFile);
  const nodes=new Map<NodeId,GraphNode>();for(const [name,service] of Object.entries(effective.services)){
-  if(name==="tester")continue;const id=nodeId(undefined,name);nodes.set(id,{id,kind:name==="main"?"main":"ordinary",projectDir:effective.projectDir,sourceService:name,declaration:service as GraphNode["declaration"],envLayers:[],origin:effective.origins.get(name)!,envOrigins:effective.envOrigins.get(name)!,requisiteOrigins:effective.requisiteOrigins.get(name)!});
+  if(name==="tester")continue;const id=nodeId(undefined,name);nodes.set(id,{id,kind:name==="main"?"main":"ordinary",projectDir:effective.projectDir,sourceService:name,declaration:service as GraphNode["declaration"],envLayers:[],origin:effective.origins.get(name)!,envOrigins:effective.envOrigins.get(name)!,buildArgsOrigins:effective.buildArgsOrigins.get(name)!,requisiteOrigins:effective.requisiteOrigins.get(name)!});
  }
  const declared=buildDeclaredGraph({nodes,roots:[nodeId(undefined,"main")],tester:build.services.tester,testerOrigin:effective.origins.get("tester")!,stage:"prod",composition:"service"} as EffectiveComposition);
  return selectReachableGraph(declared,{infraMode,stage:"prod"});

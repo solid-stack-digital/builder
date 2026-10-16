@@ -11,7 +11,7 @@ export function resultsFromReports(files:readonly string[]):{results:CaseResult[
  return {results,counts};
 }
 export function checkCoverage(scope:"fast"|"all",files:readonly string[]):{errors:string[];message:string}{
- const catalog=buildV3Catalog().filter(record=>scope==="all"||!record.id.startsWith("DOC")),{results,counts}=resultsFromReports(files);
+ const catalog=buildV3Catalog().filter(record=>scope==="all"||record.layer!=="D"),{results,counts}=resultsFromReports(files);
  const errors=validateV3Report(catalog,results);return {errors,message:`V3 coverage: ${catalog.length} named families; ${counts.passed}/${counts.total} test cases passed, ${counts.failed} failed, ${counts.skipped} skipped; 61 final invariants mapped.`};
 }
 if(process.argv[1]?.endsWith("check-v3-coverage.ts")){const scope=process.argv[2] as "fast"|"all",files=process.argv.slice(3);if(!(["fast","all"] as string[]).includes(scope)||!files.length)throw new Error("Usage: check-v3-coverage.ts fast|all <vitest-json-report> [...]");const result=checkCoverage(scope,files);console.log(result.message);if(result.errors.length){console.error(result.errors.join("\n"));process.exitCode=1;}}

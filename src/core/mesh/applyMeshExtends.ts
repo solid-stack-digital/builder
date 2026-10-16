@@ -28,6 +28,9 @@ export function applyMeshExtends(mesh: EffectiveMeshConfig, builds: Map<string,E
       const env = build.envOrigins.get(name) ?? new Map<string,Origin>();
       for (const key of Object.keys((patch.env as Record<string,string>) ?? {})) env.set(key,{ ...origin, configPath: `${origin.configPath}.env.${key}` });
       build.envOrigins.set(name,env);
+      const args = build.buildArgsOrigins.get(name) ?? new Map<string,Origin>();
+      for (const key of Object.keys((patch.buildArgs as Record<string,string>) ?? {})) args.set(key,{ ...origin, configPath: `${origin.configPath}.buildArgs.${key}` });
+      build.buildArgsOrigins.set(name,args);
       const edges = build.requisiteOrigins.get(name) ?? new Map<string,Origin>();
       for (const [target, kind] of Object.entries((patch.requisites as Record<string,unknown>) ?? {})) {
         const canonical = target.startsWith("source.") ? target.slice(7) : `@mesh:${target}`;

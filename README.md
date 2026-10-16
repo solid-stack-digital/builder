@@ -1,12 +1,14 @@
 # Solid Stack Builder V3
 
-Builder 3.0.0 compiles a service's `build.json` or a system's `mesh.json` into Docker Compose. Services declare possible runtime modules; explicit **requisites** select which modules run and how they wait. Mesh sources stay independently runnable, with explicit `extends` rewrites when a real service replaces a local mock.
+Builder 3.1.0 compiles a service's `build.json` or a system's `mesh.json` into Docker Compose. Services declare possible runtime modules; explicit **requisites** select which modules run and how they wait. Mesh sources stay independently runnable, with explicit `extends` rewrites when a real service replaces a local mock. Main services can declare stage-aware Docker `buildArgs`.
 
-The source package declares version 3.0.0. This checkout does not imply that version has been published to a package registry. For a local checkout, run `pnpm install`, `pnpm build`, and `node dist/bin.js --version`. The package exposes both `builder` and `solid-builder` when installed. Node.js 20 or newer and Docker Engine with Compose are required for runtime commands.
+The source package declares version 3.1.0. This checkout does not imply that version has been published to a package registry. For a local checkout, run `pnpm install`, `pnpm build`, and `node dist/bin.js --version`. The package exposes both `builder` and `solid-builder` when installed. Node.js 20 or newer and Docker Engine with Compose are required for runtime commands.
 
 [Builder V3 documentation](docs/README.md)
 
 [Upgrade from Builder 2.2.0](docs/migration/v2.2-to-v3.0.md)
+
+[Upgrade from Builder 3.0.0](docs/migration/v3.0-to-v3.1.md)
 
 ## Tests
 

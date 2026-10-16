@@ -64,6 +64,12 @@
                             "type": "string"
                           }
                         },
+                        "buildArgs": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
                         "endpoints": {
                           "type": "object",
                           "propertyNames": {
@@ -312,6 +318,12 @@
                           "type": "object",
                           "properties": {
                             "env": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            },
+                            "buildArgs": {
                               "type": "object",
                               "additionalProperties": {
                                 "type": "string"
@@ -568,6 +580,12 @@
                                 "type": "string"
                               }
                             },
+                            "buildArgs": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            },
                             "endpoints": {
                               "type": "object",
                               "propertyNames": {
@@ -814,6 +832,12 @@
                           "type": "object",
                           "properties": {
                             "env": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            },
+                            "buildArgs": {
                               "type": "object",
                               "additionalProperties": {
                                 "type": "string"

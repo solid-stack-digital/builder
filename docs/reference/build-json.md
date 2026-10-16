@@ -5,7 +5,7 @@ A complete file requires `name`, `services.main`, and `services.tester`. Other `
 | Location | Allowed fields | Meaning |
 |---|---|---|
 | root | `$schema`, `name`, `services`, `dev`, `prod`, `test`, `e2e` | `name` is required. |
-| `services.main` | `env`, `endpoints`, `requisites`, `override-compose` | Builder builds the canonical project Dockerfile. |
+| `services.main` | `env`, `buildArgs`, `endpoints`, `requisites`, `override-compose` | Builder builds the canonical project Dockerfile. |
 | `services.<ordinary>` | `compose`, `service`, `env`, `endpoints`, `requisites` | `compose` is required; endpoint-less modules need `service`. |
 | `services.tester` | `compose`, `service`, `env` | Both `compose` and selected runner `service` are required. |
 | `<stage>.services.<name>` | Partial service overlay | Existing fields merge recursively; arrays and scalars replace; `false` removes a requisite. |
@@ -14,11 +14,14 @@ The main endpoint has `port`, optional `publicPort`, `primary`, and `scheme`. Or
 
 `dev`, `prod`, `test`, and `e2e` are configuration overlays. E2E inherits the structured `prod` overlay before its own overlay. The main Dockerfile targets are `dev`, `test`, and `prod`; an E2E run uses `prod`. The main override path belongs under `services.main.override-compose` or its selected stage overlay. Paths in a source file resolve from that source's directory.
 
+`services.main.buildArgs` and `<stage>.services.main.buildArgs` contain string-to-string Docker build arguments. Stage keys merge with base keys; an empty string is retained. Values can use Builder endpoint references, subject to the same requisite and publication rules as `env`. `.env.<stage>` contributes only runtime environment variables, never build arguments. Ordinary services and the tester cannot declare `buildArgs`. Keys beginning `BUILDER_` are reserved. **Do not put secrets in build arguments:** Docker build metadata, image history, caches, and build logs may expose them. Use build secrets or runtime environment variables for secrets.
+
 ```json
 {
   "name": "example-api",
   "services": {
     "main": {
+      "buildArgs": { "BASE_PATH": "/api" },
       "endpoints": { "http": { "port": 3000, "publicPort": "AUTO", "primary": true, "scheme": "http" } },
       "requisites": { "db": "dependency" }
     },
@@ -29,7 +32,7 @@ The main endpoint has `port`, optional `publicPort`, `primary`, and `scheme`. Or
     },
     "tester": { "compose": "./e2e/docker-compose.yml", "service": "runner", "env": { "API_URL": "${main.endpoints.http.public_url}" } }
   },
-  "prod": { "services": { "main": { "env": { "DATABASE_HOST": "${db.endpoints.tcp.network_host}" } } } }
+  "prod": { "services": { "main": { "buildArgs": { "BUILD_MODE": "production" }, "env": { "DATABASE_HOST": "${db.endpoints.tcp.network_host}" } } } }
 }
 ```
 

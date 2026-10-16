@@ -29,6 +29,7 @@ export const currentPages = [
   "docs/guides/use-stage-only-services-and-dependencies.md",
   "docs/guides/validate-before-running.md",
   "docs/migration/v2.2-to-v3.0.md",
+  "docs/migration/v3.0-to-v3.1.md",
   "docs/recipes/automatic-host-ports.md",
   "docs/recipes/composition-owned-gateway-wiring.md",
   "docs/recipes/dependency-to-dependency-readiness.md",

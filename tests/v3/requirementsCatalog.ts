@@ -53,6 +53,15 @@ export function buildV3Catalog():V3Case[]{
     ["LIF28","Exec-form dev command backgrounds its process","Dockerfile contract rejects the command"],
     ["CHK05","Declared YAML file is missing","Diagnostic uses the canonical build.json path"],
   ])descriptions.set(id!,{setup:setup!,action:"Run the focused V3 regression fixture",expected:expected!});
+  const buildArgCases=[
+    "Base main build args compile","Build stages accept args","Mesh base accepts args","Mesh stages accept args",
+    "Ordinary service rejects args","Tester rejects args","Mesh ordinary extends rejects args","Values require strings",
+    "Empty strings survive","Stage keys merge with origins","E2E inherits prod args","Standalone override precedence",
+    "Mesh source and extends precedence","Global E2E precedence","Mesh beats source override","Dotenv isolation",
+    "Self endpoint reference","Requisite endpoint reference","Missing requisite reference","Pruned target reference",
+    "Shadowed invalid reference","Surviving invalid reference","Reserved Builder key","Compose build args output","Docker build ingests args"
+  ];
+  buildArgCases.forEach((setup,index)=>{const id=`BAR${String(index+1).padStart(2,"0")}`;descriptions.set(id,{setup,action:"Run V3.1 build argument acceptance case",expected:"Build argument behavior matches the V3.1 feature specification"});});
   const sections=new Map<string,Set<string>>(),invariants=new Map<string,Set<number>>();
   const mapping=fs.readFileSync(path.join(planRoot,files[2]!),"utf8");
   for(const line of mapping.split("\n")){
@@ -61,7 +70,7 @@ export function buildV3Catalog():V3Case[]{
     if(cols.length>=6&&/^\d+$/.test(cols[1]??"")){for(const [index,cases] of [[1,2],[3,4]] as const){const number=Number(cols[index]);if(!Number.isInteger(number)||number<1||number>61)continue;for(const id of expandIds(cols[cases]??"")){const current=invariants.get(id)??new Set<number>();current.add(number);invariants.set(id,current);}}}
   }
   const tests=sourceIndex();
-  return [...descriptions].sort(([a],[b])=>a.localeCompare(b)).map(([id,value])=>({id,title:value.setup,specSections:[...sections.get(id)??["verification"]],invariantIds:[...invariants.get(id)??[]].sort((a,b)=>a-b),layer:id.startsWith("DOC")?"D":/^(RUN|MSH|OPS|CLI)/.test(id)?"W":/^(CFG|MER|GRF|REF|ENV|PUB)/.test(id)?"U":"I",fixture:id.startsWith("DOC")?"tests/v3/docker":"tests/v3/support/fixtures.ts",setup:value.setup,action:value.action,expected:value.expected,testFile:tests.get(id)??""}));
+  return [...descriptions].sort(([a],[b])=>a.localeCompare(b)).map(([id,value])=>({id,title:value.setup,specSections:[...sections.get(id)??["verification"]],invariantIds:[...invariants.get(id)??[]].sort((a,b)=>a-b),layer:id.startsWith("DOC")||id==="BAR25"?"D":/^(RUN|MSH|OPS|CLI)/.test(id)?"W":/^(CFG|MER|GRF|REF|ENV|PUB)/.test(id)?"U":"I",fixture:id.startsWith("DOC")||id==="BAR25"?"tests/v3/docker":"tests/v3/support/fixtures.ts",setup:value.setup,action:value.action,expected:value.expected,testFile:tests.get(id)??""}));
 }
 
 /** Validate actual Vitest outcomes, not only test names or registry size. */

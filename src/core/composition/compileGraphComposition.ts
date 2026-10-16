@@ -12,11 +12,11 @@ import { resolveInsideProject, resolveApplicationDockerfile } from "../config/pa
 import { resolvePublicationIntent } from "../config/publication.js";
 import { interpolateBuilderReferences } from "../config/references.js";
 import { buildDeclaredGraph, selectReachableGraph } from "../config/serviceGraph.js";
-import type { EffectiveBuildConfig, EffectiveGraph, EffectiveMeshConfig, GraphNode, NodeId, Origin, ResolvedEndpoint } from "../config/types.js";
+import type { EffectiveBuildConfig, EffectiveGraph, EffectiveMain, EffectiveMeshConfig, GraphNode, NodeId, Origin, ResolvedEndpoint } from "../config/types.js";
 import { displayNode, nodeId } from "../config/types.js";
 import { assertComposeLifecycleAcyclic } from "./assertComposeLifecycleAcyclic.js";
 import { addComposeCondition } from "./composeDependsOn.js";
-import { normalizeComposeEnvironment } from "./composeEnvironment.js";
+import { normalizeComposeBuildArgs, normalizeComposeEnvironment } from "./composeEnvironment.js";
 import { normalizeNetworks } from "./composeNetworks.js";
 import { rebaseAppOverridePaths, rebaseComposePaths } from "./composePaths.js";
 import { GeneratedComposeNameAllocator } from "./generatedNames.js";
@@ -41,7 +41,7 @@ function makeGraph(input: GraphCompileInput): EffectiveGraph {
     for(const [name,declaration] of Object.entries(build.services)){
       if(name==="tester")continue;
       const id=nodeId(root,name),origin=copyOrigin(build.origins.get(name)!,root);
-      nodes.set(id,{id,kind:name==="main"?"main":"ordinary",projectDir:build.projectDir,sourceService:name,...(root?{meshRoot:root}:{}),declaration:declaration as GraphNode["declaration"],envLayers:[],origin,envOrigins:new Map([...build.envOrigins.get(name)??[]].map(([key,value])=>[key,copyOrigin(value,root)])),requisiteOrigins:new Map([...build.requisiteOrigins.get(name)??[]].map(([key,value])=>[key,copyOrigin(value,root)]))});
+      nodes.set(id,{id,kind:name==="main"?"main":"ordinary",projectDir:build.projectDir,sourceService:name,...(root?{meshRoot:root}:{}),declaration:declaration as GraphNode["declaration"],envLayers:[],origin,envOrigins:new Map([...build.envOrigins.get(name)??[]].map(([key,value])=>[key,copyOrigin(value,root)])),buildArgsOrigins:new Map([...build.buildArgsOrigins.get(name)??[]].map(([key,value])=>[key,copyOrigin(value,root)])),requisiteOrigins:new Map([...build.requisiteOrigins.get(name)??[]].map(([key,value])=>[key,copyOrigin(value,root)]))});
     }
   }
   const tester=input.mesh?.tester??input.instances.get("")?.services.tester as TesterService;
@@ -74,6 +74,14 @@ function resolveJsonEnv(node:GraphNode, graph:EffectiveGraph, endpoints:Map<Node
   }return output;
 }
 function validateJsonEnv(node:GraphNode,graph:EffectiveGraph,endpoints:Map<NodeId,Record<string,ResolvedEndpoint>>,stage:Environment,composition:"service"|"mesh",shadowed:Set<string>):void{resolveJsonEnv(node,graph,endpoints,stage,composition,shadowed);}
+function resolveJsonBuildArgs(node:GraphNode,graph:EffectiveGraph,endpoints:Map<NodeId,Record<string,ResolvedEndpoint>>,stage:Environment,composition:"service"|"mesh",shadowed:Set<string>):Record<string,string>{
+  const output:Record<string,string>={};const main=node.declaration as EffectiveMain;
+  for(const [key,value] of Object.entries(main.buildArgs)){if(shadowed.has(key))continue;const origin=node.buildArgsOrigins.get(key)??node.origin;output[key]=interpolateBuilderReferences(value,{graph,endpoints,consumer:node.id,origin,stage,composition}).replace(/\$/g,"$$$$");}
+  return output;
+}
+function assertNoReservedBuildArgs(args:Record<string,string>,origin:(key:string)=>Origin,stage:Environment,composition:"service"|"mesh"):void{
+  for(const key of Object.keys(args))if(key.startsWith("BUILDER_")){const where=origin(key);throw new ConfigError({sourceFile:where.sourceFile,configPath:where.configPath,stage,composition,reason:"BUILDER_ build arguments are reserved for Builder",value:key});}
+}
 function validateReserved(node:GraphNode,keys:string[],stage:Environment,composition:"service"|"mesh"):void{
   for(const key of keys)if(key in node.declaration.env){const origin=node.envOrigins.get(key)??node.origin;assertNoBuilderOwnedEnvKeys({[key]:node.declaration.env[key]},[key],{sourceFile:origin.sourceFile,configPath:origin.configPath.replace(/\.env\.[^.]+$/,'.env'),stage,composition});}
 }
@@ -82,6 +90,7 @@ export function compileGraphComposition(input:GraphCompileInput):CompiledComposi
   const projectName=deriveProjectName(input.name,input.stage,input.projectDir),compose:ComposeDocument={name:projectName,services:{},networks:{builder:{driver:"bridge"}}};
   const mainServiceNames=new Map<NodeId,string>(),modules=new Map<NodeId,MaterializedModule>(),runtimeServiceNames:string[]=[],deferredHealthChecks:DeferredHealthCheck[]=[];
   const mainOverrideEnv=new Map<NodeId,Record<string,string|null>>();
+  const mainOverrideBuildArgs=new Map<NodeId,Record<string,string>>();
   for(const [id,node] of [...graph.nodes].sort(([a],[b])=>a.localeCompare(b))){
     if(node.kind==="main"){
       resolveApplicationDockerfile(node.projectDir,"Dockerfile",input.stage);
@@ -93,9 +102,9 @@ export function compileGraphComposition(input:GraphCompileInput):CompiledComposi
       const selected=selectedOverride(input.instances.get(node.meshRoot??"")!,"main");
       if(selected){const file=resolveInsideProject(selected.origin.projectDir,selected.path,{sourceFile:selected.origin.sourceFile,configPath:selected.origin.configPath,stage:input.stage});const raw=loadComposeDocument(file,{sourceFile:selected.origin.sourceFile,configPath:selected.origin.configPath,stage:input.stage,composition:input.composition});const rebased=rebaseAppOverridePaths(raw,selected.origin.projectDir,input.projectDir);const prepared=validateAndPrepareMainOverride(rebased,{file,stage:input.stage,expectedBuildContext:String(build.context),buildContextBaseDir:input.projectDir,allocator,resourceNamespace:node.meshRoot??"main"});validateMaterializedComposeFiles(raw,file,input.stage,{baseDir:selected.origin.projectDir,composition:input.composition});for(const section of ["volumes","networks","configs","secrets"] as const)if(prepared.resources[section])mergeDocument(compose,{services:{},[section]:prepared.resources[section]} as ComposeDocument,selected.origin,input.stage);
         mainOverrideEnv.set(id,normalizeComposeEnvironment(prepared.main.environment,`${selected.origin.configPath}.services.main.environment`));
+        if(prepared.main.build&&typeof prepared.main.build==="object"&&Object.hasOwn(prepared.main.build,"args"))mainOverrideBuildArgs.set(id,normalizeComposeBuildArgs((prepared.main.build as Record<string,unknown>).args,"services.main.build.args",file));
         const overlay={...prepared.main};delete overlay.environment;delete overlay.build;
         Object.assign(service,mergeMainOverride(service,overlay));
-        if(prepared.main.build&&typeof prepared.main.build==="object")Object.assign(service.build as Record<string,unknown>,{args:(prepared.main.build as Record<string,unknown>).args});
       }
       withBuilderNetwork(service);compose.services[serviceName]=service;runtimeServiceNames.push(serviceName);
     }else{
@@ -125,7 +134,9 @@ export function compileGraphComposition(input:GraphCompileInput):CompiledComposi
   const intents=resolvePublicationIntent(graph,input.stage,input.composition,publish,input.mesh?.sourceFile,publishOrigins);
   for(const item of intents){const record=endpoints.get(item.nodeId)![item.endpoint]!;record.effectivelyPublished=true;record.publicHost="127.0.0.1";record.publicPort=1;}
   // Validate only winning Builder JSON references before any AUTO allocation.
-  for(const [id,node] of graph.nodes){const override=mainOverrideEnv.get(id)??{};const shadowed=new Set(node.kind==="main"?Object.keys(override).filter(key=>node.envOrigins.get(key)?.scope!=="mesh"):[]);validateJsonEnv(node,graph,endpoints,input.stage,input.composition,shadowed);}
+  for(const [id,node] of graph.nodes){const override=mainOverrideEnv.get(id)??{};const shadowed=new Set(node.kind==="main"?Object.keys(override).filter(key=>node.envOrigins.get(key)?.scope!=="mesh"):[]);validateJsonEnv(node,graph,endpoints,input.stage,input.composition,shadowed);
+    if(node.kind==="main"){const args=(node.declaration as EffectiveMain).buildArgs,overrideArgs=mainOverrideBuildArgs.get(id)??{};assertNoReservedBuildArgs(args,key=>node.buildArgsOrigins.get(key)??node.origin,input.stage,input.composition);const overrideFile=selectedOverride(input.instances.get(node.meshRoot??"")!,"main");assertNoReservedBuildArgs(overrideArgs,key=>({sourceFile:overrideFile?.origin.sourceFile??node.origin.sourceFile,configPath:`services.main.build.args.${key}`,projectDir:node.projectDir,scope:node.origin.scope,layer:node.origin.layer}),input.stage,input.composition);resolveJsonBuildArgs(node,graph,endpoints,input.stage,input.composition,new Set(Object.keys(overrideArgs).filter(key=>node.buildArgsOrigins.get(key)?.scope!=="mesh")));}
+  }
   const tester=input.mesh?.tester??input.instances.get("")?.services.tester as TesterService;
   const testerOrigin:Origin=input.mesh?{sourceFile:input.mesh.sourceFile,configPath:"services.tester",projectDir:input.projectDir,scope:"mesh",layer:"base"}:{sourceFile:input.instances.get("")!.sourceFile,configPath:"services.tester",projectDir:input.projectDir,scope:"build",layer:"base"};
   const testerLayers=input.mesh?input.mesh.testerLayers.map(layer=>({entry:layer.services.tester,origin:layer.origin})):input.instances.get("")!.layers.map(layer=>({entry:layer.services.tester,origin:{...layer.origin,configPath:`${layer.origin.configPath}.tester`}}));
@@ -144,6 +155,12 @@ export function compileGraphComposition(input:GraphCompileInput):CompiledComposi
       const sourceEnv=Object.fromEntries(Object.entries(buildEnv).filter(([key])=>node.envOrigins.get(key)?.scope!=="mesh"));
       const meshEnv=Object.fromEntries(Object.entries(buildEnv).filter(([key])=>node.envOrigins.get(key)?.scope==="mesh"));
       service.environment={...sourceEnv,...override,...meshEnv,EXEC_MODE:profile.execMode,INFRA_MODE:profile.infraMode,...(primary?{PORT:String(primary.port)}:{})};
+      const overrideArgs=mainOverrideBuildArgs.get(id)??{},shadowedArgs=new Set(Object.keys(overrideArgs).filter(key=>node.buildArgsOrigins.get(key)?.scope!=="mesh"));
+      const resolvedArgs=resolveJsonBuildArgs(node,graph,endpoints,input.stage,input.composition,shadowedArgs);
+      const sourceArgs=Object.fromEntries(Object.entries(resolvedArgs).filter(([key])=>node.buildArgsOrigins.get(key)?.scope!=="mesh"));
+      const meshArgs=Object.fromEntries(Object.entries(resolvedArgs).filter(([key])=>node.buildArgsOrigins.get(key)?.scope==="mesh"));
+      const effectiveArgs={...sourceArgs,...overrideArgs,...meshArgs};
+      if(Object.keys(effectiveArgs).length||mainOverrideBuildArgs.has(id))(service.build as Record<string,unknown>).args=effectiveArgs;
     }else{
       const module=modules.get(id)!;for(const name of module.serviceNames){const service=compose.services[name]!;const defaults=normalizeComposeEnvironment(service.environment,`services.${name}.environment`);assertNoBuilderOwnedEnvKeys(defaults,[EXEC_MODE_KEY,INFRA_MODE_KEY],{sourceFile:module.sourceFile,configPath:`services.${name}.environment`,stage:input.stage,composition:input.composition});service.environment={...defaults,...resolveJsonEnv(node,graph,endpoints,input.stage,input.composition,new Set())};}
     }

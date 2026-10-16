@@ -3,7 +3,7 @@ import path from "node:path";
 import { canonicalPath } from "../../utils/paths.js";
 import { parseVolume, namespaceVolume, isHostFilesystemRoot } from "./composeVolumes.js";
 import { ConfigError } from "../../errors/ConfigError.js";
-import { normalizeComposeEnvironment } from "./composeEnvironment.js";
+import { normalizeComposeBuildArgs, normalizeComposeEnvironment } from "./composeEnvironment.js";
 import { namespaceResourceDefinition } from "./namespaceResourceDefinition.js";
 import { validateComposeResourceReferences } from "./validateComposeResourceReferences.js";
 import type { ComposeDocument, ComposeService } from "./types.js";
@@ -81,6 +81,7 @@ export function validateAndPrepareMainOverride(document:ComposeDocument,context:
     fail("services.main.build.context", "override cannot change main build context", build.context);
    }
   }
+  if (build.args !== undefined) build.args=normalizeComposeBuildArgs(build.args,"services.main.build.args",context.file);
  }
  const env=normalizeComposeEnvironment(main.environment,"services.main.environment");for(const k of ["EXEC_MODE","INFRA_MODE"])if(k in env)fail(`services.main.environment.${k}`,"override cannot set Builder-owned environment");main.environment=env;
  const allocator=context.allocator??new GeneratedComposeNameAllocator();

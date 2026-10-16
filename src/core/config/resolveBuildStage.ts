@@ -11,6 +11,7 @@ export function resolveBuildStage(build: BuildJson, stage: Environment, sourceFi
   const services = structuredClone(build.services) as unknown as Record<string, Record<string,unknown>>;
   const origins = new Map<string,Origin>();
   const envOrigins = new Map<string,Map<string,Origin>>();
+  const buildArgsOrigins = new Map<string,Map<string,Origin>>();
   const requisiteOrigins = new Map<string,Map<string,Origin>>();
   const layers: EffectiveBuildConfig["layers"] = [];
   const deletedRequisiteTargets: {target:string;path:string}[] = [];
@@ -21,6 +22,9 @@ export function resolveBuildStage(build: BuildJson, stage: Environment, sourceFi
     const env = envOrigins.get(name) ?? new Map<string,Origin>();
     for (const key of Object.keys((entry.env as Record<string,string>) ?? {})) env.set(key, originFor(sourceFile, `${where}.env.${key}`, layer));
     envOrigins.set(name, env);
+    const args = buildArgsOrigins.get(name) ?? new Map<string,Origin>();
+    for (const key of Object.keys((entry.buildArgs as Record<string,string>) ?? {})) args.set(key, originFor(sourceFile, `${where}.buildArgs.${key}`, layer));
+    buildArgsOrigins.set(name, args);
     const edges = requisiteOrigins.get(name) ?? new Map<string,Origin>();
     for (const [key, value] of Object.entries((entry.requisites as Record<string,unknown>) ?? {})) {
       if (value === false) edges.delete(key); else edges.set(key, originFor(sourceFile, `${where}.requisites.${key}`, layer));
@@ -62,8 +66,8 @@ export function resolveBuildStage(build: BuildJson, stage: Environment, sourceFi
       const primary = Object.values(endpoints).find(endpoint => endpoint.primary);
       if (primary?.service && value.service !== primary.service) fail(sourceFile, stage, `${originPath}.service`, "top-level service must equal primary endpoint owner", value.service);
     }
-    value.env ??= {}; value.endpoints ??= {}; value.requisites ??= {};
+    value.env ??= {}; if(name === "main") value.buildArgs ??= {}; value.endpoints ??= {}; value.requisites ??= {};
     value.kind = name === "main" ? "main" : "ordinary";
   }
-  return { name: build.name, services: services as unknown as Record<string,EffectiveService|TesterService>, layers, origins, envOrigins, requisiteOrigins, sourceFile, projectDir: path.dirname(sourceFile) };
+  return { name: build.name, services: services as unknown as Record<string,EffectiveService|TesterService>, layers, origins, envOrigins, buildArgsOrigins, requisiteOrigins, sourceFile, projectDir: path.dirname(sourceFile) };
 }
