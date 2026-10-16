@@ -24,6 +24,14 @@ export function buildV3Catalog():V3Case[]{
     ["FIX04","Mesh requisite target is invalid","Diagnostic displays the authored target without compiler prefix"],
     ["FIX05","Dormant ordinary service owner differs from primary endpoint","Isolated dev rejects the mismatch at build.json service path"],
   ])descriptions.set(id!,{setup:setup!,action:"Compile the focused V3 regression fixture",expected:expected!});
+  for(const [id,setup,expected] of [
+    ["ENV21","Escaped quotes in double-quoted dotenv values","Value retains its quoted content"],
+    ["ENV22","Colon-separated Builder-owned dotenv key","Compilation rejects the key"],
+    ["LIF23","Platform flags on Dockerfile FROM instructions","Required stage aliases resolve"],
+    ["LIF24","Compose lifecycle cycle","Diagnostic names services.depends_on"],
+    ["CLI11","Application environment requests a live port","Export uses the cached available port"],
+    ["CMP25","Ordinary service owner mismatch in JSON or mesh overlay","Diagnostic identifies the declaring JSON file"],
+  ])descriptions.set(id!,{setup:setup!,action:"Run the focused V3 regression fixture",expected:expected!});
   const sections=new Map<string,Set<string>>(),invariants=new Map<string,Set<number>>();
   const mapping=fs.readFileSync(path.join(planRoot,files[2]!),"utf8");
   for(const line of mapping.split("\n")){

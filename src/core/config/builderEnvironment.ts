@@ -12,5 +12,5 @@ export function assertNoBuilderOwnedEnvKeys(env:Record<string,unknown>,keys:read
 
 export function assertDotenvDoesNotDefineKeys(filePath:string,keys:readonly string[],context:Omit<BuilderEnvContext,"sourceFile">):void{
  if(!fs.existsSync(filePath))return;const forbidden=new Set(keys),lines=fs.readFileSync(filePath,"utf8").split(/\r?\n/);
- for(let index=0;index<lines.length;index+=1){const match=/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(lines[index]!);if(!match)continue;const key=match[1]!;if(!forbidden.has(key))continue;throw new ConfigError({sourceFile:filePath,configPath:`${context.configPath}.${key}`,stage:context.stage,composition:context.composition,value:`line ${index+1}`,reason:`Environment file cannot set Builder-owned key "${key}"`});}
+ for(let index=0;index<lines.length;index+=1){const match=/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*[:=]/.exec(lines[index]!);if(!match)continue;const key=match[1]!;if(!forbidden.has(key))continue;throw new ConfigError({sourceFile:filePath,configPath:`${context.configPath}.${key}`,stage:context.stage,composition:context.composition,value:`line ${index+1}`,reason:`Environment file cannot set Builder-owned key "${key}"`});}
 }

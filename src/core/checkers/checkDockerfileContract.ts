@@ -14,7 +14,7 @@ export function assertMainDockerfileContract(projectDir:string,activeStage:"dev"
   const lines=readFileSync(file,"utf8").replace(/\\\r?\n\s*/g," ").split(/\r?\n/);
   const stages=new Map<string,DockerStage>();let current:DockerStage|undefined;
   for(const raw of lines){const line=raw.trim();if(!line||line.startsWith("#"))continue;
-    const from=/^FROM\s+(\S+)(?:\s+AS\s+(\S+))?/i.exec(line);
+    const from=/^FROM\s+(?:--\S+\s+)*(\S+)(?:\s+AS\s+(\S+))?/i.exec(line);
     if(from){current={name:(from[2]??`__${stages.size}`).toLowerCase(),parent:from[1]!.toLowerCase()};stages.set(current.name,current);continue;}
     if(!current)continue;
     const instruction=/^(CMD|ENTRYPOINT|HEALTHCHECK)\s+(.+)$/i.exec(line);

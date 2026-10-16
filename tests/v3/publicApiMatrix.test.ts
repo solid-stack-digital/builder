@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import net from "node:net";
 import { afterEach,describe,expect,it,vi } from "vitest";
 import { parse as parseYaml } from "yaml";
 import { createCli,runCli,compileEnvironment,compileMeshEnvironment,compileApplicationEnv,serializeApplicationEnv } from "../../src/index.js";
@@ -7,9 +8,11 @@ import { compileServiceComposition } from "../../src/core/composition/compileSer
 import { basicBuild,writeBasic } from "./support/fixtures.js";
 import { checkInfra } from "../../src/core/checkers/checkInfra.js";
 import { checkMesh } from "../../src/core/mesh/checkers/checkMesh.js";
+import { persistHostPortAllocations } from "../../src/core/config/hostPorts.js";
 
 afterEach(()=>vi.restoreAllMocks());
 describe("V3 public command and API contract",()=>{
+ it("[CLI11] application env honors explicit live port allocation",async()=>{const root=writeBasic(),file=path.join(root,"build.json"),build=JSON.parse(fs.readFileSync(file,"utf8"));build.services.main.env={PUBLIC_PORT:"${main.endpoints.http.public_port}"};fs.writeFileSync(file,JSON.stringify(build));const server=net.createServer();await new Promise<void>(resolve=>server.listen(0,"127.0.0.1",resolve));const address=server.address();if(!address||typeof address==="string")throw new Error("Missing temporary port");const port=address.port;await new Promise<void>(resolve=>server.close(()=>resolve()));persistHostPortAllocations(root,new Map([["main.endpoints.http",port]]));const env=compileApplicationEnv("dev",root,{validationMode:false},yaml=>({services:{main:{environment:parseYaml(yaml).services.main.environment}}}));expect(env.PUBLIC_PORT).toBe(String(port));});
  it("[CLI01] both package aliases dispatch the same built executable",()=>{const pkg=JSON.parse(fs.readFileSync("package.json","utf8"));expect(pkg.bin.builder).toBe(pkg.bin["solid-builder"]);expect(fs.existsSync(path.resolve(pkg.bin.builder))).toBe(true);const cli=createCli();expect(cli.name()).toBe("builder");});
  it.each([["service","unknown"],["mesh","test-e2e"],["mesh","test-unit"]])("[CLI03] unsupported %s target %s rejects before runtime",async(group,stage)=>{const root=writeBasic();await expect(runCli(["node","builder",group,"up",stage,"-C",root,"--skip-checks","--dry-run"])).rejects.toThrow(/Unsupported|Unknown|not supported|Valid|dev|prod|test/);});
  it("[CLI04] public help names supported targets and workflows",()=>{const cli=createCli(),help=cli.helpInformation();expect(help).toContain("service");expect(help).toContain("mesh");const service=cli.commands.find(c=>c.name()==="service")!,mesh=cli.commands.find(c=>c.name()==="mesh")!;expect(service.commands.find(c=>c.name()==="up")!.helpInformation()).toContain("test-e2e");const meshHelp=mesh.commands.find(c=>c.name()==="up")!.helpInformation();expect(meshHelp).toContain("dev, prod, test");expect(meshHelp).not.toContain("up test-e2e");});

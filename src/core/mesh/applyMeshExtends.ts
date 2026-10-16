@@ -18,7 +18,13 @@ export function applyMeshExtends(mesh: EffectiveMeshConfig, builds: Map<string,E
       if (canonicalPatch.requisites) {
         canonicalPatch.requisites = Object.fromEntries(Object.entries(canonicalPatch.requisites as Record<string,unknown>).map(([target, kind]) => [target.startsWith("source.") ? target.slice(7) : `@mesh:${target}`, kind]));
       }
-      build.services[name] = applyServiceOverlay(old as EffectiveService & Record<string,unknown>, canonicalPatch) as EffectiveService;
+      const merged = applyServiceOverlay(old as EffectiveService & Record<string,unknown>, canonicalPatch) as EffectiveService;
+      if (name !== "main" && name !== "tester") {
+        const ordinary = merged as Extract<EffectiveService,{kind:"ordinary"}>;
+        const primary = Object.values(ordinary.endpoints ?? {}).find(endpoint => endpoint.primary);
+        if (primary?.service && ordinary.service && ordinary.service !== primary.service) throw new ConfigError({sourceFile:mesh.sourceFile,configPath:`${origin.configPath}.service`,stage,composition:"mesh",referencedObject:`${root}.source.${name}`,reason:"top-level service must equal primary endpoint owner",value:ordinary.service});
+      }
+      build.services[name] = merged;
       const env = build.envOrigins.get(name) ?? new Map<string,Origin>();
       for (const key of Object.keys((patch.env as Record<string,string>) ?? {})) env.set(key,{ ...origin, configPath: `${origin.configPath}.env.${key}` });
       build.envOrigins.set(name,env);

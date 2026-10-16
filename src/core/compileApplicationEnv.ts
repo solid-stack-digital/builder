@@ -22,7 +22,7 @@ export function compileApplicationEnv(
   resolver: ResolveComposeConfig = resolveComposeConfig,
 ): Record<string, string> {
   const dir = resolveProjectDir(projectDir);
-  const compiled=compileServiceComposition(stage,dir,{...options,validationMode:true});
+  const compiled=compileServiceComposition(stage,dir,{validationMode:true,...options});
   const main=compiled.mainServiceNames.get(nodeId(undefined,"main"));
   const yaml = stringify(compiled.compose);
   const config = resolver(yaml,dir);

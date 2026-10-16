@@ -1,11 +1,11 @@
 import { ConfigError } from "../../errors/ConfigError.js";
-import type { EffectiveOrdinary } from "../config/types.js";
+import type { EffectiveOrdinary, Origin } from "../config/types.js";
 import { assertComposeLifecycleAcyclic } from "./assertComposeLifecycleAcyclic.js";
 import { validateComposeResourceReferences } from "./validateComposeResourceReferences.js";
 import { parseVolume, isHostFilesystemRoot } from "./composeVolumes.js";
 import { isEnabledValidComposeHealthcheck } from "./composeHealthcheck.js";
 import type { ComposeDocument } from "./types.js";
-export function validateServiceCompose(name:string, declaration:EffectiveOrdinary, document:ComposeDocument, context:{composePath:string;stage:string;composition:"service"|"mesh";healthRequired:boolean;prerequisite:boolean;deferHealth?:(representative:string)=>void}):string {
+export function validateServiceCompose(name:string, declaration:EffectiveOrdinary, document:ComposeDocument, context:{composePath:string;stage:string;composition:"service"|"mesh";healthRequired:boolean;prerequisite:boolean;declarationOrigin?:Origin;deferHealth?:(representative:string)=>void}):string {
   const fail=(configPath:string,reason:string,value?:unknown):never=>{throw new ConfigError({sourceFile:context.composePath,configPath,stage:context.stage,composition:context.composition,referencedObject:name,reason,value});};
   if(document.include!==undefined)fail("include","Compose include is unsupported for atomic service implementations");
   validateComposeResourceReferences(document,{sourceFile:context.composePath,stage:context.stage,composition:context.composition});
@@ -25,7 +25,7 @@ export function validateServiceCompose(name:string, declaration:EffectiveOrdinar
   }
   const endpoints=declaration.endpoints;
   let representative:string;
-  if(Object.keys(endpoints).length){const primary=Object.values(endpoints).find(endpoint=>endpoint.primary);representative=primary!.service;if(declaration.service&&declaration.service!==representative)fail("service","top-level service must equal primary endpoint owner");}
+  if(Object.keys(endpoints).length){const primary=Object.values(endpoints).find(endpoint=>endpoint.primary);representative=primary!.service;if(declaration.service&&declaration.service!==representative){const origin=(declaration as EffectiveOrdinary & {origin?:Origin}).origin??context.declarationOrigin;if(origin)throw new ConfigError({sourceFile:origin.sourceFile,configPath:`${origin.configPath}.service`,stage:context.stage,composition:context.composition,referencedObject:name,reason:"top-level service must equal primary endpoint owner",value:declaration.service});fail("service","top-level service must equal primary endpoint owner");}}
   else {if(!declaration.service)fail("service","endpoint-less service requires service");representative=declaration.service!;}
   if(!services[representative])fail("service","lifecycle representative does not exist",representative);
   for(const [endpoint,definition] of Object.entries(endpoints)){
