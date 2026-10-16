@@ -1,26 +1,32 @@
 {
+  "name": "largeproject",
   "services": {
+    "tester": {
+      "compose": "./e2e/docker-compose.yml",
+      "service": "global-e2e",
+      "env": {
+        "BACKEND_URL": "${backend.source.main.endpoints.http.public_url}"
+      }
+    },
     "auth-api": {
-      "path": "./services/auth-api"
+      "source": "./services/auth-api"
     },
     "backend": {
-      "path": "./services/backend",
-      "dependencies": {
-        "auth-api": "auth-api"
-      },
-      "env": {
-        "AUTH_API_URL": "${auth-api.app.endpoints.http.network_url}"
-      },
+      "source": "./services/backend",
       "publish": [
-        "app.endpoints.http"
-      ]
-    }
-  },
-  "tester": {
-    "compose": "./e2e/docker-compose.yml",
-    "service": "global-e2e",
-    "env": {
-      "BACKEND_URL": "${backend.app.endpoints.http.public_url}"
+        "main.endpoints.http"
+      ],
+      "extends": {
+        "main": {
+          "requisites": {
+            "source.auth-api": false,
+            "auth-api": "dependency"
+          },
+          "env": {
+            "AUTH_API_URL": "${auth-api.source.main.endpoints.http.network_url}"
+          }
+        }
+      }
     }
   }
 }

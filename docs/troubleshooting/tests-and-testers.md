@@ -1,18 +1,3 @@
-# Troubleshoot tests and testers
+# Test and tester errors
 
-**Removed mesh unit command:** `mesh up test-unit` and `mesh down test-unit` are no longer supported. Use `builder service up test-unit -C <service>` for isolated tests, or `builder mesh up test` for the full pipeline. `build.json.test` and `.env.test` remain supported; see [migration](../migration/v2.1-to-v2.2.md).
-
-- **`mesh test-e2e` says tester is missing:** configure root `mesh.json.tester.compose` and `tester.service`; the `mesh up test` pipeline also needs it.
-- **`mesh check --require-tester` fails:** root global tester is absent or invalid; this option intentionally makes it required.
-- **Tester service not found:** `tester.service` must exactly match a service key in tester Compose; Builder does not infer a runner.
-- **Service tester cannot reach app:** service tester is outside the app network; publish the app endpoint and use a public property.
-- **E2E unexpectedly lacks a value:** E2E inherits structured `prod` values before `e2e`; it uses `.env.e2e` and does not merge `.env.prod`. The app uses `EXEC_MODE=prod`; only the tester uses `EXEC_MODE=e2e`.
-- **Confusing service/global E2E:** service E2E runs one production-mode app with local dependencies and its `test-e2e` tester. Global mesh E2E runs production-mode apps with the root tester. Canonical `mesh test` runs each root service unit + service E2E lifecycle before global E2E.
-
-See [testing model](../concepts/testing-model.md), [service E2E](../guides/configure-service-e2e.md), and [global mesh E2E](../guides/configure-global-mesh-e2e.md).
-
-## Related
-
-- [Stage matrix](../reference/stage-matrix.md)
-- [Global tester guide](../guides/configure-global-mesh-e2e.md)
-- [CLI reference](../reference/cli.md)
+Both source and mesh testers require a Compose path and selected runner service. Verify the selected service name exists; a helper exit does not determine the test result. E2E uses a production main in integrated mode, while tester receives no Builder `EXEC_MODE`, `INFRA_MODE` or `PORT`. Source Phase 1 failures stop later sources and global E2E. Strict cleanup failure makes the workflow fail and may leave saved state for recovery; inspect that state and use matching project down. A tester expecting the old main `test-e2e` target must be extracted to its own Compose implementation. See [testing model](../concepts/testing-model.md).

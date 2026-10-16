@@ -1,48 +1,64 @@
+import path from "node:path";
 import { ConfigError } from "../../errors/ConfigError.js";
-import type { BuildJson, DependencyConfig, Environment } from "../../types/index.js";
-import type { EffectiveBuildConfig, EffectiveBuildLayer } from "./types.js";
+import type { BuildJson, Environment, MainService, OrdinaryService, TesterService } from "../../types/index.js";
 import { assertPrimaryEndpointInvariant } from "./endpointProperties.js";
-import { assertAcyclicGraph, type LifecycleGraph } from "./lifecycleGraph.js";
-import { mergeStringMap, stageOverlayChain, unionStable } from "./stageMerge.js";
-import { DEPENDENCY_REFERENCE_PATTERN } from "./constants.js";
+import { applyServiceOverlay, stageOverlayChain } from "./stageMerge.js";
+import type { EffectiveBuildConfig, EffectiveService, Origin } from "./types.js";
 
+const originFor = (sourceFile: string, configPath: string, layer: "base" | Environment): Origin => ({ sourceFile, configPath, projectDir: path.dirname(sourceFile), scope: "build", layer });
+const fail = (sourceFile: string, stage: Environment, configPath: string, reason: string, value?: unknown): never => { throw new ConfigError({ sourceFile, stage, composition: "service", configPath, reason, value }); };
 export function resolveBuildStage(build: BuildJson, stage: Environment, sourceFile: string): EffectiveBuildConfig {
- const context = (configPath: string, value: unknown, reason: string, referencedObject?: string): ConfigError => new ConfigError({ sourceFile, configPath, stage, composition: "service", value, ...(referencedObject ? { referencedObject } : {}), reason });
- const appEnv = { ...(build.app.env ?? {}) };
- const appEndpoints: Record<string, any> = structuredClone(build.app.endpoints ?? {});
- const dependencies: Record<string, any> = {};
- for (const [name, dep] of Object.entries(build.dependencies ?? {})) dependencies[name] = { ...dep, env: { ...(dep.env ?? {}) }, endpoints: structuredClone(dep.endpoints ?? {}), dependsOn: [...(dep.dependsOn ?? [])] };
- const layers: EffectiveBuildLayer[] = [{ stage: "base", appEnv: { ...(build.app.env ?? {}) } }];
-
- for (const overlayStage of stageOverlayChain(stage)) {
-  const overlay = build[overlayStage];
-  if (!overlay) continue;
-  Object.assign(appEnv, overlay.app?.env ?? {});
-  for (const [name, endpoint] of Object.entries(overlay.app?.endpoints ?? {})) appEndpoints[name] = { ...(appEndpoints[name] ?? {}), ...endpoint };
-  for (const [name, patch] of Object.entries(overlay.dependencies ?? {})) {
-   const inherited = dependencies[name];
-   if (inherited && patch.compose !== undefined) throw context(`${overlayStage}.dependencies.${name}.compose`, patch.compose, "A stage cannot replace the Compose implementation of an inherited dependency", `dependencies.${name}`);
-   const next = inherited ?? { compose: undefined, env: {}, endpoints: {}, dependsOn: [] };
-   if (!inherited && patch.compose !== undefined) next.compose = patch.compose;
-   next.env = mergeStringMap(next.env, patch.env);
-   for (const [endpointName, endpointPatch] of Object.entries(patch.endpoints ?? {})) next.endpoints[endpointName] = { ...(next.endpoints[endpointName] ?? {}), ...endpointPatch };
-   next.dependsOn = unionStable(next.dependsOn, patch.dependsOn);
-   dependencies[name] = next;
+  const services = structuredClone(build.services) as unknown as Record<string, Record<string,unknown>>;
+  const origins = new Map<string,Origin>();
+  const envOrigins = new Map<string,Map<string,Origin>>();
+  const requisiteOrigins = new Map<string,Map<string,Origin>>();
+  const layers: EffectiveBuildConfig["layers"] = [];
+  const deletedRequisiteTargets: {target:string;path:string}[] = [];
+  const record = (name: string, entry: Record<string,unknown>, layer: "base"|Environment) => {
+    const where = layer === "base" ? `services.${name}` : `${layer}.services.${name}`;
+    const origin = originFor(sourceFile, where, layer);
+    origins.set(name, origin);
+    const env = envOrigins.get(name) ?? new Map<string,Origin>();
+    for (const key of Object.keys((entry.env as Record<string,string>) ?? {})) env.set(key, originFor(sourceFile, `${where}.env.${key}`, layer));
+    envOrigins.set(name, env);
+    const edges = requisiteOrigins.get(name) ?? new Map<string,Origin>();
+    for (const [key, value] of Object.entries((entry.requisites as Record<string,unknown>) ?? {})) {
+      if (value === false) edges.delete(key); else edges.set(key, originFor(sourceFile, `${where}.requisites.${key}`, layer));
+    }
+    requisiteOrigins.set(name, edges);
+  };
+  for (const [name, value] of Object.entries(services).sort(([a],[b]) => a.localeCompare(b))) record(name, value, "base");
+  layers.push({ stage: "base", services: structuredClone(services), origin: originFor(sourceFile, "services", "base") });
+  for (const overlayStage of stageOverlayChain(stage)) {
+    const patches = (build[overlayStage]?.services ?? {}) as Record<string,Record<string,unknown>>;
+    for (const [name, patch] of Object.entries(patches).sort(([a],[b]) => a.localeCompare(b))) {
+      const current = services[name];
+      const where = `${overlayStage}.services.${name}`;
+      if (!current && (name === "main" || name === "tester")) fail(sourceFile, stage, where, "Required special service is missing from base");
+      if (current && patch.compose !== undefined && patch.compose !== current.compose) fail(sourceFile, stage, `${where}.compose`, `compose is immutable; previous declaration ${origins.get(name)?.configPath}.compose, attempted ${where}.compose`, patch.compose);
+      if (!current && name !== "main" && name !== "tester" && (typeof patch.compose !== "string" || !patch.compose.trim())) fail(sourceFile, stage, `${where}.compose`, "Stage-introduced service requires a complete compose declaration");
+      services[name] = current ? applyServiceOverlay(current, patch) : structuredClone(patch);
+      for (const [target,kind] of Object.entries((patch.requisites as Record<string,unknown>)??{})) if(kind===false)deletedRequisiteTargets.push({target,path:`${where}.requisites.${target}`});
+      record(name, patch, overlayStage);
+    }
+    layers.push({ stage: overlayStage, services: structuredClone(patches), origin: originFor(sourceFile, `${overlayStage}.services`, overlayStage) });
   }
-  layers.push({ stage: overlayStage, appEnv: { ...(overlay.app?.env ?? {}) }, ...(overlay["override-compose"] ? { overrideCompose: overlay["override-compose"] } : {}) });
- }
- const effective = { ...build, app: { env: appEnv, endpoints: appEndpoints }, dependencies, tester: build.tester ? { env: { ...(build.tester.env ?? {}) } } : undefined, layers } as EffectiveBuildConfig;
- delete (effective as any).dev; delete (effective as any).prod; delete (effective as any).test; delete (effective as any).e2e;
- for (const [name, ep] of Object.entries(appEndpoints)) if (!Number.isInteger(ep.port) || ep.port < 1 || ep.port > 65535) throw context(`app.endpoints.${name}.port`, ep.port, "Effective endpoint requires a port in 1..65535");
- assertPrimaryEndpointInvariant(appEndpoints, { sourceFile, configPath: "app.endpoints", stage });
- const graph: LifecycleGraph = new Map();
- for (const [name, dep] of Object.entries(dependencies)) {
-  if (typeof dep.compose !== "string" || !dep.compose.trim()) throw context(`dependencies.${name}.compose`, dep.compose, "Effective dependency requires compose");
-  for (const [epName, ep] of Object.entries(dep.endpoints) as [string, any][]) if (!ep.service || !Number.isInteger(ep.port) || ep.port < 1 || ep.port > 65535) throw context(`dependencies.${name}.endpoints.${epName}`, ep, "Effective dependency endpoint requires service and port");
-  assertPrimaryEndpointInvariant(dep.endpoints, { sourceFile, configPath: `dependencies.${name}.endpoints`, stage });
-  const node = `dependencies.${name}`; graph.set(node, new Set());
-  for (const ref of dep.dependsOn as string[]) { const match = DEPENDENCY_REFERENCE_PATTERN.exec(ref); if (!match) throw context(`dependencies.${name}.dependsOn`, ref, "Expected dependencies.<name> lifecycle reference", ref); const targetName = match[1]!; if (targetName === name) throw context(`dependencies.${name}.dependsOn`, ref, "Dependency cannot depend on itself", ref); const target = dependencies[targetName]; if (!target) throw context(`dependencies.${name}.dependsOn`, ref, "Unknown dependency", ref); if (!Object.keys(target.endpoints).length) throw context(`dependencies.${name}.dependsOn`, ref, "Lifecycle target is inert and has no endpoints", ref); graph.get(node)!.add(`dependencies.${targetName}`); }
- }
- assertAcyclicGraph(graph, { sourceFile, stage, composition: "service" });
- return effective;
+  for(const deleted of deletedRequisiteTargets)if(!(deleted.target in services))fail(sourceFile,stage,deleted.path,"Unknown requisite target",deleted.target);
+  for (const [name, value] of Object.entries(services)) {
+    if (name === "tester") {
+      if (typeof value.compose !== "string" || typeof value.service !== "string") fail(sourceFile, stage, `services.${name}`, "Effective tester requires compose and service");
+      continue;
+    }
+    const endpoints = (value.endpoints ?? {}) as Record<string, { port?: number; service?: string; primary?: boolean }>;
+    for (const [endpointName, endpoint] of Object.entries(endpoints)) {
+      if (!Number.isInteger(endpoint.port) || endpoint.port! < 1 || endpoint.port! > 65535) fail(sourceFile, stage, `services.${name}.endpoints.${endpointName}.port`, "Effective endpoint requires port in 1..65535", endpoint.port);
+      if (name !== "main" && (typeof endpoint.service !== "string" || !endpoint.service.trim())) fail(sourceFile, stage, `services.${name}.endpoints.${endpointName}.service`, "Effective ordinary endpoint requires service");
+    }
+    assertPrimaryEndpointInvariant(endpoints, { sourceFile, stage, configPath: `services.${name}.endpoints` });
+    if (name !== "main" && (typeof value.compose !== "string" || !value.compose.trim())) fail(sourceFile, stage, `services.${name}.compose`, "Effective ordinary service requires compose");
+    if (name !== "main" && Object.keys(endpoints).length === 0 && (typeof value.service !== "string" || !value.service.trim())) fail(sourceFile, stage, `services.${name}.service`, "endpoint-less service requires service");
+    value.env ??= {}; value.endpoints ??= {}; value.requisites ??= {};
+    value.kind = name === "main" ? "main" : "ordinary";
+  }
+  return { name: build.name, services: services as unknown as Record<string,EffectiveService|TesterService>, layers, origins, envOrigins, requisiteOrigins, sourceFile, projectDir: path.dirname(sourceFile) };
 }

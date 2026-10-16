@@ -1,20 +1,3 @@
-# Define multiple app and dependency endpoints
+# Give one service multiple endpoints
 
-An app can declare HTTP as primary and metrics as secondary:
-
-```json
-{
-  "app": { "endpoints": {
-    "http": { "port": 3000, "publicPort": "AUTO", "primary": true, "scheme": "http" },
-    "metrics": { "port": 9090, "scheme": "http" }
-  } }
-}
-```
-
-A dependency can expose API and admin UI on separate owners; each endpoint has explicit `service`, internal `port`, and optional publication metadata. Use `network_url` for service-to-service access and public properties only from host-side testers. See [endpoint properties](../reference/endpoint-properties.md).
-
-## Related
-
-- [Endpoints](../concepts/endpoints.md)
-- [build.json](../reference/build-json.md)
-- [Publication](../concepts/publication-and-ports.md)
+Declare several endpoints with their actual internal `port` and, for an ordinary module, owning `service`. Exactly one is primary. Main `PORT` follows its primary internal port; an ordinary module's representative follows its primary owner. A secondary owner does not become a separate logical lifecycle target and does not automatically need a healthcheck unless its own native Compose dependency requires one. Publish each desired reachable endpoint separately in a mesh. See [endpoints](../concepts/endpoints.md).

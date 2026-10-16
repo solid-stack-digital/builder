@@ -1,0 +1,9 @@
+services:
+  e2e-runner:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile
+      target: runner
+    network_mode: host
+    environment:
+      CI: "true"

@@ -1,25 +1,38 @@
+import path from "node:path";
 import { ConfigError } from "../../errors/ConfigError.js";
-import { RESERVED_MESH_SERVICE_NAMES, BUILDER_IDENTIFIER_PATTERN } from "./constants.js";
-import { assertAcyclicGraph, type LifecycleGraph } from "./lifecycleGraph.js";
-import { assertNoLegacyMeshTest, assertMeshConfigStage, meshStageOverlayChain } from "./meshStageContract.js";
-import { mergeStringMap, unionStable } from "./stageMerge.js";
-import type { EffectiveMeshConfig } from "./types.js";
-import type { MeshConfig, MeshConfigStage } from "../mesh/types.js";
+import type { MeshConfig, MeshConfigStage, MeshSourceService, MeshSourceOverlay } from "../mesh/types.js";
+import type { TesterService, TesterOverlay } from "../../types/index.js";
+import { assertMeshConfigStage, meshStageOverlayChain } from "./meshStageContract.js";
+import { mergeEffectiveObject } from "./stageMerge.js";
+import type { EffectiveMeshConfig, EffectiveMeshSource, Origin } from "./types.js";
+const originFor = (sourceFile: string, configPath: string, layer: "base"|MeshConfigStage): Origin => ({ sourceFile, configPath, projectDir: path.dirname(sourceFile), scope: "mesh", layer });
 export function resolveMeshStage(mesh: MeshConfig, stage: MeshConfigStage, sourceFile: string): EffectiveMeshConfig {
- assertNoLegacyMeshTest(mesh, sourceFile);
- assertMeshConfigStage(stage, sourceFile);
- if (Object.keys(mesh.services).length === 0) throw new ConfigError({ sourceFile, configPath: "services", stage, composition: "mesh", reason: "mesh.json must declare at least one root service" });
- const services: Record<string, any> = {};
- for (const [name, service] of Object.entries(mesh.services)) services[name] = { path: service.path, env: { ...(service.env ?? {}) }, dependencies: { ...(service.dependencies ?? {}) }, dependsOn: [...(service.dependsOn ?? [])], publish: [...(service.publish ?? [])] };
- for (const overlayStage of meshStageOverlayChain(stage)) for (const [name, patch] of Object.entries(mesh[overlayStage]?.services ?? {})) {
-  const prior = services[name] ?? { path: undefined, env: {}, dependencies: {}, dependsOn: [], publish: [] };
-  services[name] = { path: patch.path ?? prior.path, env: mergeStringMap(prior.env, patch.env), dependencies: { ...prior.dependencies, ...(patch.dependencies ?? {}) }, dependsOn: unionStable(prior.dependsOn, patch.dependsOn), publish: unionStable(prior.publish, patch.publish) };
- }
- if (!Object.keys(services).length) throw new ConfigError({ sourceFile, configPath: "services", stage, composition: "mesh", reason: "At least one effective mesh service is required" });
- for (const [name, service] of Object.entries(services)) if (!service.path) throw new ConfigError({ sourceFile, configPath: `services.${name}.path`, stage, composition: "mesh", reason: "Effective mesh service requires path" });
- const graph: LifecycleGraph = new Map();
- for (const [name, service] of Object.entries(services)) { if (!BUILDER_IDENTIFIER_PATTERN.test(name) || RESERVED_MESH_SERVICE_NAMES.has(name)) throw new ConfigError({ sourceFile, configPath: `services.${name}`, stage, composition: "mesh", value: name, reason: "Invalid or reserved mesh service name" }); graph.set(name, new Set()); for (const target of service.dependsOn as string[]) { if (target === name) throw new ConfigError({ sourceFile, configPath: `services.${name}.dependsOn`, stage, composition: "mesh", referencedObject: target, reason: "Mesh service cannot depend on itself" }); if (!services[target]) throw new ConfigError({ sourceFile, configPath: `services.${name}.dependsOn`, stage, composition: "mesh", referencedObject: target, reason: "Unknown mesh lifecycle target" }); graph.get(name)!.add(target); } }
- assertAcyclicGraph(graph, { sourceFile, stage, composition: "mesh" });
- const { dev: _dev, prod: _prod, e2e: _e2e, ...base } = mesh;
- return { ...base, services } as EffectiveMeshConfig;
+  assertMeshConfigStage(stage, sourceFile);
+  const sources: Record<string,EffectiveMeshSource> = {};
+  const baseSources = Object.keys(mesh.services).filter(name => name !== "tester").sort();
+  const testerLayers: EffectiveMeshConfig["testerLayers"] = [];
+  let tester = structuredClone(mesh.services.tester) as TesterService;
+  testerLayers.push({ stage: "base", services: { tester: structuredClone(tester) as unknown as Record<string,unknown> }, origin: originFor(sourceFile, "services.tester", "base") });
+  for (const name of baseSources) {
+    const entry = mesh.services[name] as MeshSourceService;
+    sources[name] = { source: entry.source, publish: [...(entry.publish ?? [])], extendsLayers: entry.extends ? [{ layer: "base", patches: structuredClone(entry.extends) as Record<string,Record<string,unknown>>, origin: originFor(sourceFile, `services.${name}.extends`, "base") }] : [], origin: originFor(sourceFile, `services.${name}`, "base") };
+  }
+  for (const layer of meshStageOverlayChain(stage)) for (const [name, patch] of Object.entries(mesh[layer]?.services ?? {}).sort(([a],[b]) => a.localeCompare(b))) {
+    if (name === "tester") {
+      const next = patch as TesterOverlay;
+      if (next.compose !== undefined && next.compose !== tester.compose) throw new ConfigError({ sourceFile, configPath: `${layer}.services.tester.compose`, stage, composition: "mesh", reason: "compose is immutable; previous services.tester.compose", value: next.compose });
+      tester = mergeEffectiveObject(tester, next);
+      testerLayers.push({ stage: layer, services: { tester: structuredClone(next) as unknown as Record<string,unknown> }, origin: originFor(sourceFile, `${layer}.services.tester`, layer) });
+      continue;
+    }
+    const next = patch as MeshSourceOverlay;
+    const old = sources[name];
+    if (old && next.source !== undefined && next.source !== old.source) throw new ConfigError({ sourceFile, configPath: `${layer}.services.${name}.source`, stage, composition: "mesh", reason: `source is immutable; previous ${old.origin.configPath}.source`, value: next.source });
+    if (!old && (!next.source || !next.source.trim())) throw new ConfigError({ sourceFile, configPath: `${layer}.services.${name}.source`, stage, composition: "mesh", reason: "Stage-introduced source requires source" });
+    const entry: EffectiveMeshSource = old ?? { source: next.source!, publish: [], extendsLayers: [], origin: originFor(sourceFile, `${layer}.services.${name}`, layer) };
+    if (next.publish !== undefined) entry.publish = structuredClone(next.publish);
+    if (next.extends) entry.extendsLayers.push({ layer, patches: structuredClone(next.extends) as Record<string,Record<string,unknown>>, origin: originFor(sourceFile, `${layer}.services.${name}.extends`, layer) });
+    sources[name] = entry;
+  }
+  return { name: mesh.name, services: sources, tester, testerLayers, sourceFile, projectDir: path.dirname(sourceFile), baseSources, raw: mesh };
 }

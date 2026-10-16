@@ -27,19 +27,16 @@ healthcheck_indices[a] := {i | some i; stage_at[i] in lineage[a]; input[i].Cmd =
 effective_healthcheck_index[a] := max(indices) if { indices := healthcheck_indices[a]; count(indices) > 0 }
 effective_healthcheck_value[a] := lower(concat(" ", input[index].Value)) if { index := effective_healthcheck_index[a] }
 has_valid_effective_healthcheck(a) if { value := effective_healthcheck_value[a]; value != "none" }
-artifact_copies[a] := {i | some i; stage_at[i] in lineage[a]; input[i].Cmd == "copy"; startswith(lower(input[i].Flags[_]), "--from=")} if { some j; a := alias_at[j] }
-
 deny contains msg if {
-  missing := {"dev", "test", "test-e2e", "prod"} - stages
+  missing := {"dev", "test", "prod"} - stages
   count(missing) > 0
   msg := sprintf("Missing required Dockerfile stages: %v", [missing])
 }
-deny contains "Hardcoded EXPOSE is forbidden; Builder owns endpoint publication" if { some i; input[i].Cmd == "expose" }
-deny contains "dev stage requires a default CMD" if { "dev" in stages; count(commands.dev) == 0 }
+deny contains "dev stage requires an effective CMD or ENTRYPOINT" if { "dev" in stages; not has_runtime_instruction("dev") }
+deny contains "test stage requires an effective CMD or ENTRYPOINT" if { "test" in stages; not has_runtime_instruction("test") }
 deny contains "prod stage requires an effective CMD or ENTRYPOINT" if { "prod" in stages; not has_runtime_instruction("prod") }
 deny contains "dev stage requires a valid HEALTHCHECK" if { "dev" in stages; not has_valid_effective_healthcheck("dev") }
 deny contains "prod stage requires a valid HEALTHCHECK" if { "prod" in stages; not has_valid_effective_healthcheck("prod") }
-deny contains "prod stage requires COPY --from= artifact isolation" if { "prod" in stages; count(artifact_copies.prod) == 0 }
 deny contains msg if {
   some i
   a := alias_at[i]

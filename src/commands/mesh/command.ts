@@ -9,7 +9,8 @@ export const registerMeshCommand = (program: Command) => {
     .command("mesh")
     .description("Manage and orchestrate multi-service mesh environments");
 
-  meshCmd.hook("preAction", () => {
+  meshCmd.hook("preAction", (_thisCommand,actionCommand) => {
+    if(actionCommand.name()==="up"){const options=actionCommand.opts(),stage=actionCommand.args[0]?.toLowerCase();if(options.dryRun||(stage&&!(["dev","prod","test"] as string[]).includes(stage)))return;}
     checkDependencies();
   });
 

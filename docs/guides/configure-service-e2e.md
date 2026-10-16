@@ -1,20 +1,3 @@
-# Configure service-level E2E
+# Configure a source E2E runner
 
-Service-level E2E runs an app with its local dependencies and a finite Dockerfile `test-e2e` tester. Configure `build.json.tester.env` for the tester. Because the tester is a host-side client, it may reference only effectively published public endpoint properties. The app endpoint must declare `publicPort`.
-
-The E2E app inherits structured configuration as `base -> prod -> e2e`, runs target `prod` with `EXEC_MODE=prod` and `INFRA_MODE=integrated`, and loads `.env.e2e`. It does not load or merge `.env.prod`. The tester runs target `test-e2e` with `EXEC_MODE=e2e`, no `INFRA_MODE`, and `.env.e2e-tester`.
-
-```json
-{
-  "app": { "endpoints": { "http": { "port": 3000, "publicPort": "AUTO", "primary": true, "scheme": "http" } } },
-  "tester": { "env": { "APP_URL": "${app.endpoints.http.public_url}" } }
-}
-```
-
-`network_url` is invalid in tester env because the tester is outside the app network; use `public_url`. Run `builder service up test-e2e`, or `builder service up test` to run unit tests first and E2E only after unit success.
-
-## Related
-
-- [Testing model](../concepts/testing-model.md)
-- [Endpoint properties](../reference/endpoint-properties.md)
-- [Stage matrix](../reference/stage-matrix.md)
+Create `e2e/Dockerfile` and `e2e/docker-compose.yml` in the source. Select the actual runner with `services.tester.compose` and `.service`; helpers may exist but their status does not determine success. Give the runner its own `.env.e2e-tester` and base/prod/e2e tester env. E2E builds the main `prod` target in integrated mode with `.env.e2e`, waits for the complete reachable graph, runs the selected runner, and cleans strictly. Host networking is appropriate for a runner that uses a loopback `public_url`; choose bridge networking for network URLs. See [testing model](../concepts/testing-model.md).

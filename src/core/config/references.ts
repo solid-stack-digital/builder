@@ -1,78 +1,38 @@
 import { ConfigError } from "../../errors/ConfigError.js";
-import { ENDPOINT_PROPERTIES, PUBLIC_ENDPOINT_PROPERTIES } from "./constants.js";
-import type { EndpointProperty } from "./types.js";
-
-export type ReferenceScope = "build" | "mesh";
-export interface ReferenceDiagnosticContext {
-  sourceFile: string;
-  configPath: string;
-  stage: string;
-  composition: "service" | "mesh";
-}
-export interface ParsedBuilderReference {
-  raw: string;
-  scope: ReferenceScope;
-  meshService?: string;
-  target: "app" | "dependency";
-  dependency?: string;
-  endpoint: string;
-  property: EndpointProperty;
-}
-
-const BUILD_APP = /^app\.endpoints\.([a-z][a-z0-9-]*)\.([a-z_]+)$/;
-const BUILD_DEP = /^dependencies\.([a-z][a-z0-9-]*)\.endpoints\.([a-z][a-z0-9-]*)\.([a-z_]+)$/;
-const MESH_APP = /^([a-z][a-z0-9-]*)\.app\.endpoints\.([a-z][a-z0-9-]*)\.([a-z_]+)$/;
-const MESH_DEP = /^([a-z][a-z0-9-]*)\.dependencies\.([a-z][a-z0-9-]*)\.endpoints\.([a-z][a-z0-9-]*)\.([a-z_]+)$/;
-
-function parse(raw: string, scope: ReferenceScope, context: ReferenceDiagnosticContext): ParsedBuilderReference {
+import { ENDPOINT_PROPERTIES } from "./constants.js";
+import { resolveEndpointProperty } from "./endpointProperties.js";
+import type { EffectiveGraph, EndpointProperty, NodeId, Origin, ResolvedEndpoint } from "./types.js";
+import { displayNode, nodeId } from "./types.js";
+export interface ParsedBuilderReference { raw: string; target: NodeId; endpoint: string; property: EndpointProperty; origin: Origin }
+export interface ReferenceContext { graph: EffectiveGraph; endpoints: Map<NodeId,Record<string,ResolvedEndpoint>>; consumer?: NodeId; origin: Origin; stage: string; composition: "service"|"mesh" }
+const token = /^([a-z][a-z0-9-]*)\.endpoints\.([a-z][a-z0-9-]*)\.([a-z_]+)$/;
+const sourceToken = /^source\.([a-z][a-z0-9-]*)\.endpoints\.([a-z][a-z0-9-]*)\.([a-z_]+)$/;
+const meshToken = /^([a-z][a-z0-9-]*)\.source\.([a-z][a-z0-9-]*)\.endpoints\.([a-z][a-z0-9-]*)\.([a-z_]+)$/;
+function fail(context: ReferenceContext, raw: string, reason: string): never { throw new ConfigError({ sourceFile: context.origin.sourceFile, configPath: context.origin.configPath, stage: context.stage, composition: context.composition, referencedObject: raw, reason }); }
+export function parseBuilderReference(raw: string, context: ReferenceContext): ParsedBuilderReference {
+  let target: NodeId, endpoint: string, property: string;
   let match: RegExpExecArray | null;
-  if (scope === "build" && (match = BUILD_APP.exec(raw))) return valid({ raw, scope, target: "app", endpoint: match[1]!, property: match[2]! }, context);
-  if (scope === "build" && (match = BUILD_DEP.exec(raw))) return valid({ raw, scope, target: "dependency", dependency: match[1]!, endpoint: match[2]!, property: match[3]! }, context);
-  if (scope === "mesh" && (match = MESH_APP.exec(raw))) return valid({ raw, scope, meshService: match[1]!, target: "app", endpoint: match[2]!, property: match[3]! }, context);
-  if (scope === "mesh" && (match = MESH_DEP.exec(raw))) return valid({ raw, scope, meshService: match[1]!, target: "dependency", dependency: match[2]!, endpoint: match[3]!, property: match[4]! }, context);
-  throw new ConfigError({ ...context, referencedObject: raw, value: raw, reason: `Invalid ${scope} endpoint reference` });
+  if (context.origin.scope === "build" && (match = token.exec(raw))) { target = nodeId(context.origin.meshRoot,match[1]!); endpoint=match[2]!;property=match[3]!; }
+  else if (context.origin.scope === "mesh" && (match = sourceToken.exec(raw))) { if (!context.origin.meshRoot) fail(context,raw,"source-relative reference requires mesh root");target=nodeId(context.origin.meshRoot,match[1]!);endpoint=match[2]!;property=match[3]!; }
+  else if (context.origin.scope === "mesh" && (match = meshToken.exec(raw))) { target=nodeId(match[1]!,match[2]!);endpoint=match[3]!;property=match[4]!; }
+  else fail(context,raw,"Invalid V3 endpoint reference grammar");
+  if (!(ENDPOINT_PROPERTIES as readonly string[]).includes(property)) fail(context,raw,"Unknown endpoint property");
+  return {raw,target,endpoint,property:property as EndpointProperty,origin:context.origin};
 }
-
-function valid(ref: Omit<ParsedBuilderReference, "property"> & { property: string }, context: ReferenceDiagnosticContext): ParsedBuilderReference {
-  if (!(ENDPOINT_PROPERTIES as readonly string[]).includes(ref.property)) {
-    throw new ConfigError({ ...context, referencedObject: ref.raw, value: ref.property, reason: "Unknown endpoint property" });
-  }
-  return ref as ParsedBuilderReference;
+export function resolveBuilderReference(ref: ParsedBuilderReference, context: ReferenceContext): string {
+  const target = context.graph.nodes.get(ref.target);
+  if (!target || (context.consumer && !context.graph.closures.get(context.consumer)?.has(ref.target))) fail(context,ref.raw,`outside effective requisite closure: ${context.consumer ? displayNode(context.consumer) : "tester"} -> ${displayNode(ref.target)}`);
+  const endpoint = context.endpoints.get(ref.target)?.[ref.endpoint];
+  if (!endpoint) fail(context,ref.raw,`Unknown endpoint ${displayNode(ref.target)}.endpoints.${ref.endpoint}`);
+  return resolveEndpointProperty(endpoint,ref.property,{sourceFile:context.origin.sourceFile,configPath:context.origin.configPath,stage:context.stage,composition:context.composition,referencedObject:ref.raw});
 }
-
-export function collectBuilderReferences(value: string, scope: ReferenceScope, context: ReferenceDiagnosticContext): ParsedBuilderReference[] {
-  const protectedValue = value.replace(/\$\$/g, "\u0000DOLLAR\u0000");
-  const refs: ParsedBuilderReference[] = [];
-  for (const match of protectedValue.matchAll(/\$\{([^}]*)\}/g)) refs.push(parse(match[1]!, scope, context));
-  return refs;
-}
-
-export function interpolateBuilderReferences(
-  value: string,
-  scope: ReferenceScope,
-  resolve: (ref: ParsedBuilderReference, context: ReferenceDiagnosticContext) => string,
-  context: ReferenceDiagnosticContext,
-): string {
+export function interpolateBuilderReferences(value: string, context: ReferenceContext): string {
   const sentinel = "\u0000DOLLAR\u0000";
-  return value.replace(/\$\$/g, sentinel)
-    .replace(/\$\{([^}]*)\}/g, (_whole, body: string) => {
-      const ref = parse(body, scope, context);
-      return resolve(ref, context);
-    })
-    .replaceAll(sentinel, "$");
+  const protectedValue = value.replace(/\$\$/g,sentinel);
+  if (protectedValue.includes("${") && /\$\{[^}]*$/.test(protectedValue)) fail(context,protectedValue,"Malformed Builder endpoint reference");
+  return protectedValue.replace(/\$\{([^}]*)\}/g,(_whole,body:string)=>resolveBuilderReference(parseBuilderReference(body,context),context)).replaceAll(sentinel,"$");
 }
-
-export function assertTesterReferencesArePublic(
-  env: Record<string, string>,
-  scope: ReferenceScope,
-  baseContext: ReferenceDiagnosticContext,
-): void {
-  for (const [key, value] of Object.entries(env)) {
-    const context = { ...baseContext, configPath: `${baseContext.configPath}.${key}` };
-    for (const ref of collectBuilderReferences(value, scope, context)) {
-      if (!PUBLIC_ENDPOINT_PROPERTIES.has(ref.property)) {
-        throw new ConfigError({ ...context, referencedObject: ref.raw, value: ref.raw, reason: "Tester references may use only public endpoint properties" });
-      }
-    }
-  }
+export function collectBuilderReferences(value: string, context: ReferenceContext): ParsedBuilderReference[] {
+  const safe=value.replace(/\$\$/g,"\u0000DOLLAR\u0000");
+  return [...safe.matchAll(/\$\{([^}]*)\}/g)].map(match=>parseBuilderReference(match[1]!,context));
 }

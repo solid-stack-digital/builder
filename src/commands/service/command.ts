@@ -12,6 +12,10 @@ export const registerServiceCommand = (cmd: Command): void => {
 
   // attach hooks
   service.hook("preAction", async (_thisCommand, actionCommand) => {
+    if(actionCommand.name()==="up"){
+      const options=actionCommand.opts(),stageArg=actionCommand.args[0]?.toLowerCase();
+      if(options.dryRun||(stageArg&&!SERVICE_STAGES.includes(stageArg as any)))return;
+    }
     if (actionCommand.name() === "env" && actionCommand.parent?.name() === "export") {
       checkComposeAvailability();
       return;
@@ -22,11 +26,6 @@ export const registerServiceCommand = (cmd: Command): void => {
     if (actionCommand.name() === "up") {
       const options = actionCommand.opts();
       const stageArg = actionCommand.args[0]?.toLowerCase();
-
-      // If an unknown stage was given to 'up', don't run checkInfra
-      if (stageArg && !SERVICE_STAGES.includes(stageArg as any)) {
-        return;
-      }
 
       const projectDir = resolveProjectDir(options.projectDir);
 

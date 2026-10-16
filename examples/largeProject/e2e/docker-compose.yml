@@ -2,6 +2,8 @@ services:
   global-e2e:
     build:
       context: .
+      target: test
+    network_mode: host
     environment:
       NODE_ENV: test
       CI: "true"

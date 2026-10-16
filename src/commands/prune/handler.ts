@@ -1,45 +1,21 @@
 import { spawnSync } from "node:child_process";
 import pc from "picocolors";
 import { ScriptError } from "../../errors/ScriptError.js";
+import { BUILDER_OWNER_LABEL } from "../../core/composition/compileGraphComposition.js";
 
 export interface PruneOptions {
   volumes?: boolean;
+  dryRun?: boolean;
 }
 
-export async function handlePrune(options: PruneOptions = {}): Promise<number> {
-  console.log(pc.cyan("\n🧹 Pruning stopped Compose containers and unused networks..."));
-
-  // 1. Remove stopped containers
-  const rmContainers = spawnSync("docker", ["container", "prune", "-f"], {
-    stdio: "inherit",
-    encoding: "utf-8",
-  });
-  if (rmContainers.error) {
-    throw new ScriptError(`Failed to prune containers: ${rmContainers.error.message}`, {
-      cause: rmContainers.error,
-    });
+export async function handlePrune(options: PruneOptions = {},spawn:typeof spawnSync=spawnSync): Promise<number> {
+  const filter=`label=${BUILDER_OWNER_LABEL}=true`;
+  for(const kind of ["container","network",...(options.volumes?["volume"]:[])]){
+    const args=[kind,"prune","-f","--filter",filter];
+    if(options.dryRun){console.log(`docker ${args.join(" ")}`);continue;}
+    const result=spawn("docker",args,{stdio:"inherit",encoding:"utf-8"});
+    if(result.error||result.status!==0)throw new ScriptError(`Failed to prune Builder ${kind}s: ${result.error?.message??result.stderr??`exit code ${result.status}`}`);
   }
-
-  // 2. Remove unused networks
-  const rmNetworks = spawnSync("docker", ["network", "prune", "-f"], {
-    stdio: "inherit",
-    encoding: "utf-8",
-  });
-  if (rmNetworks.error) {
-    throw new ScriptError(`Failed to prune networks: ${rmNetworks.error.message}`, {
-      cause: rmNetworks.error,
-    });
-  }
-
-  // 3. Optional volume pruning
-  if (options.volumes) {
-    console.log(pc.cyan("🧹 Pruning dangling volumes..."));
-    spawnSync("docker", ["volume", "prune", "-f"], {
-      stdio: "inherit",
-      encoding: "utf-8",
-    });
-  }
-
-  console.log(pc.green("✅ Docker environment pruned successfully.\n"));
+  if(!options.dryRun)console.log(pc.green("Builder-owned Docker resources pruned."));
   return 0;
 }

@@ -48,10 +48,15 @@ export async function handleServiceDown(
 
   // H6: Robust teardown by project name (does not fail when YAML/env files are broken)
   const runState = readRunState(projectDir);
-  const candidateProjects = projectNamesForServiceStage(projectDir, stage);
-  if (runState?.projectName) {
-    candidateProjects.unshift(runState.projectName);
+  if (runState && stage !== "test" && runState.stage !== stage) {
+    throw new ScriptError(`Saved runtime is for ${runState.stage}; use builder service down ${runState.stage} -C ${projectDir}`);
   }
+  if (runState && stage === "test" && !["test", "test-unit", "test-e2e"].includes(runState.stage)) {
+    throw new ScriptError(`Saved runtime is for ${runState.stage}; use its matching down command`);
+  }
+  const candidateProjects = runState?.projectName
+    ? [runState.projectName]
+    : projectNamesForServiceStage(projectDir, stage);
   const uniqueProjects = Array.from(new Set(candidateProjects));
 
   for (const proj of uniqueProjects) {

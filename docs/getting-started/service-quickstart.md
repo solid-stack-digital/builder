@@ -1,78 +1,84 @@
-# Run your first service
+# Run a standalone service
 
-Create a service project with `build.json`, `Dockerfile`, and `server.mjs`. `app` is required, even when it has no other fields. This example names one HTTP endpoint:
+Use the complete V3 [docs-service fixture](../examples/docs-service/build.json) as a file tree: `build.json`, project `Dockerfile`, `e2e/Dockerfile`, `e2e/docker-compose.yml`, ordinary Compose modules, and selected `.docker/overrides` files. `services.main` and `services.tester` are required. The main Dockerfile has `dev`, `test`, `prod`; dev/prod have health. The tester is a separate selected runner.
 
+From that directory run `builder check`, `builder service up dev`, `builder service down dev`, `builder service up dev --full`, `builder service up prod`, and `builder service up test`. Isolated dev starts main only. `--full` follows main requisites; prod is integrated. `test` runs unit then service E2E with strict cleanup between phases. `test-unit` and `test-e2e` are convenience phase commands. The [stage matrix](../reference/stage-matrix.md) shows exact targets and environment.
+
+## Complete fixture
+
+The following is `docs/examples/docs-service/build.json` (complete file). Its supporting files are in the same fixture tree.
+
+```text
+docs-service/
+├── build.json
+├── Dockerfile
+├── server.mjs
+├── compose/mock-backend.yml
+├── overrides/prod.yml
+└── e2e/{Dockerfile,docker-compose.yml,test.mjs}
+```
+
+<!-- example: docs-service/build.json -->
 ```json
 {
-  "app": {
-    "env": {
-      "PUBLIC_URL": "${app.endpoints.http.public_url}"
+  "name": "frontend",
+  "services": {
+    "main": {
+      "endpoints": {
+        "http": {
+          "port": 3000,
+          "publicPort": "AUTO",
+          "primary": true,
+          "scheme": "http"
+        }
+      },
+      "requisites": {
+        "backend": "dependency"
+      },
+      "env": {
+        "BACKEND_URL": "http://localhost:8080"
+      }
     },
-    "endpoints": {
-      "http": { "port": 3000, "publicPort": "AUTO", "primary": true, "scheme": "http" }
+    "backend": {
+      "compose": "./compose/mock-backend.yml",
+      "service": "backend",
+      "endpoints": {
+        "http": {
+          "service": "backend",
+          "port": 8080,
+          "primary": true,
+          "scheme": "http"
+        }
+      }
+    },
+    "tester": {
+      "compose": "./e2e/docker-compose.yml",
+      "service": "e2e-runner",
+      "env": {
+        "API_URL": "${main.endpoints.http.public_url}"
+      }
+    }
+  },
+  "prod": {
+    "services": {
+      "main": {
+        "env": {
+          "BACKEND_URL": "${backend.endpoints.http.network_url}"
+        },
+        "override-compose": "./overrides/prod.yml"
+      }
+    }
+  },
+  "e2e": {
+    "services": {
+      "main": {
+        "env": {
+          "TEST_KIND": "black-box"
+        }
+      }
     }
   }
 }
 ```
 
-Create `server.mjs`:
-
-```js
-import { createServer } from "node:http";
-
-const port = Number(process.env.PORT ?? 3000);
-createServer((request, response) => {
-  response.writeHead(200, { "content-type": "text/plain" });
-  response.end(request.url === "/health" ? "ok" : "Hello from Builder\n");
-}).listen(port, "0.0.0.0");
-```
-
-Create `Dockerfile`:
-
-```dockerfile
-FROM node:22-alpine AS source
-WORKDIR /app
-COPY server.mjs ./server.mjs
-
-FROM source AS dev
-HEALTHCHECK CMD node -e "fetch('http://127.0.0.1:' + process.env.PORT + '/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
-CMD ["node", "server.mjs"]
-
-FROM source AS test
-CMD ["node", "-e", "console.log('unit tests pass')"]
-
-FROM source AS test-e2e
-CMD ["node", "-e", "console.log('service E2E pass')"]
-
-FROM source AS builder
-RUN mkdir -p /out && cp server.mjs /out/server.mjs
-
-FROM node:22-alpine AS prod
-WORKDIR /app
-COPY --from=builder /out/server.mjs ./server.mjs
-HEALTHCHECK CMD node -e "fetch('http://127.0.0.1:' + process.env.PORT + '/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
-CMD ["node", "server.mjs"]
-```
-
-The endpoint's `port` is inside the container. `publicPort: "AUTO"` asks Builder to choose a host port. The primary endpoint supplies Builder's `PORT` environment value. URL construction uses `scheme`.
-
-The Dockerfile must provide the `dev`, `test`, `test-e2e`, and `prod` targets. For a dev run, `dev` needs a foreground command and healthcheck. See the [Dockerfile contract](../reference/dockerfile-contract.md).
-
-```bash
-builder check
-builder service up dev
-```
-
-`PUBLIC_URL` resolves to the host-facing URL because `app.env` explicitly references `app.endpoints.http.public_url`. Run `builder service export env dev` to write the resolved app environment, then read `PUBLIC_URL` from `.env.dev.resolved`. If `.env.dev.resolved` already exists, the command prompts to overwrite or choose another filename. `PORT` is the app's container port and is not the allocated host port. The export file may contain secrets; keep it out of version control. Use Ctrl+C to stop a foreground run, or run `builder service down dev`. From a parent directory:
-
-```bash
-builder service up dev -C ./hello-service
-```
-
-See [endpoints](../concepts/endpoints.md), [stages](../concepts/stages.md), [CLI](../reference/cli.md), and the complete [build.json reference](../reference/build-json.md).
-
-## Related
-
-- [Installation](installation.md)
-- [Develop a service](../guides/develop-a-service.md)
-- [build.json](../reference/build-json.md)
+`dev` and isolated unit use the source's safe base URL. `prod` and E2E select the mock backend reference and its health-gated requisite. The runner uses host networking to reach the main public URL.

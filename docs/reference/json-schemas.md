@@ -1,13 +1,5 @@
-# JSON schemas
+# JSON Schemas
 
-`mesh.json` supports `dev`, `prod`, and `e2e` overlays only. A root `test` field is rejected, including an empty object and when `--skip-checks` is used. `build.json.test` remains supported. See [migration](../migration/v2.1-to-v2.2.md).
+The package includes [build-schema.json](../../schemas/build-schema.json) and [mesh-schema.json](../../schemas/mesh-schema.json). Set `$schema` in a configuration file to the corresponding installed schema URI or local file path for editor completion. The source of truth is the V3 Zod contract; `pnpm build:schemas` regenerates the checked-in JSON Schema files.
 
-The package includes `schemas/build-schema.json` and `schemas/mesh-schema.json`. Add the relevant schema URI as the `$schema` value in your JSON file to enable editor completion and structural validation. When working from this repository, the local files are in the `schemas/` directory.
-
-Schemas catch shapes, types, ranges, and identifier constraints. They do not express every effective-stage rule, endpoint-reference resolution, lifecycle cycle, healthcheck requirement, or publication collision. Use `builder check` and `builder mesh check` as well; the prose references explain the semantics.
-
-## Related
-
-- [build.json](build-json.md)
-- [mesh.json](mesh-json.md)
-- [Validate before running](../guides/validate-before-running.md)
+Structural schema validation checks keys, types, required `name`/`services.main`/`services.tester`, stages and declaration shapes. It cannot prove cross-file paths, endpoint reachability, health, port availability or selected Compose runner behavior. Run `builder check`, `builder mesh check`, and the appropriate `--dry-run` for effective validation. A live test is needed to verify actual engine health and connectivity.

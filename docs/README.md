@@ -1,42 +1,17 @@
-# Solid Stack Builder V2
+# Builder V3 documentation
 
-Builder runs one service project from `build.json` or composes several service projects from `mesh.json`. Docker Compose runs the resulting containers, while Builder configuration gives apps stable named endpoints, explicit stage overlays, dependency contracts, and controlled host publication.
+Builder 3.0.0 uses explicit service graphs. A `build.json` names a standalone main, a tester, and optional ordinary Compose modules. Requisites make ordinary modules reachable; `requirement` includes, `dependency` waits for health, and `prerequisite` waits for successful completion. A `mesh.json` imports independently runnable sources and may explicitly rewrite their requisites and environment.
 
-## Start here
+Start with [installation](getting-started/installation.md), the [service quickstart](getting-started/service-quickstart.md), and the [mesh quickstart](getting-started/mesh-quickstart.md). Existing 2.2.0 users should follow the [V3 migration guide](migration/v2.2-to-v3.0.md).
 
-- [Install Builder](getting-started/installation.md)
-- [Run your first service](getting-started/service-quickstart.md)
-- [Add a local dependency](getting-started/dependencies-quickstart.md)
-- [Compose a mesh](getting-started/mesh-quickstart.md)
+## Reference
 
-## I want to...
+- [build.json](reference/build-json.md), [mesh.json](reference/mesh-json.md), [JSON Schemas](reference/json-schemas.md), and [identifier rules](reference/identifier-rules.md)
+- [Stages](reference/stage-matrix.md), [environment precedence](reference/environment-precedence.md), and [endpoint properties](reference/endpoint-properties.md)
+- [Dockerfile](reference/dockerfile-contract.md), [ordinary Compose modules](reference/dependency-compose-contract.md), [main overrides](reference/override-compose-contract.md), and [CLI](reference/cli.md)
 
-| Goal | Start here |
-|---|---|
-| Run development | [Develop a service](guides/develop-a-service.md) |
-| Run development with local dependencies | [Run with local dependencies](guides/run-with-local-dependencies.md) |
-| Run production-style locally | [Service stage matrix](reference/stage-matrix.md) |
-| Run unit tests or E2E tests | [Testing model](concepts/testing-model.md) |
-| Expose an endpoint to the host | [Publish mesh endpoints](guides/publish-mesh-endpoints.md) |
-| Replace a local mock with a real service | [Dependency substitution](concepts/dependency-substitution.md) |
-| Wire mesh services together | [Build a mesh](guides/build-a-mesh.md) |
-| Export effective environment variables | [Export resolved environment](guides/export-resolved-environment.md) |
-| Validate a project | [Validate before running](guides/validate-before-running.md) |
-| Clean Docker resources | [Clean up Builder resources](guides/clean-up-builder-resources.md) |
-| Migrate from V1/V1.2 | [Migration guide](migration/v1-to-v2.md) |
+## Workflows
 
-## Core references
+Read [testing](concepts/testing-model.md), [publication and ports](concepts/publication-and-ports.md), [local modules](concepts/local-dependencies.md), and [source rewrites](concepts/dependency-substitution.md). The [guides](guides/build-a-mesh.md), [recipes](recipes/real-service-replaces-local-mock.md), and [troubleshooting pages](troubleshooting/configuration-errors.md) cover common tasks. The [glossary](glossary.md) defines V3 terms.
 
-[CLI reference](reference/cli.md) · [build.json](reference/build-json.md) · [mesh.json](reference/mesh-json.md) · [Endpoint properties](reference/endpoint-properties.md) · [Stage matrix](reference/stage-matrix.md) · [Dockerfile contract](reference/dockerfile-contract.md) · [Dependency Compose contract](reference/dependency-compose-contract.md)
-
-## Learn the model
-
-Start with [service and mesh responsibilities](concepts/service-and-mesh-model.md), then read about [stages](concepts/stages.md), [endpoints](concepts/endpoints.md), [references](concepts/endpoint-references.md), and [environment precedence](concepts/environment.md). The [glossary](glossary.md) defines the terms used throughout.
-
-## Related
-
-- [Installation](getting-started/installation.md)
-- [CLI reference](reference/cli.md)
-- [Troubleshooting](troubleshooting/configuration-errors.md)
-
-See [Migrate from v2.1 to v2.2](migration/v2.1-to-v2.2.md) for removal of the mesh test topology.
+[Earlier V1 to V2](migration/v1-to-v2.md) and [V2.1 to V2.2](migration/v2.1-to-v2.2.md) guides are historical; their examples are not V3 configuration.

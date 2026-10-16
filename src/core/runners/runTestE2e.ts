@@ -1,64 +1,21 @@
-import { runWithCleanup } from "../runWithCleanup.js";
-import pc from "picocolors";
-import { parse } from "yaml";
+import { stringify } from "yaml";
+import type { RunOptions } from "../RunOptions.js";
+import { compileServiceComposition } from "../composition/compileServiceComposition.js";
+import { persistHostPortAllocations, removeHostPortAllocations } from "../config/hostPorts.js";
 import { checkHostPortCollisions, extractHostPorts } from "../../utils/checkPortCollision.js";
 import { redactYamlSecrets } from "../../utils/redactSecrets.js";
 import { clearRunState, writeRunState } from "../../utils/runState.js";
-import { compileEnvironment } from "../compileEnvironment.js";
-import { runFiniteTester } from "./runFiniteTester.js";
-import type { RunOptions } from "../RunOptions.js";
+import { runWithCleanup } from "../runWithCleanup.js";
 import { teardownCompose } from "../teardownCompose.js";
-
-export const runTestE2e = async (options: RunOptions): Promise<number> => {
-  if (!options.skipBanner) {
-    console.log(pc.bold(pc.blue(`\n========================================`)));
-    console.log(pc.bold(pc.blue(`🚦 STAGE: INTEGRATED E2E TESTS`)));
-    console.log(pc.bold(pc.blue(`========================================\n`)));
-  }
-  const finalYamlConfig = compileEnvironment("e2e", options.projectDir, {
-    silenceWarnings: options.silenceWarnings,
-  });
-  const parsed = parse(finalYamlConfig);
-  const projectName = parsed?.name || "e2e";
-
-  if (options.debug) {
-    console.log(
-      pc.yellow("Final merged YAML configuration:\n"),
-      redactYamlSecrets(finalYamlConfig)
-    );
-  }
-
-  if (options.dryRun) {
-    console.log(pc.green("[DRY-RUN] E2E tests simulated. Compose was not started."));
-    return 0;
-  }
-
-  await checkHostPortCollisions(extractHostPorts(finalYamlConfig));
-
-  // Stale-project cleanup before up (quietly)
-  await teardownCompose(finalYamlConfig, options.projectDir, {
-    removeVolumes: true,
-    silent: true,
-  });
-
-  // Stateful tracking
-  writeRunState(options.projectDir, {
-    projectName,
-    stage: "test-e2e",
-    projectDir: options.projectDir,
-  });
-
-  const status = await runWithCleanup(
-    () => runFiniteTester(finalYamlConfig, options.projectDir, "tester"),
-    async () => {
-      await teardownCompose(finalYamlConfig, options.projectDir, { removeVolumes: true });
-      clearRunState(options.projectDir);
-    },
-  );
-  if (status === 0) {
-    console.log(pc.bold(pc.green(`\n✅ E2E tests passed successfully.\n`)));
-  } else {
-    console.error(pc.red(`\n❌ E2E tests failed with exit code ${status}.\n`));
-  }
-  return status;
-};
+import { runFiniteTester, type FiniteTesterAdapters } from "./runFiniteTester.js";
+export interface E2eRuntimeAdapters { finite?: FiniteTesterAdapters; teardown?: typeof teardownCompose; checkPorts?: typeof checkHostPortCollisions }
+export async function runTestE2e(options:RunOptions,adapters:E2eRuntimeAdapters={}):Promise<number> {
+  const compiled=compileServiceComposition("e2e",options.projectDir,{validationMode:Boolean(options.dryRun)}),yaml=stringify(compiled.compose);
+  if(options.debug)console.log(redactYamlSecrets(yaml));
+  if(options.dryRun)return 0;
+  await (adapters.checkPorts??checkHostPortCollisions)(extractHostPorts(yaml));
+  await (adapters.teardown??teardownCompose)(yaml,options.projectDir,{removeVolumes:true,silent:true});
+  persistHostPortAllocations(options.projectDir,compiled.allocations);
+  writeRunState(options.projectDir,{projectName:compiled.projectName,stage:"test-e2e",configStage:"e2e",workflow:"test",composition:"service",projectDir:options.projectDir,runtimeServiceNames:compiled.runtimeServiceNames,testerServiceNames:compiled.testerServiceNames,allocatedEndpointKeys:[...compiled.allocations.keys()]});
+  return runWithCleanup(()=>runFiniteTester(compiled,options.projectDir,adapters.finite),async()=>{await (adapters.teardown??teardownCompose)(yaml,options.projectDir,{removeVolumes:true});removeHostPortAllocations(options.projectDir,[...compiled.allocations.keys()]);clearRunState(options.projectDir);});
+}

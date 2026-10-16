@@ -1,18 +1,3 @@
-# Troubleshoot references and environment
+# Reference and environment errors
 
-- **Bad reference grammar:** use build forms `${app.endpoints...}` / `${dependencies...}` or mesh forms `${backend.app...}` / `${frontend.dependencies...}`. Mesh references have no `services.` prefix.
-- **URL unavailable:** add an endpoint `scheme` before requesting a `*_url` property.
-- **Tester rejects network property:** testers run as host-side clients; replace `network_url` with an effectively published `public_url`.
-- **Reference unresolved after substitution:** provider must expose the exact endpoint name referenced through the logical dependency.
-- **Builder env conflict:** remove user values for Builder-owned keys such as `EXEC_MODE`, `INFRA_MODE`, or primary app `PORT`.
-- **Environment type rejected:** quote textual values; Builder JSON env supports strings only. E2E inherits the structured `prod` overlay, while `.env.prod` remains separate from `.env.e2e`.
-- **Need literal `${...}`:** use `$$` to escape a literal dollar where Builder/Compose interpolation applies.
-- **Reference exists but service not ready:** references do not add lifecycle edges; configure readiness separately.
-
-See [endpoint references](../concepts/endpoint-references.md), [environment precedence](../reference/environment-precedence.md), and [identifier rules](../reference/identifier-rules.md).
-
-## Related
-
-- [Endpoint properties](../reference/endpoint-properties.md)
-- [Environment](../concepts/environment.md)
-- [Dependency substitution](../concepts/dependency-substitution.md)
+A target can be active as another mesh root but still be outside this consumer's requisite closure. Add an explicit edge from the consumer. If a local mock was pruned, rewrite every surviving env reference to the real source; a lower-precedence value overwritten by `extends` is ignored. Use local `${main.endpoints.http.network_url}` in build JSON, source-relative `${source.main.endpoints.http.network_url}` in mesh-local overrides, and `${backend.source.main.endpoints.http.network_url}` across roots. Isolated main cannot use an active external reference without closure. Only main receives Builder-owned execution keys; do not set them in user env. See [reference grammar](../reference/endpoint-properties.md) and [precedence](../reference/environment-precedence.md).

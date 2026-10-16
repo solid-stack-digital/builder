@@ -1,0 +1,42 @@
+{
+  "name": "frontend",
+  "app": {
+    "endpoints": {
+      "http": {
+        "port": 3000,
+        "publicPort": "AUTO",
+        "primary": true,
+        "scheme": "http"
+      }
+    },
+    "env": {
+      "BACKEND_URL": "http://localhost:8080"
+    }
+  },
+  "dependencies": {
+    "backend": {
+      "compose": "./compose/mock-backend.yml",
+      "endpoints": {
+        "http": {
+          "service": "backend",
+          "port": 8080,
+          "primary": true,
+          "scheme": "http"
+        }
+      }
+    }
+  },
+  "tester": {
+    "env": {
+      "API_URL": "${app.endpoints.http.public_url}"
+    }
+  },
+  "prod": {
+    "app": {
+      "env": {
+        "BACKEND_URL": "${dependencies.backend.endpoints.http.network_url}"
+      }
+    },
+    "override-compose": "./overrides/prod.yml"
+  }
+}

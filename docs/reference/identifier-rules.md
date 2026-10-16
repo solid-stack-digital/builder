@@ -1,15 +1,3 @@
 # Identifier rules
 
-Builder keys used in endpoint-reference paths match `^[a-z][a-z0-9-]*$`. This applies to dependency keys, endpoint keys, and top-level mesh service names.
-
-Valid: `backend`, `payments-api`, `http`, `admin-ui`.
-
-Invalid: `Backend`, `payments_api`, `payments.api`, `1backend`.
-
-Mesh service names additionally cannot be `app`, `dependencies`, `tester`, `services`, `dev`, `prod`, `test`, or `e2e`. A dependency endpoint's `service` field is a Compose service key, not a Builder logical identifier; it must exactly name a service in that Compose file.
-
-## Related
-
-- [build.json reference](build-json.md)
-- [mesh.json reference](mesh-json.md)
-- [Endpoint references](../concepts/endpoint-references.md)
+Builder service, source, and endpoint identifiers use lowercase ASCII letters first, followed by lowercase letters, digits, or hyphens: `^[a-z][a-z0-9-]*$`. `main` and `tester` have special service roles in `build.json`. Mesh `services.main` is reserved because each source already contains its own main. Other words, including `app`, `dependencies`, and `dev`, are not blanket-reserved identifiers; old root fields with those names are still invalid in V3. A requisite key in a mesh `extends` may use `source.<local>` to distinguish a source-local service from a fellow source alias.

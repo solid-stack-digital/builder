@@ -1,20 +1,3 @@
-# Replace a local mock with a real service
+# Replace a local mock with a real source
 
-Frontend declares logical dependency `backend` and references `${dependencies.backend.endpoints.http.network_url}`. Its local mock Compose file keeps standalone development self-contained. In the mesh, bind `frontend.dependencies.backend` to top-level provider `backend`:
-
-```json
-{
-  "services": {
-    "frontend": { "path": "./services/frontend", "dependencies": { "backend": "backend" } },
-    "backend": { "path": "./services/backend" }
-  }
-}
-```
-
-The mock is suppressed atomically; frontend configuration and code remain unchanged. Provider needs endpoint `http` if that name is referenced. See [dependency substitution](../concepts/dependency-substitution.md).
-
-## Related
-
-- [Bind dependencies guide](../guides/bind-dependencies-to-real-services.md)
-- [Local dependencies](../concepts/local-dependencies.md)
-- [mesh.json](../reference/mesh-json.md)
+Keep the frontend source independently runnable with a local backend mock and `main.requisites.backend: dependency`. In mesh `services.frontend.extends.main`, remove `source.backend` with `false`, add fellow source `backend: dependency`, and rewrite `BACKEND_URL` to `${backend.source.main.endpoints.http.network_url}`. The local mock declaration remains in its source but is unreachable in this mesh. A reference alone cannot start backend. Check every other consumer of the mock and rewrite it explicitly. See the [complete before/after migration](../migration/v2.2-to-v3.0.md#mesh-two-source-roots-and-explicit-replacement).

@@ -8,7 +8,3 @@ dev:
 
 test: 
 	pnpm builder mesh up test
-
-
-test-e2e: 
-	pnpm builder mesh up test-e2e

@@ -1,12 +1,10 @@
 export const BUILDER_IDENTIFIER_PATTERN = /^[a-z][a-z0-9-]*$/;
 export const ENDPOINT_SCHEME_PATTERN = /^[A-Za-z][A-Za-z0-9+.-]*$/;
-export const DEPENDENCY_REFERENCE_PATTERN = /^dependencies\.([a-z][a-z0-9-]*)$/;
 export const ENDPOINT_PROPERTIES = ["network_host", "network_port", "network_address", "network_url", "public_host", "public_port", "public_address", "public_url"] as const;
 export const PUBLIC_ENDPOINT_PROPERTIES = new Set(["public_host", "public_port", "public_address", "public_url"]);
 export const NETWORK_ENDPOINT_PROPERTIES = new Set(["network_host", "network_port", "network_address", "network_url"]);
 export const URL_ENDPOINT_PROPERTIES = new Set(["network_url", "public_url"]);
-export const RESERVED_MESH_SERVICE_NAMES = new Set(["app", "dependencies", "tester", "services", "dev", "prod", "test", "e2e"]);
 export const PUBLIC_HOST = "127.0.0.1";
-export const AUTO_PORT_CACHE_VERSION = 1;
-export const AUTO_PORT_CACHE_RELATIVE_PATH = ".builder/ports-v2.json";
+export const AUTO_PORT_CACHE_VERSION = 3;
+export const AUTO_PORT_CACHE_RELATIVE_PATH = ".builder/ports-v3.json";
 export const AUTO_PORT_SCAN_START = 20000;

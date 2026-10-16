@@ -1,46 +1,55 @@
-# Compose a two-service mesh
+# Run a named mesh
 
-Assume independent `frontend` and `backend` service projects nested under the mesh project directory:
+The [complete docs-mesh fixture](../examples/docs-mesh/mesh.json) has a required `name`, `services.tester`, and source roots. Each source has its own complete build and tester. To replace frontend's local backend mock, `extends.main.requisites` prunes `source.backend`, adds `backend: dependency`, and `extends.main.env` rewrites the backend URL to `${backend.source.main.endpoints.http.network_url}`. The three steps are independent; a URL never creates an edge.
+
+A source `publish` array uses source-relative selectors such as `main.endpoints.http`. Only already reachable, `publicPort`-capable endpoints may be selected. Run `builder mesh check`, `builder mesh up dev`, `builder mesh up prod`, or `builder mesh up test`; stop with `builder mesh down dev` or `prod`. `test` first tests base sources in isolation and then starts fresh global E2E. The public mesh `up` command has no E2E-only stage.
+
+## Complete fixture
+
+The following is `docs/examples/docs-mesh/mesh.json` (complete file). The fixture includes `services/frontend` and `services/backend` with their own complete builds, plus a global `e2e/docker-compose.yml` runner.
 
 ```text
-mesh-project/
-  mesh.json
-  services/
-    frontend/
-      build.json
-      Dockerfile
-    backend/
-      build.json
-      Dockerfile
+docs-mesh/
+├── mesh.json
+├── services/frontend/{build.json,Dockerfile,compose/,overrides/,e2e/}
+├── services/backend/{build.json,Dockerfile,e2e/}
+└── e2e/{Dockerfile,docker-compose.yml,test.mjs}
 ```
 
-These are independently runnable service projects whose directories are nested under the mesh project. Frontend's `build.json` declares a logical dependency named `backend` with an endpoint `http`; it may use a local mock Compose implementation when run alone.
-
-Create a mesh project `mesh.json`:
-
+<!-- example: docs-mesh/mesh.json -->
 ```json
 {
+  "name": "frontend-system",
   "services": {
-    "frontend": { "path": "./services/frontend", "dependencies": { "backend": "backend" } },
-    "backend": { "path": "./services/backend", "publish": [] }
+    "tester": {
+      "compose": "./e2e/docker-compose.yml",
+      "service": "global-runner",
+      "env": {
+        "API_URL": "${frontend.source.main.endpoints.http.public_url}"
+      }
+    },
+    "backend": {
+      "source": "./services/backend"
+    },
+    "frontend": {
+      "source": "./services/frontend",
+      "publish": [
+        "main.endpoints.http"
+      ],
+      "extends": {
+        "main": {
+          "requisites": {
+            "source.backend": false,
+            "backend": "dependency"
+          },
+          "env": {
+            "BACKEND_URL": "${backend.source.main.endpoints.http.network_url}"
+          }
+        }
+      }
+    }
   }
 }
 ```
 
-The left binding key is the logical dependency slot in frontend's build config; the right value is the top-level provider service key. The binding suppresses frontend's local backend implementation atomically. Frontend code keeps using the logical dependency endpoint reference, which resolves through backend's app endpoint of the same name.
-
-To expose a browser-facing frontend endpoint, ensure its `build.json` endpoint has `publicPort`, then set frontend `publish` to `app.endpoints.http`. Meshes are private by default.
-
-```bash
-builder mesh check
-builder mesh up dev
-builder mesh down dev
-```
-
-Read about [substitution](../concepts/dependency-substitution.md), [publication](../concepts/publication-and-ports.md), [mesh fields](../reference/mesh-json.md), and the [mesh guide](../guides/build-a-mesh.md).
-
-## Related
-
-- [Service and mesh model](../concepts/service-and-mesh-model.md)
-- [Build a mesh](../guides/build-a-mesh.md)
-- [mesh.json](../reference/mesh-json.md)
+The frontend local mock remains in its independently runnable source. The mesh prunes only its local edge; the real backend root supplies the integrated URL and healthy dependency.

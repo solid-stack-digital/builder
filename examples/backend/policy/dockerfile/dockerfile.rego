@@ -2,100 +2,60 @@ package main
 
 import rego.v1
 
-# ---------------------------------------------------------------------------
-# AST PARSER HELPER: Maps every Dockerfile line to its specific stage name
-# ---------------------------------------------------------------------------
-stage_at_index[i] := alias if {
-    some i
-    _ = input[i]
-    
-    # Find the closest "FROM" command preceding this instruction
-    j := max({ k | input[k].Cmd == "from"; k <= i })
-    
-    # Extract the alias (e.g., "FROM node AS prod" -> "prod")
-    val := input[j].Value
-    lower(val[count(val)-2]) == "as"
-    alias := val[count(val)-1]
+# Conftest supplies Dockerfile instructions in source order.
+from_indices := {i | some i; input[i].Cmd == "from"}
+alias_at[i] := lower(input[i].Value[count(input[i].Value)-1]) if {
+  i in from_indices
+  value := input[i].Value
+  count(value) >= 3
+  lower(value[count(value)-2]) == "as"
 }
-
-# Find all stages defined in the file
-found_stages := { alias | alias := stage_at_index[_] }
-
-# ---------------------------------------------------------------------------
-# RULE 1: The Multi-Stage Target Aliases
-# ---------------------------------------------------------------------------
-deny contains msg if {
-    required_stages := {"dev", "test", "test-e2e", "prod"}
-    missing := required_stages - found_stages
-    count(missing) > 0
-    
-    msg := sprintf("❌ Rule 1 Failed: Missing required stages %v", [missing])
+stages := {a | a := alias_at[_]}
+stage_alias[n] := alias_at[i] if { some i; n := input[i].Stage; alias_at[i] }
+stage_at[i] := stage_alias[input[i].Stage] if { some i; _ := input[i] }
+parent[a] := lower(input[i].Value[0]) if {
+  some i
+  a := alias_at[i]
+  lower(input[i].Value[0]) in stages
 }
-
-# ---------------------------------------------------------------------------
-# RULE 2: Dynamic Port Ingestion (No Hardcoded EXPOSE)
-# ---------------------------------------------------------------------------
+edges := {a: neighbors | some i; a := alias_at[i]; neighbors := [p | p := parent[a]]}
+lineage[a] := graph.reachable(edges, {a}) | {a} if { some i; a := alias_at[i] }
+commands[a] := {i | some i; stage_at[i] in lineage[a]; input[i].Cmd == "cmd"} if { some j; a := alias_at[j] }
+runtime_instruction_indices[a] := {i | some i; stage_at[i] in lineage[a]; input[i].Cmd in {"cmd", "entrypoint"}} if { some j; a := alias_at[j] }
+has_runtime_instruction(a) if { count(runtime_instruction_indices[a]) > 0 }
+healthcheck_indices[a] := {i | some i; stage_at[i] in lineage[a]; input[i].Cmd == "healthcheck"} if { some j; a := alias_at[j] }
+effective_healthcheck_index[a] := max(indices) if { indices := healthcheck_indices[a]; count(indices) > 0 }
+effective_healthcheck_value[a] := lower(concat(" ", input[index].Value)) if { index := effective_healthcheck_index[a] }
+has_valid_effective_healthcheck(a) if { value := effective_healthcheck_value[a]; value != "none" }
 deny contains msg if {
-    some i
-    input[i].Cmd == "expose"
-    
-    msg := "❌ Rule 2 Failed: Hardcoded EXPOSE found. Orchestrator manages ports via ${PORT}."
+  missing := {"dev", "test", "prod"} - stages
+  count(missing) > 0
+  msg := sprintf("Missing required Dockerfile stages: %v", [missing])
 }
-
-# ---------------------------------------------------------------------------
-# RULE 3: Native OS/Runtime Healthchecks in Prod
-# ---------------------------------------------------------------------------
+deny contains "dev stage requires an effective CMD or ENTRYPOINT" if { "dev" in stages; not has_runtime_instruction("dev") }
+deny contains "test stage requires an effective CMD or ENTRYPOINT" if { "test" in stages; not has_runtime_instruction("test") }
+deny contains "prod stage requires an effective CMD or ENTRYPOINT" if { "prod" in stages; not has_runtime_instruction("prod") }
+deny contains "dev stage requires a valid HEALTHCHECK" if { "dev" in stages; not has_valid_effective_healthcheck("dev") }
+deny contains "prod stage requires a valid HEALTHCHECK" if { "prod" in stages; not has_valid_effective_healthcheck("prod") }
 deny contains msg if {
-    "prod" in found_stages
-    
-    # Look for a healthcheck specifically inside the 'prod' stage
-    healthchecks := { i | input[i].Cmd == "healthcheck"; stage_at_index[i] == "prod" }
-    count(healthchecks) == 0
-    
-    msg := "❌ Rule 3 Failed: Stage [prod] is missing a native HEALTHCHECK directive."
+  some i
+  a := alias_at[i]
+  p := parent[a]
+  a in lineage[p]
+  msg := sprintf("Dockerfile stage inheritance cycle at %s", [a])
 }
-
-# ---------------------------------------------------------------------------
-# RULE 4: Absolute Artifact Isolation in Prod
-# ---------------------------------------------------------------------------
 deny contains msg if {
-    "prod" in found_stages
-    
-    # Ensure there is at least one COPY --from= in the prod stage
-    copies := { i | 
-        input[i].Cmd == "copy"
-        stage_at_index[i] == "prod"
-        startswith(input[i].Flags[_], "--from=")
-    }
-    count(copies) == 0
-    
-    msg := "❌ Rule 4 Failed: Stage [prod] must use 'COPY --from=' to isolate artifacts."
+  some i
+  input[i].Cmd in {"cmd", "entrypoint"}
+  command := lower(concat(" ", input[i].Value))
+  regex.match("(^|[ ;])nohup[ ;]|&[[:space:]]*$|pm2[[:space:]]+start.*--daemon|nginx(.*[[:space:]])?-g[[:space:]]*['\"]?daemon[[:space:]]+on", command)
+  msg := sprintf("Runtime CMD/ENTRYPOINT must remain in foreground (instruction %v)", [i])
 }
-
-# ---------------------------------------------------------------------------
-# RULE 5: Foreground Process Control (Anti-patterns)
-# ---------------------------------------------------------------------------
 deny contains msg if {
-    some i
-    input[i].Cmd in {"run", "cmd"}
-    
-    # Combine the command array into a single string for regex checking
-    val := concat(" ", input[i].Value)
-    
-    # Use \\s for whitespace to exactly match the JS behavior
-    regex.match("(nohup\\s+|pm2\\s+start.*--daemon|&\\s*$)", val)
-    
-    msg := "❌ Rule 5 Failed: Background process anti-pattern detected. App must run in foreground."
-}
-
-# ---------------------------------------------------------------------------
-# RULE 6: Dev Stage Boot Behavior
-# ---------------------------------------------------------------------------
-deny contains msg if {
-    "dev" in found_stages
-    
-    cmds := { i | input[i].Cmd == "cmd"; stage_at_index[i] == "dev" }
-    count(cmds) == 0
-    
-    msg := "❌ Contract Violation: Stage [dev] is missing a default CMD instruction."
+  some i
+  input[i].Cmd in {"cmd", "entrypoint"}
+  command := lower(concat(" ", input[i].Value))
+  regex.match("(^|[ ;])nginx([ ;]|$)", command)
+  not contains(command, "daemon off")
+  msg := sprintf("nginx CMD/ENTRYPOINT must use daemon off (instruction %v)", [i])
 }

@@ -1,12 +1,7 @@
 services:
-  app:
+  main:
     build:
       target: prod
     env_file:
       - path: .env.e2e
         required: false
-  tester:
-    build:
-      context: .
-      target: test-e2e
-    network_mode: host

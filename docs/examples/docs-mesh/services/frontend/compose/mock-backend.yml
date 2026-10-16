@@ -1,0 +1,9 @@
+services:
+  backend:
+    image: node:20-alpine
+    command: ["node", "-e", "require('node:http').createServer((q,r)=>r.end('mock')).listen(8080,'0.0.0.0')"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('node:http').get('http://127.0.0.1:8080',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 5

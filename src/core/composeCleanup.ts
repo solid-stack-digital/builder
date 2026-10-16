@@ -45,7 +45,15 @@ export function registerActiveCompose(
 
   return () => {
     activeComposeSet.delete(entry);
+    if(activeComposeSet.size===0&&activeChildProcess===null)releaseSignalHandlers();
   };
+}
+
+function releaseSignalHandlers():void {
+  for(const [sig,listener] of registeredListeners)process.removeListener(sig,listener);
+  registeredListeners.length=0;
+  signalHandlersRegistered=false;
+  isShuttingDown=false;
 }
 
 function ensureSignalHandlers(): void {
@@ -148,9 +156,6 @@ export function resetSignalHandlersForTests(): void {
   isTearingDown = false;
   isShuttingDown = false;
   activeComposeSet.clear();
-  for (const [sig, listener] of registeredListeners) {
-    process.removeListener(sig, listener);
-  }
-  registeredListeners.length = 0;
+  releaseSignalHandlers();
 }
 

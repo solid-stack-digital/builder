@@ -1,6 +1,7 @@
 services:
-  app:
+  main:
     volumes:
+      - .:/app
       - /app/node_modules
     environment:
       - CI=true

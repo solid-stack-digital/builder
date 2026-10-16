@@ -1,10 +1,7 @@
 services:
-  app:
+  main:
     build:
       target: dev
     env_file:
       - path: .env.dev
         required: false
-    volumes:
-      - .:/app
-      - /app/node_modules

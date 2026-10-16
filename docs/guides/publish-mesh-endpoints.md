@@ -1,22 +1,3 @@
-# Publish mesh endpoints
+# Publish reachable mesh endpoints
 
-An endpoint's `publicPort` makes it eligible for host publication. It does not publish by itself in a mesh. Mesh services are private by default; list the desired endpoint path in `services.<name>.publish`.
-
-```json
-{
-  "services": {
-    "gateway": { "path": "./services/gateway", "publish": ["app.endpoints.http"] },
-    "backend": { "path": "./services/backend", "publish": [] }
-  }
-}
-```
-
-App target syntax is `app.endpoints.<endpoint>`. An unsubstituted local dependency target is `dependencies.<dependency>.endpoints.<endpoint>`. A substituted dependency cannot be published through the consumer; publish the provider app endpoint. Fixed ports fail on collision; `AUTO` is allocated. Host references resolve to `127.0.0.1` and are best consumed through endpoint references or tester env.
-
-Recommended pattern: publish only a gateway and keep internal services private.
-
-## Related
-
-- [Publication concept](../concepts/publication-and-ports.md)
-- [Endpoint properties](../reference/endpoint-properties.md)
-- [Port troubleshooting](../troubleshooting/ports-and-publication.md)
+A source `publish` selector has the form `main.endpoints.http` or `db.endpoints.ui`. The selected node must already be reachable by requisites and the endpoint must declare `publicPort`. Mesh source endpoints are otherwise private even with `publicPort`. A stage `publish` array replaces the earlier list; repeat all bindings you need. A private endpoint still exposes network properties but not public properties. See [publication](../concepts/publication-and-ports.md).

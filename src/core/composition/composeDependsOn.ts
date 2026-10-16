@@ -1,26 +1,9 @@
-import type { ComposeDocument } from "./types.js";
-
-/** Every dependency in generated Compose is gated by health. */
-export function normalizeComposeDependsOn(value: unknown): Record<string, unknown> {
-  const entries = Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-        .map((name) => [name, {}] as const)
-    : value && typeof value === "object"
-      ? Object.entries(value as Record<string, unknown>)
-      : [];
-  return Object.fromEntries(entries.map(([name, options]) => [
-    name,
-    {
-      ...(options && typeof options === "object" && !Array.isArray(options)
-        ? options as Record<string, unknown> : {}),
-      condition: "service_healthy",
-    },
-  ]));
+import type { ComposeService } from "./types.js";
+export type ComposeCondition = "service_started" | "service_healthy" | "service_completed_successfully";
+export function normalizeComposeDependsOn(value: unknown): Record<string, { condition: ComposeCondition; restart?: boolean; required?: boolean }> {
+  const entries = Array.isArray(value) ? value.filter((item):item is string => typeof item === "string").map(name => [name, { condition: "service_started" }] as const) : value && typeof value === "object" ? Object.entries(value as Record<string,unknown>) : [];
+  return Object.fromEntries(entries.map(([name,raw]) => [name, raw && typeof raw === "object" && !Array.isArray(raw) ? { condition: "service_started", ...raw } : { condition: "service_started" }]));
 }
-
-export function enforceHealthyDependsOn(document: ComposeDocument): void {
-  for (const service of Object.values(document.services ?? {})) {
-    if (service.depends_on === undefined) continue;
-    service.depends_on = normalizeComposeDependsOn(service.depends_on);
-  }
+export function addComposeCondition(service: ComposeService, target: string, condition: ComposeCondition): void {
+  service.depends_on = { ...normalizeComposeDependsOn(service.depends_on), [target]: { condition } };
 }

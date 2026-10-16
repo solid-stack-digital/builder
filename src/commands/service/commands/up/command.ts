@@ -23,7 +23,7 @@ export const registerUpCommand = (cmd: Command): void => {
     )
     .option(
       "--full",
-      "Run dev with all declared local dependencies integrated"
+      "Run dev with the full effective requisite graph"
     )
     .option(
       "-C, --project-dir <dir>",
@@ -40,6 +40,7 @@ export const registerUpCommand = (cmd: Command): void => {
   $ builder service up test-e2e
 
 JSON overlays: test-unit uses build.json test; test-e2e uses build.json e2e.
+These convenience workflow names do not select Dockerfile targets. Main targets are dev, test, and prod.
 The test command runs unit tests before E2E.`
     )
     .action(

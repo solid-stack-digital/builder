@@ -1,0 +1,7 @@
+services:
+  main:
+    build:
+      args:
+        FEATURE: "on"
+    environment:
+      LOG_LEVEL: info

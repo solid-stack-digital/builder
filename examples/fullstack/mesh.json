@@ -1,68 +1,85 @@
 {
   "name": "fullstack",
   "services": {
+    "tester": {
+      "compose": "./e2e/docker-compose.yml",
+      "service": "global-e2e",
+      "env": {
+        "FILESYSTEM_URL": "${filesystem.source.main.endpoints.http.public_url}",
+        "MAILER_URL": "${mailer.source.main.endpoints.http.public_url}",
+        "BACKEND_URL": "${backend.source.main.endpoints.http.public_url}",
+        "FRONTEND_URL": "${frontend.source.main.endpoints.http.public_url}",
+        "GATEWAY_URL": "${gateway.source.main.endpoints.http.public_url}"
+      }
+    },
     "filesystem": {
-      "path": "./services/filesystem",
+      "source": "./services/filesystem",
       "publish": [
-        "app.endpoints.http"
+        "main.endpoints.http"
       ]
     },
     "mailer": {
-      "path": "./services/mailer",
+      "source": "./services/mailer",
       "publish": [
-        "app.endpoints.http"
+        "main.endpoints.http"
       ]
     },
     "backend": {
-      "path": "./services/backend",
-      "dependencies": {
-        "filesystem": "filesystem",
-        "mailer": "mailer"
-      },
-      "env": {
-        "FILESYSTEM_URL": "${filesystem.app.endpoints.http.network_url}",
-        "MAILER_URL": "${mailer.app.endpoints.http.network_url}"
-      },
+      "source": "./services/backend",
       "publish": [
-        "app.endpoints.http"
-      ]
+        "main.endpoints.http"
+      ],
+      "extends": {
+        "main": {
+          "requisites": {
+            "source.filesystem": false,
+            "filesystem": "dependency",
+            "source.mailer": false,
+            "mailer": "dependency"
+          },
+          "env": {
+            "FILESYSTEM_URL": "${filesystem.source.main.endpoints.http.network_url}",
+            "MAILER_URL": "${mailer.source.main.endpoints.http.network_url}"
+          }
+        }
+      }
     },
     "frontend": {
-      "path": "./services/frontend",
-      "dependencies": {
-        "backend": "backend"
-      },
-      "env": {
-        "BACKEND_URL": "${backend.app.endpoints.http.network_url}"
-      },
+      "source": "./services/frontend",
       "publish": [
-        "app.endpoints.http"
-      ]
+        "main.endpoints.http"
+      ],
+      "extends": {
+        "main": {
+          "requisites": {
+            "source.backend": false,
+            "backend": "dependency"
+          },
+          "env": {
+            "BACKEND_URL": "${backend.source.main.endpoints.http.network_url}"
+          }
+        }
+      }
     },
     "gateway": {
-      "path": "./services/gateway",
-      "dependencies": {
-        "frontend": "frontend",
-        "backend": "backend"
-      },
-      "env": {
-        "FRONTEND_URL": "${frontend.app.endpoints.http.network_url}",
-        "BACKEND_URL": "${backend.app.endpoints.http.network_url}"
-      },
+      "source": "./services/gateway",
       "publish": [
-        "app.endpoints.http"
-      ]
-    }
-  },
-  "tester": {
-    "compose": "./e2e/docker-compose.yml",
-    "service": "global-e2e",
-    "env": {
-      "FILESYSTEM_URL": "${filesystem.app.endpoints.http.public_url}",
-      "MAILER_URL": "${mailer.app.endpoints.http.public_url}",
-      "BACKEND_URL": "${backend.app.endpoints.http.public_url}",
-      "FRONTEND_URL": "${frontend.app.endpoints.http.public_url}",
-      "GATEWAY_URL": "${gateway.app.endpoints.http.public_url}"
+        "main.endpoints.http"
+      ],
+      "extends": {
+        "main": {
+          "requisites": {
+            "source.frontend": false,
+            "frontend": "dependency",
+            "source.backend": false,
+            "backend": "dependency"
+          },
+          "env": {
+            "FRONTEND_URL": "${frontend.source.main.endpoints.http.network_url}",
+            "BACKEND_URL": "${backend.source.main.endpoints.http.network_url}"
+          }
+        }
+      }
     }
   }
 }

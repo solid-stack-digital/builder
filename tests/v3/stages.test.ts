@@ -1,0 +1,18 @@
+import path from "node:path";
+import { describe,expect,it } from "vitest";
+import { resolveBuildStage } from "../../src/core/config/resolveBuildStage.js";
+import { resolveMeshStage } from "../../src/core/config/resolveMeshStage.js";
+import { mergeEffectiveObject } from "../../src/core/config/stageMerge.js";
+import type { BuildJson } from "../../src/types/index.js";
+import type { MeshConfig } from "../../src/core/mesh/types.js";
+import { basicBuild } from "./support/fixtures.js";
+const source=path.resolve(".builder/test-tmp/stages/build.json"),meshFile=path.resolve(".builder/test-tmp/stages/mesh.json");
+describe("V3 effective overlays",()=>{
+ it("[MER01] merges env by key without mutating source",()=>{const b=basicBuild();b.services.main.env={A:"base",B:"keep"};b.prod={services:{main:{env:{A:"prod",C:"new"}}}};const frozen=structuredClone(b);const x=resolveBuildStage(b,"prod",source);expect((x.services.main as any).env).toEqual({A:"prod",B:"keep",C:"new"});expect(b).toEqual(frozen);});
+ it("[MER02] recursively merges endpoint siblings",()=>{const b=basicBuild();b.prod={services:{main:{endpoints:{http:{publicPort:15555}}}}};const x=resolveBuildStage(b,"prod",source);expect((x.services.main as any).endpoints.http).toEqual({port:3100,publicPort:15555,primary:true,scheme:"http"});});
+ it("[MER06] e2e inherits prod then e2e",()=>{const b=basicBuild();b.services.main.env={A:"base"};b.dev={services:{main:{env:{A:"dev"}}}};b.test={services:{main:{env:{A:"test"}}}};b.prod={services:{main:{env:{A:"prod",B:"from-prod"}}}};b.e2e={services:{main:{env:{A:"e2e"}}}};for(const [stage,a,bValue] of [["dev","dev",undefined],["test","test",undefined],["prod","prod","from-prod"],["e2e","e2e","from-prod"]] as const){const env=(resolveBuildStage(b,stage,source).services.main as any).env;expect(env.A).toBe(a);expect(env.B).toBe(bValue);}});
+ it("[MER08] false removes an edge and leaves its service",()=>{const b=basicBuild();b.services.db={compose:"db.yml",service:"db"};b.services.main.requisites={db:"dependency"};b.prod={services:{main:{requisites:{db:false}}}};const x=resolveBuildStage(b,"prod",source);expect((x.services.main as any).requisites).toEqual({});expect(x.services.db).toBeDefined();});
+ it("[MER05] compose and source can repeat identically but not change",()=>{const b=basicBuild();b.services.db={compose:"db.yml",service:"db"};b.prod={services:{db:{compose:"db.yml"}}};expect(()=>resolveBuildStage(b,"prod",source)).not.toThrow();b.prod.services!.db={compose:"other.yml"};expect(()=>resolveBuildStage(b,"prod",source)).toThrow(/immutable/);const m:MeshConfig={name:"mesh",services:{tester:{compose:"t.yml",service:"runner"},api:{source:"api"}},prod:{services:{api:{source:"api"}}}};expect(()=>resolveMeshStage(m,"prod",meshFile)).not.toThrow();m.prod!.services!.api={source:"other"};expect(()=>resolveMeshStage(m,"prod",meshFile)).toThrow(/immutable/);});
+ it("[MER03] publish arrays replace and clear",()=>{const m:MeshConfig={name:"mesh",services:{tester:{compose:"t.yml",service:"runner"},api:{source:"api",publish:["main.endpoints.http","db.endpoints.http"]}},prod:{services:{api:{publish:["db.endpoints.http"]}}},e2e:{services:{api:{publish:[]}}}};expect(resolveMeshStage(m,"prod",meshFile).services.api!.publish).toEqual(["db.endpoints.http"]);expect(resolveMeshStage(m,"e2e",meshFile).services.api!.publish).toEqual([]);});
+ it("[MER20] generic merge replaces arrays and clones",()=>{const base={a:{b:1,c:2},values:[1,2]};const patch={a:{b:3},values:[]};const result=mergeEffectiveObject(base,patch);expect(result).toEqual({a:{b:3,c:2},values:[]});expect(base.values).toEqual([1,2]);});
+});

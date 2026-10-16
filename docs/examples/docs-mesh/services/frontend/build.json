@@ -1,0 +1,59 @@
+{
+  "name": "frontend",
+  "services": {
+    "main": {
+      "endpoints": {
+        "http": {
+          "port": 3000,
+          "publicPort": "AUTO",
+          "primary": true,
+          "scheme": "http"
+        }
+      },
+      "requisites": {
+        "backend": "dependency"
+      },
+      "env": {
+        "BACKEND_URL": "http://localhost:8080"
+      }
+    },
+    "backend": {
+      "compose": "./compose/mock-backend.yml",
+      "service": "backend",
+      "endpoints": {
+        "http": {
+          "service": "backend",
+          "port": 8080,
+          "primary": true,
+          "scheme": "http"
+        }
+      }
+    },
+    "tester": {
+      "compose": "./e2e/docker-compose.yml",
+      "service": "e2e-runner",
+      "env": {
+        "API_URL": "${main.endpoints.http.public_url}"
+      }
+    }
+  },
+  "prod": {
+    "services": {
+      "main": {
+        "env": {
+          "BACKEND_URL": "${backend.endpoints.http.network_url}"
+        },
+        "override-compose": "./overrides/prod.yml"
+      }
+    }
+  },
+  "e2e": {
+    "services": {
+      "main": {
+        "env": {
+          "TEST_KIND": "black-box"
+        }
+      }
+    }
+  }
+}

@@ -15,6 +15,8 @@ export async function handleServiceUp(
   const stage = (rawStage || "dev").toLowerCase();
 
   const isFull = Boolean(options.full);
+  if(isFull&&stage!=="dev")throw new ScriptError("--full applies only to service dev");
+  if(options.detach&&!["dev","prod"].includes(stage))throw new ScriptError("--detach applies only to dev/prod; tests are finite");
   const runOptions = {
     projectDir,
     debug: Boolean(options.debug),

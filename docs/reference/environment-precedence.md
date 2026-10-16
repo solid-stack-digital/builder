@@ -1,76 +1,15 @@
 # Environment precedence
 
-The lists below run from low to high priority. Dotenv files are inputs to their selected stage; `.env.prod` is not merged into `.env.e2e`. E2E does inherit the structured `prod` overlays.
+Later applicable values win. Builder resolves references only in the final surviving value. This does not let an invalid active external reference work in an isolated graph.
 
-## Ordinary standalone app
+| Recipient | Low → high precedence |
+|---|---|
+| Standalone main | selected main dotenv → source base env → source stage env → selected main override env → Builder-owned variables |
+| Standalone E2E main | `.env.e2e` → base → prod → e2e env → selected override → Builder-owned variables |
+| Mesh main | source selected dotenv → source base/stage env → selected main override env → mesh base/stage `extends.main.env` → Builder-owned variables |
+| Global E2E main | source `.env.e2e` → source base/prod/e2e → selected override → mesh base/prod/e2e extends → Builder-owned variables |
+| Ordinary module | each container's native Compose defaults/env_file → source base/stage env → mesh base/stage extends env |
+| Source tester | native runner defaults → source `.env.e2e-tester` → source base/prod/e2e tester env |
+| Global tester | native runner defaults → mesh `.env.e2e-tester` → mesh base/prod/e2e tester env |
 
-```text
-.env.<stage>
--> base app.env
--> active-stage app.env
--> active-stage override-compose app environment
--> Builder internal base environment
--> Builder internal active-stage environment
-```
-
-## Ordinary mesh app
-
-```text
-.env.<stage>
--> base app.env
--> active-stage app.env
--> active-stage override-compose app environment
--> mesh base service env
--> active-stage mesh service env
--> Builder internal base environment
--> Builder internal active-stage environment
-```
-
-## Service E2E app
-
-```text
-.env.e2e
--> base app.env
--> prod app.env
--> prod override-compose app environment
--> e2e app.env
--> e2e override-compose app environment
--> Builder internal base environment
--> Builder internal E2E environment
-```
-
-## Global E2E app
-
-```text
-.env.e2e
--> base app.env
--> prod app.env
--> prod override-compose app environment
--> e2e app.env
--> e2e override-compose app environment
--> mesh base service env
--> mesh prod service env
--> mesh e2e service env
--> Builder internal base environment
--> Builder internal E2E environment
-```
-
-## E2E tester
-
-```text
-.env.e2e-tester
--> tester.env
--> Builder internal tester environment
-```
-
-Service E2E app uses `EXEC_MODE=prod`, `INFRA_MODE=integrated`, and target `prod`. The service tester uses `EXEC_MODE=e2e` and no `INFRA_MODE`. Global mesh E2E follows the same app semantics; the root tester uses `EXEC_MODE=e2e`, no `INFRA_MODE`, and root `.env.e2e-tester`.
-
-## Dependencies and references
-
-`dependencies.<name>.env` configures every service in that local dependency implementation when materialized. Substitution suppresses the local implementation. Tester env maps may refer only to effectively published public endpoint properties.
-
-## Related
-
-- [Environment concept](../concepts/environment.md)
-- [Export resolved environment](../guides/export-resolved-environment.md)
-- [build.json reference](build-json.md)
+E2E inherits **structured** prod configuration but reads `.env.e2e` instead of `.env.prod`. Ordinary modules do not inherit main dotenv; Builder's ordinary env applies to every container in that atomic module. Tester env applies to the selected runner, not its helpers, and it receives neither main dotenv nor `EXEC_MODE`, `INFRA_MODE`, or `PORT` from Builder. Reserved main execution keys cannot be set by user layers when Builder owns them. Override Compose is one selected file, not a stack of dev/prod/e2e files.

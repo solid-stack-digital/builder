@@ -6,7 +6,7 @@ import { HADOLINT_IMAGE } from "./constants.js";
 import { runStep } from "./runStep.js";
 
 export function checkDockerfile(buildJson: BuildJson, projectDir: string): void {
-  const dockerfileRel = (buildJson.dockerfile as string | undefined) || "Dockerfile";
+  const dockerfileRel = "Dockerfile";
   const dockerfilePath = resolveApplicationDockerfile(projectDir, dockerfileRel);
 
   const content = readFileSync(dockerfilePath, "utf-8");

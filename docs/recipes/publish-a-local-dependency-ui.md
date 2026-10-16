@@ -1,25 +1,3 @@
-# Publish a local dependency's admin UI
+# Publish a local module UI
 
-Declare Mailpit endpoints explicitly in the service project:
-
-```json
-{
-  "dependencies": {
-    "mailpit": {
-      "compose": "dependencies/mailpit.yml",
-      "endpoints": {
-        "smtp": { "service": "mailpit", "port": 1025, "primary": true, "scheme": "smtp" },
-        "http": { "service": "mailpit", "port": 8025, "publicPort": "AUTO", "scheme": "http" }
-      }
-    }
-  }
-}
-```
-
-Keep the dependency local/unsubstituted in the mesh and select `dependencies.mailpit.endpoints.http` in the consumer service's `publish` list. A dependency with no endpoint owner healthcheck is invalid for integrated use. See [dependency Compose contract](../reference/dependency-compose-contract.md).
-
-## Related
-
-- [Publication guide](../guides/publish-mesh-endpoints.md)
-- [Endpoint properties](../reference/endpoint-properties.md)
-- [Local dependencies](../concepts/local-dependencies.md)
+A mesh source can select `"inspection.endpoints.ui"` in its `publish` array. The local ordinary `inspection` node must already be reachable through requisites and its `ui` endpoint must have `publicPort`. Publishing does not bring a dormant module into the graph. A stage override must restate any other selectors it wants to retain. See [publication](../concepts/publication-and-ports.md).

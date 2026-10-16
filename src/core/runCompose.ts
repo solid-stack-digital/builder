@@ -6,6 +6,9 @@ import { registerActiveCompose, setActiveChild } from "./composeCleanup.js";
 
 export interface RunComposeOptions {
   removeVolumes?: boolean;
+  timeoutMs?: number;
+  /** Internal process boundary for deterministic workflow tests. */
+  spawnProcess?: typeof spawn;
 }
 
 export async function runCompose(
@@ -22,7 +25,7 @@ export async function runCompose(
   return new Promise<number>((resolve, reject) => {
     let child;
     try {
-      child = spawn(
+      child = (options.spawnProcess??spawn)(
         "docker",
         ["compose", "--project-directory", absProjectDir, "-f", "-", ...args],
         {
@@ -40,6 +43,14 @@ export async function runCompose(
     }
 
     setActiveChild(child);
+    let timer: NodeJS.Timeout | undefined;
+    if (options.timeoutMs) {
+      timer = setTimeout(() => {
+        child.kill("SIGTERM");
+        reject(new ScriptError(`Compose readiness deadline exceeded after ${options.timeoutMs}ms`));
+      }, options.timeoutMs);
+      timer.unref();
+    }
 
     child.stdin?.on("error", () => {
       // Child process may have closed stdin or exited early
@@ -51,6 +62,7 @@ export async function runCompose(
     }
 
     child.on("error", (err) => {
+      if (timer) clearTimeout(timer);
       setActiveChild(null);
       unregister();
       reject(
@@ -61,6 +73,7 @@ export async function runCompose(
     });
 
     child.on("close", (code, signal) => {
+      if (timer) clearTimeout(timer);
       setActiveChild(null);
       unregister();
 

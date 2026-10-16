@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.0.0 (source tree; publication not implied)
+
+### Breaking changes
+
+- Replace V2 `app`, `dependencies`, provider substitution and root tester configuration with `services.main`, ordinary modules, explicit requisites, mesh `extends`, and dedicated tester Compose files.
+- Require names and testers in complete build and mesh configuration. V3 rejects old fields; there is no V2 runtime fallback.
+- Use main Dockerfile targets `dev`, `test`, and `prod`; E2E runs a production main with an independent selected tester runner. Public mesh tests use `builder mesh up test`.
+- Mesh endpoint publication is explicit and stage arrays replace earlier selections. Source and Compose paths remain immutable across overlays.
+
+### Added
+
+- Strict V3 schemas, graph and lifecycle validation, namespace-safe shared Compose compilation, environment/reference resolution, and V3 test workflows.
+- Deferred image health checks resolved after image preparation and before startup; Builder ownership labels scope `builder prune` to Builder resources.
+- Migrated examples, V3 public documentation, and the [2.2.0 to 3.0.0 migration guide](docs/migration/v2.2-to-v3.0.md).
+
+# Changelog
+
 ## 1.1.1
 
 ### Patch Changes

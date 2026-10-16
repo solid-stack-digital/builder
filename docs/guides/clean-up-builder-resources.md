@@ -1,20 +1,3 @@
 # Clean up Builder resources
 
-`builder mesh down test` cleans each root service’s standalone unit/E2E projects, then the global E2E project. It uses root paths and saved project identities, not stage overlays. `mesh down test-unit` was removed; recover a service’s saved legacy test project with `builder service down test-unit -C <service>`. If root configuration is invalid, saved root cleanup remains available, but child paths cannot be discovered: run service down in each affected service directory. Failed teardown preserves recovery state.
-
-Stop one project with `builder service down [stage]` or `builder mesh down [stage]`. Add `-v, --volumes` to remove named volumes declared for that project; this destroys persisted data in those volumes.
-
-```bash
-builder service down dev
-builder mesh down test
-builder prune
-builder prune --volumes
-```
-
-`builder prune` removes stopped containers and unused networks. `--volumes` additionally prunes dangling anonymous volumes, which can remove data. Use project-specific `down` for a known environment; use `prune` for stale stopped resources or unused networks left across projects.
-
-## Related
-
-- [CLI reference](../reference/cli.md)
-- [Docker troubleshooting](../troubleshooting/docker-and-compose.md)
-- [Local dependencies](../concepts/local-dependencies.md)
+Use the matching `builder service down <stage> -C <service>` or `builder mesh down <stage> -C <mesh>` for project-specific cleanup. Detached dev/prod runs leave state and runtime until down; test phases tear down strictly and remove owned test volumes. Saved runtime identity supports down after a configuration edit; inspect failures and keep state for recovery if cleanup fails. Source-local mesh Phase 1 contexts clean before the next source. `builder prune --dry-run` shows the Builder-labelled stopped container and unused network prune commands; `--volumes` also selects Builder-labelled dangling volumes. It is not a migration step. Check `down --help` before requesting volume removal.

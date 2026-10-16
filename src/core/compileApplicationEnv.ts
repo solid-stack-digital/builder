@@ -1,29 +1,36 @@
 import { spawnSync } from "node:child_process";
+import { stringify } from "yaml";
 import { ScriptError } from "../errors/ScriptError.js";
 import type { Environment } from "../types/index.js";
 import { resolveProjectDir } from "../utils/paths.js";
-import { compileEnvironment, type CompileEnvironmentOptions } from "./compileEnvironment.js";
+import type { CompileEnvironmentOptions } from "./compileEnvironment.js";
+import { compileServiceComposition } from "./composition/compileServiceComposition.js";
+import { nodeId } from "./config/types.js";
+
+export type ResolveComposeConfig = (yaml:string,projectDir:string)=>{services:Record<string,{environment?:Record<string,string|null>}>};
+function resolveComposeConfig(yaml:string,dir:string):ReturnType<ResolveComposeConfig> {
+  const result=spawnSync("docker", ["compose", "--project-directory", dir, "-f", "-", "config", "--format", "json"], { cwd: dir, encoding: "utf-8", input: yaml });
+  if(result.error||result.status!==0)throw new ScriptError(`Failed to resolve application environment: ${result.error?.message||result.stderr||result.stdout}`);
+  return JSON.parse(result.stdout) as ReturnType<ResolveComposeConfig>;
+}
 
 /** Resolve the same compiled configuration that service runners send to Compose. */
 export function compileApplicationEnv(
   stage: Environment,
   projectDir: string,
   options: CompileEnvironmentOptions = {},
+  resolver: ResolveComposeConfig = resolveComposeConfig,
 ): Record<string, string> {
   const dir = resolveProjectDir(projectDir);
-  const yaml = compileEnvironment(stage, dir, options);
-  const result = spawnSync("docker", [
-    "compose", "--project-directory", dir, "-f", "-", "config", "--format", "json",
-  ], { cwd: dir, encoding: "utf-8", input: yaml });
-  if (result.error || result.status !== 0) {
-    throw new ScriptError(`Failed to resolve ${stage} application environment: ${result.error?.message || result.stderr || result.stdout}`);
-  }
-  const config = JSON.parse(result.stdout);
-  if (!config.services?.app) {
-    throw new ScriptError(`The ${stage} configuration has no application service ('app').`);
+  const compiled=compileServiceComposition(stage,dir,{...options,validationMode:true});
+  const main=compiled.mainServiceNames.get(nodeId(undefined,"main"));
+  const yaml = stringify(compiled.compose);
+  const config = resolver(yaml,dir);
+  if (!main || !config.services?.[main]) {
+    throw new ScriptError(`The ${stage} configuration has no main service.`);
   }
   const environment: Record<string, string> = {};
-  for (const [key, value] of Object.entries(config.services.app.environment ?? {})) {
+  for (const [key, value] of Object.entries(config.services[main].environment ?? {})) {
     // Unset pass-through entries are removed by Compose. Its config output
     // escapes literal dollars for reuse in YAML; exported values need one dollar.
     if (value !== null && value !== undefined) {

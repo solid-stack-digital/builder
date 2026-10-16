@@ -1,69 +1,23 @@
-import { runWithCleanup } from "../runWithCleanup.js";
-import pc from "picocolors";
-import { parse } from "yaml";
+import { stringify } from "yaml";
+import type { RunOptions } from "../RunOptions.js";
+import { compileServiceComposition } from "../composition/compileServiceComposition.js";
+import { nodeId } from "../config/types.js";
+import { persistHostPortAllocations, removeHostPortAllocations } from "../config/hostPorts.js";
 import { checkHostPortCollisions, extractHostPorts } from "../../utils/checkPortCollision.js";
 import { redactYamlSecrets } from "../../utils/redactSecrets.js";
 import { clearRunState, writeRunState } from "../../utils/runState.js";
-import { compileEnvironment } from "../compileEnvironment.js";
+import { runWithCleanup } from "../runWithCleanup.js";
 import { runCompose } from "../runCompose.js";
-import type { RunOptions } from "../RunOptions.js";
 import { teardownCompose } from "../teardownCompose.js";
-
-export const runTestUnit = async (options: RunOptions): Promise<number> => {
-  if (!options.skipBanner) {
-    console.log(pc.bold(pc.blue(`\n========================================`)));
-    console.log(pc.bold(pc.blue(`🧪 STAGE: UNIT & ISOLATED TESTS`)));
-    console.log(pc.bold(pc.blue(`========================================\n`)));
-  }
-  const finalYamlConfig = compileEnvironment("test", options.projectDir, {
-    silenceWarnings: options.silenceWarnings,
-  });
-  const parsed = parse(finalYamlConfig);
-  const projectName = parsed?.name || "test";
-
-  if (options.debug) {
-    console.log(
-      pc.yellow("Final merged YAML configuration:\n"),
-      redactYamlSecrets(finalYamlConfig)
-    );
-  }
-
-  if (options.dryRun) {
-    console.log(pc.green("[DRY-RUN] Unit tests simulated. Compose was not started."));
-    return 0;
-  }
-
-  await checkHostPortCollisions(extractHostPorts(finalYamlConfig));
-
-  // Stale-project cleanup before up (quietly)
-  await teardownCompose(finalYamlConfig, options.projectDir, {
-    removeVolumes: true,
-    silent: true,
-  });
-
-  // Stateful tracking
-  writeRunState(options.projectDir, {
-    projectName,
-    stage: "test-unit",
-    projectDir: options.projectDir,
-  });
-
-  const status = await runWithCleanup(
-    () => runCompose(
-      ["up", "--build", "--abort-on-container-exit", "--exit-code-from", "app"],
-      finalYamlConfig,
-      options.projectDir,
-      { removeVolumes: true }
-    ),
-    async () => {
-      await teardownCompose(finalYamlConfig, options.projectDir, { removeVolumes: true });
-      clearRunState(options.projectDir);
-    },
-  );
-  if (status === 0) {
-    console.log(pc.bold(pc.green(`\n✅ Unit tests passed successfully.\n`)));
-  } else {
-    console.error(pc.red(`\n❌ Unit tests failed with exit code ${status}.\n`));
-  }
-  return status;
-};
+export interface UnitRuntimeAdapters { compose?: typeof runCompose; teardown?: typeof teardownCompose; checkPorts?: typeof checkHostPortCollisions }
+export async function runTestUnit(options:RunOptions,adapters:UnitRuntimeAdapters={}):Promise<number> {
+  const compiled=compileServiceComposition("test",options.projectDir,{validationMode:Boolean(options.dryRun)}),yaml=stringify(compiled.compose);
+  const main=compiled.mainServiceNames.get(nodeId(undefined,"main"))!;
+  if(options.debug)console.log(redactYamlSecrets(yaml));
+  if(options.dryRun)return 0;
+  await (adapters.checkPorts??checkHostPortCollisions)(extractHostPorts(yaml));
+  await (adapters.teardown??teardownCompose)(yaml,options.projectDir,{removeVolumes:true,silent:true});
+  persistHostPortAllocations(options.projectDir,compiled.allocations);
+  writeRunState(options.projectDir,{projectName:compiled.projectName,stage:"test-unit",configStage:"test",workflow:"test",composition:"service",projectDir:options.projectDir,runtimeServiceNames:[main],testerServiceNames:[],allocatedEndpointKeys:[...compiled.allocations.keys()]});
+  return runWithCleanup(()=>(adapters.compose??runCompose)(["up","--build","--abort-on-container-exit","--exit-code-from",main,main],yaml,options.projectDir,{removeVolumes:true}),async()=>{await (adapters.teardown??teardownCompose)(yaml,options.projectDir,{removeVolumes:true});removeHostPortAllocations(options.projectDir,[...compiled.allocations.keys()]);clearRunState(options.projectDir);});
+}

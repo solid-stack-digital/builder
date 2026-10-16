@@ -1,34 +1,52 @@
 {
   "name": "fullstack-mailer",
-  "app": {
-    "endpoints": {
-      "http": {
-        "port": 3004,
-        "publicPort": "AUTO",
-        "primary": true,
-        "scheme": "http"
+  "services": {
+    "main": {
+      "endpoints": {
+        "http": {
+          "port": 3004,
+          "publicPort": "AUTO",
+          "primary": true,
+          "scheme": "http"
+        }
+      }
+    },
+    "tester": {
+      "compose": "e2e/docker-compose.yml",
+      "service": "e2e-runner",
+      "env": {
+        "API_URL": "${main.endpoints.http.public_url}"
       }
     }
   },
   "dev": {
-    "override-compose": ".docker/overrides/docker-compose.dev.override.yml"
-  },
-  "test": {
-    "override-compose": ".docker/overrides/docker-compose.test.override.yml"
-  },
-  "prod": {
-    "override-compose": ".docker/overrides/docker-compose.prod.override.yml"
-  },
-  "e2e": {
-    "app": {
-      "env": {
-        "CI": "true"
+    "services": {
+      "main": {
+        "override-compose": ".docker/overrides/docker-compose.dev.override.yml"
       }
     }
   },
-  "tester": {
-    "env": {
-      "API_URL": "${app.endpoints.http.public_url}"
+  "prod": {
+    "services": {
+      "main": {
+        "override-compose": ".docker/overrides/docker-compose.prod.override.yml"
+      }
+    }
+  },
+  "test": {
+    "services": {
+      "main": {
+        "override-compose": ".docker/overrides/docker-compose.test.override.yml"
+      }
+    }
+  },
+  "e2e": {
+    "services": {
+      "main": {
+        "env": {
+          "CI": "true"
+        }
+      }
     }
   }
 }

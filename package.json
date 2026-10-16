@@ -1,6 +1,6 @@
 {
   "name": "@solid-stack/builder",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "description": "CLI build tool and orchestrator for Solid Stack services.",
   "type": "module",
   "main": "./dist/index.js",
@@ -25,17 +25,21 @@
     "build:schemas": "tsx scripts/generate-schemas.ts",
     "build": "pnpm build:schemas && tsx scripts/build.ts",
     "dev": "tsup --watch",
-    "test": "vitest run",
+    "test": "pnpm test:v3:fast",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "check": "pnpm typecheck && pnpm test:conformance",
-    "prepublishOnly": "pnpm check:v2-no-legacy && pnpm build && pnpm test && tsx scripts/prepublish-check.ts",
-    "check:v2-no-legacy": "tsx scripts/check-no-v1-config-code.ts",
+    "prepublishOnly": "pnpm check:v3-no-legacy && pnpm build && pnpm test && tsx scripts/prepublish-check.ts",
     "builder": "tsx src/bin.ts",
-    "test:conformance": "vitest run tests/conformance",
-    "test:docker": "vitest run --config vitest.docker.config.ts",
-    "check:full": "pnpm check && pnpm test && pnpm check:v2-no-legacy && pnpm build && pnpm test:docker"
+    "test:conformance": "pnpm test:v3:fast",
+    "test:docker": "pnpm test:v3:docker",
+    "check:full": "pnpm test:v3",
+    "check:v3-no-legacy": "tsx scripts/check-no-v2-config-code.ts",
+    "test:v3:fast": "vitest run --config vitest.v3.config.ts --reporter=default --reporter=json --outputFile.json=.builder/v3-fast-report.json && tsx scripts/check-v3-coverage.ts fast .builder/v3-fast-report.json",
+    "test:v3:docker": "vitest run --config vitest.v3-docker.config.ts --reporter=default --reporter=json --outputFile.json=.builder/v3-docker-report.json",
+    "test:v3": "tsx scripts/test-v3.ts",
+    "test:v3:prepare": "tsx scripts/prepare-v3-docker.ts"
   },
   "keywords": [
     "solid-stack",
@@ -71,6 +75,7 @@
   "devDependencies": {
     "@changesets/cli": "^3.0.3",
     "@types/node": "^26.1.2",
+    "ajv": "^8.20.0",
     "tsc-alias": "^1.9.5",
     "tsup": "^8.5.1",
     "tsx": "^4.23.1",

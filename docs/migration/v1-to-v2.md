@@ -1,3 +1,5 @@
+> **Historical migration guide.** The examples below describe an older Builder version and are not V3 configuration. Continue with the [2.2.0 to 3.0.0 migration guide](v2.2-to-v3.0.md).
+
 # Migrate from V1/V1.2 to V2
 
 V2 is intentionally breaking. Legacy fields are rejected; Builder does not silently translate them.

@@ -21,9 +21,10 @@ function rootServiceDirsForCleanup(meshDir: string): string[] {
     const mesh = getMeshJson(meshDir);
     const dirs = Object.entries(mesh.services)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([name, service]) => resolveInsideProject(meshDir, service.path, {
+      .filter(([name]) => name !== "tester")
+      .map(([name, service]) => resolveInsideProject(meshDir, (service as {source:string}).source, {
         sourceFile: path.join(meshDir, "mesh.json"),
-        configPath: `services.${name}.path`,
+        configPath: `services.${name}.source`,
       }));
     return [...new Set(dirs)];
   } catch {
@@ -70,6 +71,14 @@ export async function handleMeshDown(
     }
   }
 
+  const runState = readRunState(meshDir);
+  if (runState && stage !== "test" && runState.stage !== stage) {
+    throw new ScriptError(`Saved runtime is for ${runState.stage}; use builder mesh down ${runState.stage} -C ${meshDir}`);
+  }
+  if (runState && stage === "test" && !["test", "test-e2e"].includes(runState.stage)) {
+    throw new ScriptError(`Saved runtime is for ${runState.stage}; use its matching down command`);
+  }
+
   if (stage === "test") {
     for (const serviceDir of rootServiceDirsForCleanup(meshDir)) {
       const status = await handleServiceDown("test", {
@@ -82,11 +91,9 @@ export async function handleMeshDown(
   }
 
   // H6: Robust teardown by project name (does not fail when YAML/env files are broken)
-  const runState = readRunState(meshDir);
-  const candidateProjects = projectNamesForMeshStage(meshDir, stage);
-  if (runState?.projectName) {
-    candidateProjects.unshift(runState.projectName);
-  }
+  const candidateProjects = runState?.projectName
+    ? [runState.projectName]
+    : projectNamesForMeshStage(meshDir, stage);
   const uniqueProjects = Array.from(new Set(candidateProjects));
 
   for (const proj of uniqueProjects) {

@@ -1,34 +1,18 @@
-# Stage execution matrix
+# Workflow and stage matrix
 
-Build overlay names are `dev`, `prod`, `test`, and `e2e`; mesh overlays are `dev`, `prod`, and `e2e`. Service CLI `test-unit` maps to build `test`; CLI `test-e2e` maps to `e2e`. E2E structured configuration inherits `prod` before applying `e2e`.
+Configuration stage, main Dockerfile target, execution variables, and workflow phase are separate concepts. Only main receives Builder's `EXEC_MODE` and `INFRA_MODE`. `PORT`, when present, is the primary **internal** endpoint port.
 
-## Service commands
+| Command or phase | Config overlay | Main target | `EXEC_MODE` | `INFRA_MODE` | Main dotenv | Tester dotenv |
+|---|---|---|---|---|---|---|
+| `service up dev` | dev | dev | dev | isolated | `.env.dev` | — |
+| `service up dev --full` | dev | dev | dev | integrated | `.env.dev` | — |
+| `service up prod` | prod | prod | prod | integrated | `.env.prod` | — |
+| `service up test-unit` | test | test | test | isolated | `.env.test` | — |
+| `service up test-e2e` | prod → e2e | prod | prod | integrated | `.env.e2e` | `.env.e2e-tester` |
+| `service up test` | unit, then E2E | test, then prod | test, then prod | isolated, then integrated | phase-specific | E2E only |
+| `mesh up dev` | source dev → mesh dev | dev | dev | integrated | each source `.env.dev` | — |
+| `mesh up prod` | source prod → mesh prod | prod | prod | integrated | each source `.env.prod` | — |
+| `mesh up test` Phase 1 | each base source test | test, then prod | test, then prod | isolated, then integrated | source phase-specific | source E2E only |
+| `mesh up test` Phase 2 | source prod → e2e, mesh prod → e2e | prod | prod | integrated | each source `.env.e2e` | mesh `.env.e2e-tester` |
 
-| Command | Structured config | App target | App `EXEC_MODE` | App `INFRA_MODE` | Tester target / mode | App dotenv | Tester dotenv |
-|---|---|---|---|---|---|---|---|
-| `service up dev` | `base -> dev` | `dev` | `dev` | `isolated` | — | `.env.dev` | — |
-| `service up dev --full` | `base -> dev` | `dev` | `dev` | `integrated` | — | `.env.dev` | — |
-| `service up prod` | `base -> prod` | `prod` | `prod` | `integrated` | — | `.env.prod` | — |
-| `service up test-unit` | `base -> test` | `test` | `test` | `isolated` | — | `.env.test` | — |
-| `service up test-e2e` | `base -> prod -> e2e` | `prod` | `prod` | `integrated` | `test-e2e` / `e2e` | `.env.e2e` | `.env.e2e-tester` |
-
-`service up test` runs unit/isolated tests first, followed by service E2E only after success.
-
-## Mesh commands
-
-| Command | Mesh/build config | App target / mode | App `INFRA_MODE` | App dotenv | Tester |
-|---|---|---|---|---|---|
-| `mesh up dev` | `base -> dev` | `dev` / `dev` | `integrated` | each service `.env.dev` | — |
-| `mesh up prod` | `base -> prod` | `prod` / `prod` | `integrated` | each service `.env.prod` | — |
-| `mesh up test-e2e` | `base -> prod -> e2e` | `prod` / `prod` | `integrated` | each service `.env.e2e` | global `test-e2e` runner, `EXEC_MODE=e2e`, no `INFRA_MODE`, root `.env.e2e-tester` |
-
-Global E2E apps use production runtime semantics. The tester is a separate finite host-side process.
-
-## Canonical `mesh up test`
-
-1. For every root `mesh.json.services` entry, sequentially run its standalone unit/isolated lifecycle, its service E2E lifecycle, and full teardown.
-2. Start a fresh `base -> prod -> e2e` mesh with production-mode apps, run the global tester, and fully tear it down.
-
-Stage-only mesh services participate in Phase 2 when effective, but not Phase 1 unless also declared at root. `mesh.json` supports `dev`, `prod`, and `e2e` overlays only. A root `test` field is rejected, including an empty object and when `--skip-checks` is used. `build.json.test` remains supported.
-
-See [environment precedence](environment-precedence.md) for source-by-source ordering.
+The tester's image or build target comes from its own Compose file and selected runner service; Builder injects no tester execution variables. Phase 1 finishes and cleans one base source before the next. Phase 2 starts a fresh global composition. `test-unit` and `test-e2e` are standalone command conveniences, not Dockerfile target names.

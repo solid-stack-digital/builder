@@ -1,30 +1,16 @@
-# Endpoint properties
+# Endpoint references and properties
 
-Given an endpoint with `port: 3000`, `publicPort: 8080`, and `scheme: "http"`:
+A reference in source `build.json` has `${main.endpoints.http.network_url}` or `${db.endpoints.tcp.network_host}` form. A mesh-authored source-local reference uses `${source.main.endpoints.http.network_url}`. A cross-source reference uses `${backend.source.main.endpoints.http.network_url}`. References are allowed only to nodes in the consumer's effective requisite closure; another mesh root being active is insufficient. They configure values and never create graph edges.
 
-| Property | Example | Needs `scheme` | Needs effective publication | Typical consumer |
-|---|---|---:|---:|---|
-| `network_host` | `backend` | No | No | App/container |
-| `network_port` | `3000` | No | No | App/container |
-| `network_address` | `backend:3000` | No | No | App/container |
-| `network_url` | `http://backend:3000` | Yes | No | App/container |
-| `public_host` | `127.0.0.1` | No | Yes | Host/tester/browser |
-| `public_port` | `8080` | No | Yes | Host/tester/browser |
-| `public_address` | `127.0.0.1:8080` | No | Yes | Host/tester/browser |
-| `public_url` | `http://127.0.0.1:8080` | Yes | Yes | Host/tester/browser |
+| Property | Value | Preconditions |
+|---|---|---|
+| `network_host` | Generated Docker network hostname | Endpoint reachable in graph. |
+| `network_port` | Internal endpoint port | Endpoint reachable. |
+| `network_address` | Host and internal port | Endpoint reachable. |
+| `network_url` | Scheme, host and internal port | Endpoint has `scheme`. |
+| `public_host` | Host access name | Endpoint effectively published. |
+| `public_port` | Effective fixed/AUTO host port | Endpoint effectively published. |
+| `public_address` | Public host and port | Endpoint effectively published. |
+| `public_url` | Scheme, host and public port | Published and has `scheme`. |
 
-In `build.json`, app syntax is `${app.endpoints.http.network_url}` and dependency syntax is `${dependencies.redis.endpoints.redis.network_host}`. In `mesh.json`, use `${backend.app.endpoints.http.network_url}` or `${frontend.dependencies.backend.endpoints.http.public_url}`. There is no `services.` prefix.
-
-References can be embedded in text. `$$` escapes a literal dollar. Unknown endpoints/properties fail. Tester env is restricted to `public_*` properties.
-
-Common errors:
-
-- `network_url` without `scheme`: add a scheme such as `http` to the endpoint.
-- `public_url` for a private mesh endpoint: give the endpoint `publicPort` and select it in mesh `publish`.
-- Unknown endpoint: align the reference name with the effective endpoint map, including provider endpoint names after substitution.
-
-## Related
-
-- [Endpoint references](../concepts/endpoint-references.md)
-- [Publication and ports](../concepts/publication-and-ports.md)
-- [Troubleshoot references](../troubleshooting/references-and-environment.md)
+Standalone endpoints with `publicPort` are published when reachable. Mesh endpoints stay private unless a source `publish` selector chooses them. `publicPort` is a capability, not an instruction to publish in a mesh. Main `PORT` follows primary internal `port`, never `public_port`. A tester may use public properties for black-box tests; bridge-connected testers may use network properties when network reachability is configured explicitly.

@@ -1,5 +1,5 @@
 services:
-  app:
+  main:
     build:
       target: prod
     env_file:

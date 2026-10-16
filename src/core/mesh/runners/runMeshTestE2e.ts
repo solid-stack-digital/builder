@@ -1,3 +1,22 @@
+import { stringify } from "yaml";
+import type { MeshRunOptions } from "../MeshRunOptions.js";
+import { resolveProjectDir } from "../../../utils/paths.js";
+import { compileMeshComposition } from "../compileMeshComposition.js";
+import { persistHostPortAllocations, removeHostPortAllocations } from "../../config/hostPorts.js";
+import { checkHostPortCollisions, extractHostPorts } from "../../../utils/checkPortCollision.js";
+import { redactYamlSecrets } from "../../../utils/redactSecrets.js";
+import { clearRunState, writeRunState } from "../../../utils/runState.js";
 import { runWithCleanup } from "../../runWithCleanup.js";
-import pc from "picocolors";import { parse } from "yaml";import { checkHostPortCollisions,extractHostPorts } from "../../../utils/checkPortCollision.js";import { ScriptError } from "../../../errors/ScriptError.js";import { resolveProjectDir } from "../../../utils/paths.js";import { redactYamlSecrets } from "../../../utils/redactSecrets.js";import { clearRunState,writeRunState } from "../../../utils/runState.js";import { runFiniteTester } from "../../runners/runFiniteTester.js";import { teardownCompose } from "../../teardownCompose.js";import { getMeshJson } from "../getMeshJson.js";import { compileMeshEnvironment } from "../compileMeshEnvironment.js";import type { MeshRunOptions } from "../MeshRunOptions.js";
-export async function runMeshTestE2e(options:MeshRunOptions={}):Promise<number>{const meshDir=resolveProjectDir(options.projectDir),mesh=getMeshJson(meshDir);if(!mesh.tester)throw new ScriptError("Global mesh E2E requires root mesh.json.tester { compose, service, env? }");const {yaml,testerServiceName}=compileMeshEnvironment("e2e",meshDir);if(!testerServiceName)throw new ScriptError("Global mesh E2E tester runner could not be compiled.");if(options.debug)console.log(pc.yellow("\nFinal global mesh E2E YAML configuration:\n"),redactYamlSecrets(yaml));if(options.dryRun){console.log(pc.green("[DRY-RUN] Global mesh E2E compiled; Compose was not started."));return 0;}await checkHostPortCollisions(extractHostPorts(yaml));const projectName=parse(yaml)?.name||"mesh-e2e";await teardownCompose(yaml,meshDir,{removeVolumes:true,silent:true});writeRunState(meshDir,{projectName,stage:"test-e2e",projectDir:meshDir});const status=await runWithCleanup(()=>runFiniteTester(yaml,meshDir,testerServiceName),async()=>{await teardownCompose(yaml,meshDir,{removeVolumes:true});clearRunState(meshDir);});return status;}
+import { teardownCompose } from "../../teardownCompose.js";
+import { runFiniteTester } from "../../runners/runFiniteTester.js";
+import type { E2eRuntimeAdapters } from "../../runners/runTestE2e.js";
+export async function runMeshTestE2e(options:MeshRunOptions={},adapters:E2eRuntimeAdapters={}):Promise<number> {
+  const root=resolveProjectDir(options.projectDir),compiled=compileMeshComposition("e2e",root,{validationMode:Boolean(options.dryRun)}),yaml=stringify(compiled.compose);
+  if(options.debug)console.log(redactYamlSecrets(yaml));
+  if(options.dryRun)return 0;
+  await (adapters.checkPorts??checkHostPortCollisions)(extractHostPorts(yaml));
+  await (adapters.teardown??teardownCompose)(yaml,root,{removeVolumes:true,silent:true});
+  persistHostPortAllocations(root,compiled.allocations);
+  writeRunState(root,{projectName:compiled.projectName,stage:"test-e2e",configStage:"e2e",workflow:"test",composition:"mesh",projectDir:root,runtimeServiceNames:compiled.runtimeServiceNames,testerServiceNames:compiled.testerServiceNames,allocatedEndpointKeys:[...compiled.allocations.keys()]});
+  return runWithCleanup(()=>runFiniteTester(compiled,root,adapters.finite),async()=>{await (adapters.teardown??teardownCompose)(yaml,root,{removeVolumes:true});removeHostPortAllocations(root,[...compiled.allocations.keys()]);clearRunState(root);});
+}

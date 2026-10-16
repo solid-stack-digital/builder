@@ -1,3 +1,5 @@
+> **Builder V3 example.** See the [V3 documentation](../../../../docs/README.md) and [migration guide](../../../../docs/migration/v2.2-to-v3.0.md).
+
 # Example Backend Service
 
 A lightweight example service that uses `@solid-stack/builder` linked directly to the local builder source code.

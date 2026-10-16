@@ -1,15 +1,3 @@
-# Validate before running
+# Validate before Docker runs
 
-A root `mesh.json.test` field fails during configuration loading, even with `--skip-checks`. Mesh preflight still validates each service’s own `build.json.test` through standalone service checks.
-
-Use `builder check` for a service project and `builder mesh check` for a mesh. Add `builder mesh check --require-tester` when the mesh must be ready for global E2E.
-
-Checks cover configuration shape and effective stages, Dockerfile requirements, dependency Compose validity, endpoint ownership/readiness, mesh contracts/bindings, and tester contracts. Errors identify the relevant config path and reason where available.
-
-`--skip-checks` on an `up` command skips preflight checks invoked by that flow; it is a speed/diagnostic option, not a replacement for valid configuration. See [configuration errors](../troubleshooting/configuration-errors.md) and the [CLI reference](../reference/cli.md).
-
-## Related
-
-- [Service quickstart](../getting-started/service-quickstart.md)
-- [CLI reference](../reference/cli.md)
-- [Configuration troubleshooting](../troubleshooting/configuration-errors.md)
+JSON Schemas catch structure. `builder check` and `builder mesh check` inspect cross-file contracts and declared assets. `builder service up ... --dry-run` or `builder mesh up ... --dry-run` compiles active stages, graph, Compose and endpoint values without starting runtime or writing state. Only surviving env values are reference-checked; a shadowed invalid value is ignored. `--skip-checks` skips external Hadolint/Conftest, not semantic validation. Live tests still establish health, job exit and network reachability. See [schemas](../reference/json-schemas.md).

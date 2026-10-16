@@ -1,0 +1,22 @@
+{
+  "name": "backend",
+  "services": {
+    "main": {
+      "endpoints": {
+        "http": {
+          "port": 3000,
+          "publicPort": "AUTO",
+          "primary": true,
+          "scheme": "http"
+        }
+      }
+    },
+    "tester": {
+      "compose": "./e2e/docker-compose.yml",
+      "service": "e2e-runner",
+      "env": {
+        "API_URL": "${main.endpoints.http.public_url}"
+      }
+    }
+  }
+}

@@ -1,245 +1,518 @@
 {
-  "$ref": "#/definitions/MeshJsonV2",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/MeshJsonV3",
   "definitions": {
-    "MeshJsonV2": {
+    "MeshJsonV3": {
       "type": "object",
       "properties": {
         "$schema": {
           "type": "string"
         },
         "name": {
-          "type": "string"
-        },
-        "tester": {
-          "type": "object",
-          "properties": {
-            "compose": {
-              "type": "string",
-              "minLength": 1
-            },
-            "service": {
-              "type": "string",
-              "minLength": 1
-            },
-            "env": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
-            }
-          },
-          "required": [
-            "compose",
-            "service"
-          ],
-          "additionalProperties": false
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
         },
         "services": {
           "type": "object",
-          "additionalProperties": {
-            "type": "object",
-            "properties": {
-              "path": {
-                "type": "string",
-                "minLength": 1
-              },
-              "env": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              },
-              "dependencies": {
-                "type": "object",
-                "additionalProperties": {
-                  "allOf": [
-                    {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9-]*$"
-                    },
-                    {
-                      "not": {
-                        "enum": [
-                          "app",
-                          "dependencies",
-                          "tester",
-                          "services",
-                          "dev",
-                          "prod",
-                          "test",
-                          "e2e"
-                        ]
-                      }
-                    }
-                  ]
+          "properties": {
+            "tester": {
+              "type": "object",
+              "properties": {
+                "compose": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
                 },
-                "propertyNames": {
-                  "pattern": "^[a-z][a-z0-9-]*$"
+                "service": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                },
+                "env": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
                 }
               },
-              "dependsOn": {
-                "type": "array",
-                "items": {
-                  "allOf": [
-                    {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9-]*$"
-                    },
-                    {
-                      "not": {
-                        "enum": [
-                          "app",
-                          "dependencies",
-                          "tester",
-                          "services",
-                          "dev",
-                          "prod",
-                          "test",
-                          "e2e"
-                        ]
-                      }
-                    }
-                  ]
-                }
-              },
-              "publish": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              }
-            },
-            "required": [
-              "path"
-            ],
-            "additionalProperties": false
+              "required": [
+                "compose",
+                "service"
+              ],
+              "additionalProperties": false
+            }
           },
-          "minProperties": 1,
-          "propertyNames": {
-            "allOf": [
-              {
-                "type": "string",
-                "pattern": "^[a-z][a-z0-9-]*$"
-              },
-              {
-                "not": {
-                  "enum": [
-                    "app",
-                    "dependencies",
-                    "tester",
-                    "services",
-                    "dev",
-                    "prod",
-                    "test",
-                    "e2e"
-                  ]
+          "patternProperties": {
+            "^(?!(?:main|tester)$)[a-z][a-z0-9-]*$": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                },
+                "extends": {
+                  "type": "object",
+                  "properties": {
+                    "main": {
+                      "type": "object",
+                      "properties": {
+                        "env": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "endpoints": {
+                          "type": "object",
+                          "propertyNames": {
+                            "pattern": "^[a-z][a-z0-9-]*$"
+                          },
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "port": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 65535
+                              },
+                              "publicPort": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 65535
+                                  },
+                                  {
+                                    "const": "AUTO"
+                                  }
+                                ]
+                              },
+                              "primary": {
+                                "type": "boolean"
+                              },
+                              "scheme": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                              }
+                            },
+                            "required": [],
+                            "additionalProperties": false
+                          }
+                        },
+                        "requisites": {
+                          "type": "object",
+                          "propertyNames": {
+                            "pattern": "^(?:source\\.)?[a-z][a-z0-9-]*$"
+                          },
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "enum": [
+                                  "requirement",
+                                  "dependency",
+                                  "prerequisite"
+                                ]
+                              },
+                              {
+                                "const": false
+                              }
+                            ]
+                          }
+                        },
+                        "override-compose": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "tester": {
+                      "type": "object",
+                      "properties": {
+                        "compose": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "service": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "env": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [],
+                      "additionalProperties": false
+                    }
+                  },
+                  "patternProperties": {
+                    "^(?!(?:main|tester)$)[a-z][a-z0-9-]*$": {
+                      "type": "object",
+                      "properties": {
+                        "compose": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "service": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "env": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "endpoints": {
+                          "type": "object",
+                          "propertyNames": {
+                            "pattern": "^[a-z][a-z0-9-]*$"
+                          },
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "service": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "\\S"
+                              },
+                              "port": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 65535
+                              },
+                              "publicPort": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 65535
+                                  },
+                                  {
+                                    "const": "AUTO"
+                                  }
+                                ]
+                              },
+                              "primary": {
+                                "type": "boolean"
+                              },
+                              "scheme": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                              }
+                            },
+                            "required": [],
+                            "additionalProperties": false
+                          }
+                        },
+                        "requisites": {
+                          "type": "object",
+                          "propertyNames": {
+                            "pattern": "^(?:source\\.)?[a-z][a-z0-9-]*$"
+                          },
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "enum": [
+                                  "requirement",
+                                  "dependency",
+                                  "prerequisite"
+                                ]
+                              },
+                              {
+                                "const": false
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "propertyNames": {
+                    "pattern": "^[a-z][a-z0-9-]*$"
+                  },
+                  "additionalProperties": false
+                },
+                "publish": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 }
-              }
-            ]
-          }
+              },
+              "required": [
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "required": [
+            "tester"
+          ],
+          "minProperties": 2,
+          "additionalProperties": false
         },
         "dev": {
           "type": "object",
           "properties": {
             "services": {
               "type": "object",
-              "additionalProperties": {
-                "type": "object",
-                "properties": {
-                  "path": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "env": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "string"
-                    }
-                  },
-                  "dependencies": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "allOf": [
-                        {
-                          "type": "string",
-                          "pattern": "^[a-z][a-z0-9-]*$"
-                        },
-                        {
-                          "not": {
-                            "enum": [
-                              "app",
-                              "dependencies",
-                              "tester",
-                              "services",
-                              "dev",
-                              "prod",
-                              "test",
-                              "e2e"
-                            ]
-                          }
-                        }
-                      ]
+              "properties": {
+                "tester": {
+                  "type": "object",
+                  "properties": {
+                    "compose": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
                     },
-                    "propertyNames": {
-                      "pattern": "^[a-z][a-z0-9-]*$"
+                    "service": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "env": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
                     }
                   },
-                  "dependsOn": {
-                    "type": "array",
-                    "items": {
-                      "allOf": [
-                        {
-                          "type": "string",
-                          "pattern": "^[a-z][a-z0-9-]*$"
+                  "required": [],
+                  "additionalProperties": false
+                }
+              },
+              "patternProperties": {
+                "^(?!(?:main|tester)$)[a-z][a-z0-9-]*$": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "extends": {
+                      "type": "object",
+                      "properties": {
+                        "main": {
+                          "type": "object",
+                          "properties": {
+                            "env": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            },
+                            "endpoints": {
+                              "type": "object",
+                              "propertyNames": {
+                                "pattern": "^[a-z][a-z0-9-]*$"
+                              },
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "port": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 65535
+                                  },
+                                  "publicPort": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 65535
+                                      },
+                                      {
+                                        "const": "AUTO"
+                                      }
+                                    ]
+                                  },
+                                  "primary": {
+                                    "type": "boolean"
+                                  },
+                                  "scheme": {
+                                    "type": "string",
+                                    "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                                  }
+                                },
+                                "required": [],
+                                "additionalProperties": false
+                              }
+                            },
+                            "requisites": {
+                              "type": "object",
+                              "propertyNames": {
+                                "pattern": "^(?:source\\.)?[a-z][a-z0-9-]*$"
+                              },
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "enum": [
+                                      "requirement",
+                                      "dependency",
+                                      "prerequisite"
+                                    ]
+                                  },
+                                  {
+                                    "const": false
+                                  }
+                                ]
+                              }
+                            },
+                            "override-compose": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "\\S"
+                            }
+                          },
+                          "additionalProperties": false
                         },
-                        {
-                          "not": {
-                            "enum": [
-                              "app",
-                              "dependencies",
-                              "tester",
-                              "services",
-                              "dev",
-                              "prod",
-                              "test",
-                              "e2e"
-                            ]
-                          }
+                        "tester": {
+                          "type": "object",
+                          "properties": {
+                            "compose": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "\\S"
+                            },
+                            "service": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "\\S"
+                            },
+                            "env": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [],
+                          "additionalProperties": false
                         }
-                      ]
+                      },
+                      "patternProperties": {
+                        "^(?!(?:main|tester)$)[a-z][a-z0-9-]*$": {
+                          "type": "object",
+                          "properties": {
+                            "compose": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "\\S"
+                            },
+                            "service": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "\\S"
+                            },
+                            "env": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            },
+                            "endpoints": {
+                              "type": "object",
+                              "propertyNames": {
+                                "pattern": "^[a-z][a-z0-9-]*$"
+                              },
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "service": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "pattern": "\\S"
+                                  },
+                                  "port": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 65535
+                                  },
+                                  "publicPort": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 65535
+                                      },
+                                      {
+                                        "const": "AUTO"
+                                      }
+                                    ]
+                                  },
+                                  "primary": {
+                                    "type": "boolean"
+                                  },
+                                  "scheme": {
+                                    "type": "string",
+                                    "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                                  }
+                                },
+                                "required": [],
+                                "additionalProperties": false
+                              }
+                            },
+                            "requisites": {
+                              "type": "object",
+                              "propertyNames": {
+                                "pattern": "^(?:source\\.)?[a-z][a-z0-9-]*$"
+                              },
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "enum": [
+                                      "requirement",
+                                      "dependency",
+                                      "prerequisite"
+                                    ]
+                                  },
+                                  {
+                                    "const": false
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "propertyNames": {
+                        "pattern": "^[a-z][a-z0-9-]*$"
+                      },
+                      "additionalProperties": false
+                    },
+                    "publish": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   },
-                  "publish": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "additionalProperties": false
+                  "required": [],
+                  "additionalProperties": false
+                }
               },
               "propertyNames": {
-                "allOf": [
-                  {
-                    "type": "string",
-                    "pattern": "^[a-z][a-z0-9-]*$"
-                  },
-                  {
-                    "not": {
-                      "enum": [
-                        "app",
-                        "dependencies",
-                        "tester",
-                        "services",
-                        "dev",
-                        "prod",
-                        "test",
-                        "e2e"
-                      ]
-                    }
-                  }
-                ]
-              }
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "required": [],
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -249,103 +522,248 @@
           "properties": {
             "services": {
               "type": "object",
-              "additionalProperties": {
-                "type": "object",
-                "properties": {
-                  "path": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "env": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "string"
-                    }
-                  },
-                  "dependencies": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "allOf": [
-                        {
-                          "type": "string",
-                          "pattern": "^[a-z][a-z0-9-]*$"
-                        },
-                        {
-                          "not": {
-                            "enum": [
-                              "app",
-                              "dependencies",
-                              "tester",
-                              "services",
-                              "dev",
-                              "prod",
-                              "test",
-                              "e2e"
-                            ]
-                          }
-                        }
-                      ]
+              "properties": {
+                "tester": {
+                  "type": "object",
+                  "properties": {
+                    "compose": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
                     },
-                    "propertyNames": {
-                      "pattern": "^[a-z][a-z0-9-]*$"
+                    "service": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "env": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
                     }
                   },
-                  "dependsOn": {
-                    "type": "array",
-                    "items": {
-                      "allOf": [
-                        {
-                          "type": "string",
-                          "pattern": "^[a-z][a-z0-9-]*$"
+                  "required": [],
+                  "additionalProperties": false
+                }
+              },
+              "patternProperties": {
+                "^(?!(?:main|tester)$)[a-z][a-z0-9-]*$": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "extends": {
+                      "type": "object",
+                      "properties": {
+                        "main": {
+                          "type": "object",
+                          "properties": {
+                            "env": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            },
+                            "endpoints": {
+                              "type": "object",
+                              "propertyNames": {
+                                "pattern": "^[a-z][a-z0-9-]*$"
+                              },
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "port": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 65535
+                                  },
+                                  "publicPort": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 65535
+                                      },
+                                      {
+                                        "const": "AUTO"
+                                      }
+                                    ]
+                                  },
+                                  "primary": {
+                                    "type": "boolean"
+                                  },
+                                  "scheme": {
+                                    "type": "string",
+                                    "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                                  }
+                                },
+                                "required": [],
+                                "additionalProperties": false
+                              }
+                            },
+                            "requisites": {
+                              "type": "object",
+                              "propertyNames": {
+                                "pattern": "^(?:source\\.)?[a-z][a-z0-9-]*$"
+                              },
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "enum": [
+                                      "requirement",
+                                      "dependency",
+                                      "prerequisite"
+                                    ]
+                                  },
+                                  {
+                                    "const": false
+                                  }
+                                ]
+                              }
+                            },
+                            "override-compose": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "\\S"
+                            }
+                          },
+                          "additionalProperties": false
                         },
-                        {
-                          "not": {
-                            "enum": [
-                              "app",
-                              "dependencies",
-                              "tester",
-                              "services",
-                              "dev",
-                              "prod",
-                              "test",
-                              "e2e"
-                            ]
-                          }
+                        "tester": {
+                          "type": "object",
+                          "properties": {
+                            "compose": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "\\S"
+                            },
+                            "service": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "\\S"
+                            },
+                            "env": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [],
+                          "additionalProperties": false
                         }
-                      ]
+                      },
+                      "patternProperties": {
+                        "^(?!(?:main|tester)$)[a-z][a-z0-9-]*$": {
+                          "type": "object",
+                          "properties": {
+                            "compose": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "\\S"
+                            },
+                            "service": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "\\S"
+                            },
+                            "env": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            },
+                            "endpoints": {
+                              "type": "object",
+                              "propertyNames": {
+                                "pattern": "^[a-z][a-z0-9-]*$"
+                              },
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "service": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "pattern": "\\S"
+                                  },
+                                  "port": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 65535
+                                  },
+                                  "publicPort": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 65535
+                                      },
+                                      {
+                                        "const": "AUTO"
+                                      }
+                                    ]
+                                  },
+                                  "primary": {
+                                    "type": "boolean"
+                                  },
+                                  "scheme": {
+                                    "type": "string",
+                                    "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                                  }
+                                },
+                                "required": [],
+                                "additionalProperties": false
+                              }
+                            },
+                            "requisites": {
+                              "type": "object",
+                              "propertyNames": {
+                                "pattern": "^(?:source\\.)?[a-z][a-z0-9-]*$"
+                              },
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "enum": [
+                                      "requirement",
+                                      "dependency",
+                                      "prerequisite"
+                                    ]
+                                  },
+                                  {
+                                    "const": false
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "propertyNames": {
+                        "pattern": "^[a-z][a-z0-9-]*$"
+                      },
+                      "additionalProperties": false
+                    },
+                    "publish": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   },
-                  "publish": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "additionalProperties": false
+                  "required": [],
+                  "additionalProperties": false
+                }
               },
               "propertyNames": {
-                "allOf": [
-                  {
-                    "type": "string",
-                    "pattern": "^[a-z][a-z0-9-]*$"
-                  },
-                  {
-                    "not": {
-                      "enum": [
-                        "app",
-                        "dependencies",
-                        "tester",
-                        "services",
-                        "dev",
-                        "prod",
-                        "test",
-                        "e2e"
-                      ]
-                    }
-                  }
-                ]
-              }
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "required": [],
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -355,113 +773,258 @@
           "properties": {
             "services": {
               "type": "object",
-              "additionalProperties": {
-                "type": "object",
-                "properties": {
-                  "path": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "env": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "string"
-                    }
-                  },
-                  "dependencies": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "allOf": [
-                        {
-                          "type": "string",
-                          "pattern": "^[a-z][a-z0-9-]*$"
-                        },
-                        {
-                          "not": {
-                            "enum": [
-                              "app",
-                              "dependencies",
-                              "tester",
-                              "services",
-                              "dev",
-                              "prod",
-                              "test",
-                              "e2e"
-                            ]
-                          }
-                        }
-                      ]
+              "properties": {
+                "tester": {
+                  "type": "object",
+                  "properties": {
+                    "compose": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
                     },
-                    "propertyNames": {
-                      "pattern": "^[a-z][a-z0-9-]*$"
+                    "service": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "env": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
                     }
                   },
-                  "dependsOn": {
-                    "type": "array",
-                    "items": {
-                      "allOf": [
-                        {
-                          "type": "string",
-                          "pattern": "^[a-z][a-z0-9-]*$"
+                  "required": [],
+                  "additionalProperties": false
+                }
+              },
+              "patternProperties": {
+                "^(?!(?:main|tester)$)[a-z][a-z0-9-]*$": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "extends": {
+                      "type": "object",
+                      "properties": {
+                        "main": {
+                          "type": "object",
+                          "properties": {
+                            "env": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            },
+                            "endpoints": {
+                              "type": "object",
+                              "propertyNames": {
+                                "pattern": "^[a-z][a-z0-9-]*$"
+                              },
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "port": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 65535
+                                  },
+                                  "publicPort": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 65535
+                                      },
+                                      {
+                                        "const": "AUTO"
+                                      }
+                                    ]
+                                  },
+                                  "primary": {
+                                    "type": "boolean"
+                                  },
+                                  "scheme": {
+                                    "type": "string",
+                                    "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                                  }
+                                },
+                                "required": [],
+                                "additionalProperties": false
+                              }
+                            },
+                            "requisites": {
+                              "type": "object",
+                              "propertyNames": {
+                                "pattern": "^(?:source\\.)?[a-z][a-z0-9-]*$"
+                              },
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "enum": [
+                                      "requirement",
+                                      "dependency",
+                                      "prerequisite"
+                                    ]
+                                  },
+                                  {
+                                    "const": false
+                                  }
+                                ]
+                              }
+                            },
+                            "override-compose": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "\\S"
+                            }
+                          },
+                          "additionalProperties": false
                         },
-                        {
-                          "not": {
-                            "enum": [
-                              "app",
-                              "dependencies",
-                              "tester",
-                              "services",
-                              "dev",
-                              "prod",
-                              "test",
-                              "e2e"
-                            ]
-                          }
+                        "tester": {
+                          "type": "object",
+                          "properties": {
+                            "compose": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "\\S"
+                            },
+                            "service": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "\\S"
+                            },
+                            "env": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [],
+                          "additionalProperties": false
                         }
-                      ]
+                      },
+                      "patternProperties": {
+                        "^(?!(?:main|tester)$)[a-z][a-z0-9-]*$": {
+                          "type": "object",
+                          "properties": {
+                            "compose": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "\\S"
+                            },
+                            "service": {
+                              "type": "string",
+                              "minLength": 1,
+                              "pattern": "\\S"
+                            },
+                            "env": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            },
+                            "endpoints": {
+                              "type": "object",
+                              "propertyNames": {
+                                "pattern": "^[a-z][a-z0-9-]*$"
+                              },
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "service": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "pattern": "\\S"
+                                  },
+                                  "port": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 65535
+                                  },
+                                  "publicPort": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 65535
+                                      },
+                                      {
+                                        "const": "AUTO"
+                                      }
+                                    ]
+                                  },
+                                  "primary": {
+                                    "type": "boolean"
+                                  },
+                                  "scheme": {
+                                    "type": "string",
+                                    "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                                  }
+                                },
+                                "required": [],
+                                "additionalProperties": false
+                              }
+                            },
+                            "requisites": {
+                              "type": "object",
+                              "propertyNames": {
+                                "pattern": "^(?:source\\.)?[a-z][a-z0-9-]*$"
+                              },
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "enum": [
+                                      "requirement",
+                                      "dependency",
+                                      "prerequisite"
+                                    ]
+                                  },
+                                  {
+                                    "const": false
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "propertyNames": {
+                        "pattern": "^[a-z][a-z0-9-]*$"
+                      },
+                      "additionalProperties": false
+                    },
+                    "publish": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   },
-                  "publish": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "additionalProperties": false
+                  "required": [],
+                  "additionalProperties": false
+                }
               },
               "propertyNames": {
-                "allOf": [
-                  {
-                    "type": "string",
-                    "pattern": "^[a-z][a-z0-9-]*$"
-                  },
-                  {
-                    "not": {
-                      "enum": [
-                        "app",
-                        "dependencies",
-                        "tester",
-                        "services",
-                        "dev",
-                        "prod",
-                        "test",
-                        "e2e"
-                      ]
-                    }
-                  }
-                ]
-              }
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "required": [],
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
         }
       },
       "required": [
+        "name",
         "services"
       ],
       "additionalProperties": false
     }
-  },
-  "$schema": "http://json-schema.org/draft-07/schema#"
+  }
 }

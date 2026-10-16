@@ -1,0 +1,6 @@
+services:
+  global-runner:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile
+    network_mode: host

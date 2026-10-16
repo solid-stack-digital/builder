@@ -19,11 +19,6 @@ FROM base AS test
 COPY . .
 CMD ["pnpm", "test"]
 
-# e2e testing
-FROM base AS test-e2e
-COPY . .
-CMD ["pnpm", "test:e2e"]
-
 # production build
 FROM base AS builder
 COPY . .

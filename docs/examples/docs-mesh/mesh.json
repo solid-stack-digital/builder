@@ -1,0 +1,32 @@
+{
+  "name": "frontend-system",
+  "services": {
+    "tester": {
+      "compose": "./e2e/docker-compose.yml",
+      "service": "global-runner",
+      "env": {
+        "API_URL": "${frontend.source.main.endpoints.http.public_url}"
+      }
+    },
+    "backend": {
+      "source": "./services/backend"
+    },
+    "frontend": {
+      "source": "./services/frontend",
+      "publish": [
+        "main.endpoints.http"
+      ],
+      "extends": {
+        "main": {
+          "requisites": {
+            "source.backend": false,
+            "backend": "dependency"
+          },
+          "env": {
+            "BACKEND_URL": "${backend.source.main.endpoints.http.network_url}"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,14 +1,9 @@
-name: global-e2e
-
 services:
   global-e2e:
     build:
       context: .
+      target: test
+    network_mode: host
     environment:
-      - NODE_ENV=test
-      - CI=true
-      - GATEWAY_URL=http://gateway:3000
-      - FRONTEND_URL=http://frontend:3001
-      - BACKEND_URL=http://backend:3002
-      - FILESYSTEM_URL=http://filesystem:3003
-      - MAILER_URL=http://mailer:3004
+      NODE_ENV: test
+      CI: "true"

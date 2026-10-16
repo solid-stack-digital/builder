@@ -1,19 +1,3 @@
 # Build a mesh
 
-Create a mesh project with a `mesh.json` listing independently runnable service projects. Each effective service needs a `path` relative to the mesh project. The service key is its authoritative identity in this composition.
-
-Add service `env` for composition-owned app values, dependency bindings for providers, `dependsOn` for explicit top-level readiness, and `publish` for host exposure. Direct mesh references use `${backend.app.endpoints.http.network_url}`; there is no `services.` prefix. Environment references do not add readiness edges.
-
-```bash
-builder mesh check
-builder mesh up dev
-builder mesh down dev
-```
-
-Mesh endpoint declarations stay in service build configs. See [service/mesh responsibilities](../concepts/service-and-mesh-model.md), [mesh reference](../reference/mesh-json.md), [bindings](bind-dependencies-to-real-services.md), and [publication](publish-mesh-endpoints.md).
-
-## Related
-
-- [Mesh quickstart](../getting-started/mesh-quickstart.md)
-- [Dependency substitution](../concepts/dependency-substitution.md)
-- [mesh.json](../reference/mesh-json.md)
+Create a named `mesh.json` with `services.tester` and at least one `{ "source": "./services/api" }` entry. Each source has its own runnable `build.json`. Every effective source root starts in mesh dev/prod/global E2E; an ordinary node starts only when a requisite reaches it. Use `extends` for explicit local edge/env rewrites and `publish` for host access to reachable, capable endpoints. The global tester is a separate Compose runner. Start with the [complete mesh example](../../examples/fullstack/mesh.json) and [mesh reference](../reference/mesh-json.md).

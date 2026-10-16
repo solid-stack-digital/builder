@@ -1,20 +1,3 @@
 # Develop a service
 
-Run a foreground dev environment with `builder service up dev`; Ctrl+C stops it. Add `-d` to run in the background and stop later with `builder service down dev`.
-
-```bash
-builder service up dev
-builder service up dev -d
-builder service up dev --debug
-builder service up dev --dry-run
-builder service up dev --skip-checks
-builder service up dev -C ./services/api
-```
-
-`--debug` prints merged Compose YAML with secrets redacted. `--dry-run` compiles/checks without starting containers. `--skip-checks` skips preflight lint/policy checks; use it for diagnosis or speed, not as a substitute for valid configuration. `-C` selects a service project. `--full` integrates local dependencies; see [run with local dependencies](run-with-local-dependencies.md).
-
-## Related
-
-- [Service quickstart](../getting-started/service-quickstart.md)
-- [CLI reference](../reference/cli.md)
-- [Cleanup guide](clean-up-builder-resources.md)
+Create a complete `build.json`, canonical project Dockerfile and separate tester Compose. Validate with `builder check -C <service>`. `builder service up dev -C <service>` starts main in isolated mode. Use `--full` when local ordinary modules are needed; only the effective requisite closure starts. Main dev needs a healthcheck. Put technology-specific source mounts in a selected `services.main.override-compose` file rather than assuming Builder mounts `/app` or `node_modules`. Stop with `builder service down dev -C <service>`. See the [quickstart](../getting-started/service-quickstart.md).

@@ -1,11 +1,3 @@
-# Avoid hardcoding an AUTO host port
+# Use automatic host ports
 
-Declare `publicPort: "AUTO"` and select the endpoint for mesh publication. Consume the resolved value in a tester with `${gateway.app.endpoints.http.public_url}`. To include the allocated URL in `builder service export env`, first put a `public_url` reference in `build.json.app.env`, for example `"PUBLIC_URL": "${app.endpoints.http.public_url}"`. Export copies resolved app environment values; it does not emit a separate endpoint registry.
-
-AUTO is allocated for the effective composition. Do not assume the same literal port in unrelated projects or runs; use references and exported values. See [publication](../concepts/publication-and-ports.md).
-
-## Related
-
-- [Endpoint properties](../reference/endpoint-properties.md)
-- [Export environment](../guides/export-resolved-environment.md)
-- [Publish mesh endpoints](../guides/publish-mesh-endpoints.md)
+Set an endpoint's `publicPort` to `"AUTO"`. In standalone it is published when reachable; in a mesh select it with `publish`. Builder allocates an available host port and resolves `${main.endpoints.http.public_url}` or the mesh equivalent to the effective value. Do not guess localhost ports from internal `port`. Publication does not add a requisite, and a private mesh endpoint has no public URL. See [endpoint properties](../reference/endpoint-properties.md).

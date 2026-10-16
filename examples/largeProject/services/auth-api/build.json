@@ -1,16 +1,19 @@
 {
-  "name": "example-backend",
-  "app": {
-    "endpoints": {
-      "http": {
-        "port": 3000,
-        "publicPort": "AUTO",
-        "primary": true,
-        "scheme": "http"
+  "name": "largeproject-auth-api",
+  "services": {
+    "main": {
+      "endpoints": {
+        "http": {
+          "port": 3000,
+          "publicPort": "AUTO",
+          "primary": true,
+          "scheme": "http"
+        }
+      },
+      "requisites": {
+        "filesystem": "dependency"
       }
-    }
-  },
-  "dependencies": {
+    },
     "filesystem": {
       "compose": ".docker/mocks/docker-compose.filesystem.yml",
       "endpoints": {
@@ -21,27 +24,46 @@
           "scheme": "http"
         }
       }
-    }
-  },
-  "dev": {
-    "override-compose": ".docker/overrides/docker-compose.dev.override.yml"
-  },
-  "test": {
-    "override-compose": ".docker/overrides/docker-compose.test.override.yml"
-  },
-  "prod": {
-    "override-compose": ".docker/overrides/docker-compose.prod.override.yml"
-  },
-  "e2e": {
-    "app": {
+    },
+    "tester": {
+      "compose": "e2e/docker-compose.yml",
+      "service": "e2e-runner",
       "env": {
-        "CI": "true"
+        "API_URL": "${main.endpoints.http.public_url}"
       }
     }
   },
-  "tester": {
-    "env": {
-      "API_URL": "${app.endpoints.http.public_url}"
+  "dev": {
+    "services": {
+      "main": {
+        "override-compose": ".docker/overrides/docker-compose.dev.override.yml"
+      }
+    }
+  },
+  "prod": {
+    "services": {
+      "main": {
+        "override-compose": ".docker/overrides/docker-compose.prod.override.yml",
+        "env": {
+          "FILESYSTEM_API_URL": "${filesystem.endpoints.http.network_url}"
+        }
+      }
+    }
+  },
+  "test": {
+    "services": {
+      "main": {
+        "override-compose": ".docker/overrides/docker-compose.test.override.yml"
+      }
+    }
+  },
+  "e2e": {
+    "services": {
+      "main": {
+        "env": {
+          "CI": "true"
+        }
+      }
     }
   }
 }
