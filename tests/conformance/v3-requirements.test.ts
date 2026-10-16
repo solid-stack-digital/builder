@@ -3,7 +3,7 @@ import { buildV3Catalog,validateV3Report,caseTest } from "../v3/requirements.js"
 const catalog=buildV3Catalog();
 describe("V3 requirements registry",()=>{
  caseTest(catalog.find(record=>record.id==="PKG07")!,()=>{
-  expect(catalog).toHaveLength(271);
+  expect(catalog).toHaveLength(276);
   expect(catalog.every(record=>record.testFile.length>0)).toBe(true);
   const passed=catalog.map(record=>({id:record.id,status:"passed" as const}));
   expect(validateV3Report(catalog,passed)).toEqual([]);

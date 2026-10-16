@@ -1,7 +1,7 @@
 import { GeneratedComposeNameAllocator } from "./generatedNames.js";
 import path from "node:path";
 import { canonicalPath } from "../../utils/paths.js";
-import { parseVolume, namespaceVolume } from "./composeVolumes.js";
+import { parseVolume, namespaceVolume, isHostFilesystemRoot } from "./composeVolumes.js";
 import { ConfigError } from "../../errors/ConfigError.js";
 import { normalizeComposeEnvironment } from "./composeEnvironment.js";
 import { namespaceResourceDefinition } from "./namespaceResourceDefinition.js";
@@ -34,6 +34,7 @@ export function validateAndPrepareMainOverride(document:ComposeDocument,context:
  const keys=Object.keys(document.services??{});if(keys.length!==1||keys[0]!=="main")fail("services","override must define exactly one service named main");
  validateComposeResourceReferences(document,{sourceFile:context.file,stage:context.stage,composition:"service"});
  const main=structuredClone(document.services.main!);
+ for(const volume of Array.isArray(main.volumes)?main.volumes:[]){const mount=parseVolume(volume);if(mount?.type==="bind"&&mount.source&&isHostFilesystemRoot(mount.source))fail("services.main.volumes","host root bind mounts are forbidden");}
  for(const k of ["ports","depends_on","network_mode","container_name","privileged","profiles","extends","env_file"] as const)if(main[k]!==undefined)fail(`services.main.${k}`,"override cannot own endpoint or lifecycle behavior");
  if (Object.hasOwn(main, "healthcheck")) {
   const healthcheck = main.healthcheck;

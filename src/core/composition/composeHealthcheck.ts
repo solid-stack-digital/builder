@@ -6,6 +6,7 @@ export function isEnabledValidComposeHealthcheck(value: unknown): boolean {
   const test = health.test;
   if (typeof test === "string") return test.trim().length > 0 && !/^NONE$/i.test(test.trim());
   if (!Array.isArray(test) || !test.every(item => typeof item === "string")) return false;
-  if (test[0] !== "CMD" && test[0] !== "CMD-SHELL") return false;
+  const type = test[0]?.toUpperCase();
+  if (type !== "CMD" && type !== "CMD-SHELL") return false;
   return test.length >= 2 && test.slice(1).some(item => item.trim().length > 0);
 }

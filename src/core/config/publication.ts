@@ -10,7 +10,8 @@ export function resolvePublicationIntent(graph: EffectiveGraph, stage: string, c
     const node=graph.nodes.get(id);
     if (!node) throw new ConfigError({sourceFile:origin.sourceFile,configPath:origin.configPath,stage,composition,referencedObject:selector,reason:"publish selector target is not reachable"});
     const def=node.declaration.endpoints[endpoint];
-    if (!def || def.publicPort===undefined) throw new ConfigError({sourceFile:origin.sourceFile,configPath:origin.configPath,stage,composition,referencedObject:selector,reason:"publish selector requires an endpoint with publicPort capability"});
+    if (!def) throw new ConfigError({sourceFile:origin.sourceFile,configPath:origin.configPath,stage,composition,referencedObject:selector,reason:"publish selector target endpoint does not exist"});
+    if (def.publicPort===undefined) throw new ConfigError({sourceFile:origin.sourceFile,configPath:origin.configPath,stage,composition,referencedObject:selector,reason:"publish selector requires an endpoint with publicPort capability"});
     result.push({nodeId:id,endpoint,requestedPort:def.publicPort,origin,logicalPath:`${displayNode(id)}.endpoints.${endpoint}`});
   };
   if (composition === "service") {

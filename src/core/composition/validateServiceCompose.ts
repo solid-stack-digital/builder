@@ -24,12 +24,14 @@ export function validateServiceCompose(name:string, declaration:EffectiveOrdinar
     for(const target of references)if(!services[target])fail(`services.${key}`,`internal service reference ${target} does not exist`);
   }
   const endpoints=declaration.endpoints;
+  const declarationOrigin=(declaration as EffectiveOrdinary & {origin?:Origin}).origin??context.declarationOrigin;
+  const failDeclaration=(configPath:string,reason:string,value?:unknown):never=>{if(declarationOrigin)throw new ConfigError({sourceFile:declarationOrigin.sourceFile,configPath:`${declarationOrigin.configPath}.${configPath}`,stage:context.stage,composition:context.composition,referencedObject:name,reason,value});return fail(configPath,reason,value);};
   let representative:string;
-  if(Object.keys(endpoints).length){const primary=Object.values(endpoints).find(endpoint=>endpoint.primary);representative=primary!.service;if(declaration.service&&declaration.service!==representative){const origin=(declaration as EffectiveOrdinary & {origin?:Origin}).origin??context.declarationOrigin;if(origin)throw new ConfigError({sourceFile:origin.sourceFile,configPath:`${origin.configPath}.service`,stage:context.stage,composition:context.composition,referencedObject:name,reason:"top-level service must equal primary endpoint owner",value:declaration.service});fail("service","top-level service must equal primary endpoint owner");}}
-  else {if(!declaration.service)fail("service","endpoint-less service requires service");representative=declaration.service!;}
-  if(!services[representative])fail("service","lifecycle representative does not exist",representative);
+  if(Object.keys(endpoints).length){const primary=Object.values(endpoints).find(endpoint=>endpoint.primary);representative=primary!.service;if(declaration.service&&declaration.service!==representative)failDeclaration("service","top-level service must equal primary endpoint owner",declaration.service);}
+  else {if(!declaration.service)failDeclaration("service","endpoint-less service requires service");representative=declaration.service!;}
+  if(!services[representative])failDeclaration("service","lifecycle representative does not exist",representative);
   for(const [endpoint,definition] of Object.entries(endpoints)){
-    if(!services[definition.service])fail(`endpoints.${endpoint}.service`,"endpoint owner does not exist",definition.service);
+    if(!services[definition.service])failDeclaration(`endpoints.${endpoint}.service`,"endpoint owner does not exist",definition.service);
     if(services[definition.service]!.network_mode!==undefined)fail(`services.${definition.service}.network_mode`,"endpoint owner cannot use network_mode");
   }
   if(context.healthRequired){const health=services[representative]!.healthcheck;if(health===undefined||(health&&typeof health==="object"&&!Array.isArray(health)&&(health as {test?:unknown;disable?:unknown}).test===undefined&&(health as {disable?:unknown}).disable!==true))context.deferHealth?.(representative);else if(!isEnabledValidComposeHealthcheck(health))fail(`services.${representative}.healthcheck`,"requires a valid healthcheck");}

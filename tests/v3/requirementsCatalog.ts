@@ -39,6 +39,13 @@ export function buildV3Catalog():V3Case[]{
     ["PUB21","Overlay publication selector is invalid","Diagnostic identifies the overlay publish path"],
     ["CMP26","Materialized Compose build uses a service context","Compilation rejects the hidden build dependency"],
   ])descriptions.set(id!,{setup:setup!,action:"Run the focused V3 regression fixture",expected:expected!});
+  for(const [id,setup,expected] of [
+    ["TST08","Tester overlay supplies a bad field","Diagnostic identifies the declaring overlay"],
+    ["CMP27","Ordinary endpoint owner is absent from Compose","Diagnostic identifies its JSON declaration"],
+    ["CMP28","Main override or tester mounts host root","Compilation rejects the bind mount"],
+    ["LIF27","Lowercase array healthcheck command","Healthcheck is recognized as enabled"],
+    ["PUB22","Publication selects a nonexistent endpoint","Diagnostic distinguishes missing endpoint from missing publicPort"],
+  ])descriptions.set(id!,{setup:setup!,action:"Run the focused V3 regression fixture",expected:expected!});
   const sections=new Map<string,Set<string>>(),invariants=new Map<string,Set<number>>();
   const mapping=fs.readFileSync(path.join(planRoot,files[2]!),"utf8");
   for(const line of mapping.split("\n")){
