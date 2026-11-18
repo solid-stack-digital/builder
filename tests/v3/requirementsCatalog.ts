@@ -62,6 +62,13 @@ export function buildV3Catalog():V3Case[]{
     "Shadowed invalid reference","Surviving invalid reference","Reserved Builder key","Compose build args output","Docker build ingests args"
   ];
   buildArgCases.forEach((setup,index)=>{const id=`BAR${String(index+1).padStart(2,"0")}`;descriptions.set(id,{setup,action:"Run V3.1 build argument acceptance case",expected:"Build argument behavior matches the V3.1 feature specification"});});
+  const outputModeCases:Array<[string,string]>=[
+    ["OUT01","Log file name is <ms>-<pid>-<command>.log"],["OUT02","Logfile directory is created and a file path is rejected"],
+    ["OUT03","Log file is private and ANSI-free"],["OUT04","Silent mode prints only the result"],
+    ["OUT05","Silent failure is one line on stderr"],["OUT06","Logfile mode streams to file and reports the path"],
+    ["OUT07","Normal mode delegates to console and has no result line"],["OUT08","Piped child output reaches the file in order; late writes ignored"],
+  ];
+  for(const [id,setup] of outputModeCases)descriptions.set(id,{setup,action:"Run V3.3 output mode acceptance case",expected:"Output mode behavior matches the V3.3 feature specification"});
   const isolatedOverlayCases=[
     "Dev and test accept isolated overlay","Prod and e2e reject isolated overlay","Isolated overlay rejects tester","Isolated overlay rejects nesting and unknown keys",
     "Integrated resolution ignores block","Isolated resolution merges block last","Isolated dev starts block module","Block reference resolves",
