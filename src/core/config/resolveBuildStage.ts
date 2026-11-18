@@ -1,13 +1,15 @@
 import path from "node:path";
 import { ConfigError } from "../../errors/ConfigError.js";
-import type { BuildJson, Environment, MainService, OrdinaryService, TesterService } from "../../types/index.js";
+import type { BuildJson, Environment, TesterService } from "../../types/index.js";
 import { assertPrimaryEndpointInvariant } from "./endpointProperties.js";
 import { applyServiceOverlay, stageOverlayChain } from "./stageMerge.js";
 import type { EffectiveBuildConfig, EffectiveService, Origin } from "./types.js";
 
-const originFor = (sourceFile: string, configPath: string, layer: "base" | Environment): Origin => ({ sourceFile, configPath, projectDir: path.dirname(sourceFile), scope: "build", layer });
+export const ISOLATED_OVERLAY_KEY = "on-inframode-isolated" as const;
+export interface ResolveBuildStageOptions { isolated?: boolean }
+const originFor = (sourceFile: string, configPath: string, layer: "base" | Environment, isolatedOverlay = false): Origin => ({ sourceFile, configPath, projectDir: path.dirname(sourceFile), scope: "build", layer, ...(isolatedOverlay ? { isolatedOverlay: true as const } : {}) });
 const fail = (sourceFile: string, stage: Environment, configPath: string, reason: string, value?: unknown): never => { throw new ConfigError({ sourceFile, stage, composition: "service", configPath, reason, value }); };
-export function resolveBuildStage(build: BuildJson, stage: Environment, sourceFile: string): EffectiveBuildConfig {
+export function resolveBuildStage(build: BuildJson, stage: Environment, sourceFile: string, options: ResolveBuildStageOptions = {}): EffectiveBuildConfig {
   const services = structuredClone(build.services) as unknown as Record<string, Record<string,unknown>>;
   const origins = new Map<string,Origin>();
   const envOrigins = new Map<string,Map<string,Origin>>();
@@ -15,37 +17,42 @@ export function resolveBuildStage(build: BuildJson, stage: Environment, sourceFi
   const requisiteOrigins = new Map<string,Map<string,Origin>>();
   const layers: EffectiveBuildConfig["layers"] = [];
   const deletedRequisiteTargets: {target:string;path:string}[] = [];
-  const record = (name: string, entry: Record<string,unknown>, layer: "base"|Environment) => {
-    const where = layer === "base" ? `services.${name}` : `${layer}.services.${name}`;
-    const origin = originFor(sourceFile, where, layer);
+  const record = (name: string, entry: Record<string,unknown>, layer: "base"|Environment, servicesPath: string, isolatedOverlay = false) => {
+    const where = `${servicesPath}.${name}`;
+    const origin = originFor(sourceFile, where, layer, isolatedOverlay);
     origins.set(name, origin);
     const env = envOrigins.get(name) ?? new Map<string,Origin>();
-    for (const key of Object.keys((entry.env as Record<string,string>) ?? {})) env.set(key, originFor(sourceFile, `${where}.env.${key}`, layer));
+    for (const key of Object.keys((entry.env as Record<string,string>) ?? {})) env.set(key, originFor(sourceFile, `${where}.env.${key}`, layer, isolatedOverlay));
     envOrigins.set(name, env);
     const args = buildArgsOrigins.get(name) ?? new Map<string,Origin>();
-    for (const key of Object.keys((entry.buildArgs as Record<string,string>) ?? {})) args.set(key, originFor(sourceFile, `${where}.buildArgs.${key}`, layer));
+    for (const key of Object.keys((entry.buildArgs as Record<string,string>) ?? {})) args.set(key, originFor(sourceFile, `${where}.buildArgs.${key}`, layer, isolatedOverlay));
     buildArgsOrigins.set(name, args);
     const edges = requisiteOrigins.get(name) ?? new Map<string,Origin>();
     for (const [key, value] of Object.entries((entry.requisites as Record<string,unknown>) ?? {})) {
-      if (value === false) edges.delete(key); else edges.set(key, originFor(sourceFile, `${where}.requisites.${key}`, layer));
+      if (value === false) edges.delete(key); else edges.set(key, originFor(sourceFile, `${where}.requisites.${key}`, layer, isolatedOverlay));
     }
     requisiteOrigins.set(name, edges);
   };
-  for (const [name, value] of Object.entries(services).sort(([a],[b]) => a.localeCompare(b))) record(name, value, "base");
-  layers.push({ stage: "base", services: structuredClone(services), origin: originFor(sourceFile, "services", "base") });
-  for (const overlayStage of stageOverlayChain(stage)) {
-    const patches = (build[overlayStage]?.services ?? {}) as Record<string,Record<string,unknown>>;
+  const applyOverlay = (patches: Record<string,Record<string,unknown>>, overlayStage: Environment, servicesPath: string, isolatedOverlay: boolean) => {
     for (const [name, patch] of Object.entries(patches).sort(([a],[b]) => a.localeCompare(b))) {
       const current = services[name];
-      const where = `${overlayStage}.services.${name}`;
+      const where = `${servicesPath}.${name}`;
+      if (isolatedOverlay && name === "tester") fail(sourceFile, stage, where, `tester cannot be configured in ${ISOLATED_OVERLAY_KEY}`);
       if (!current && (name === "main" || name === "tester")) fail(sourceFile, stage, where, "Required special service is missing from base");
       if (current && patch.compose !== undefined && patch.compose !== current.compose) fail(sourceFile, stage, `${where}.compose`, `compose is immutable; previous declaration ${origins.get(name)?.configPath}.compose, attempted ${where}.compose`, patch.compose);
       if (!current && name !== "main" && name !== "tester" && (typeof patch.compose !== "string" || !patch.compose.trim())) fail(sourceFile, stage, `${where}.compose`, "Stage-introduced service requires a complete compose declaration");
       services[name] = current ? applyServiceOverlay(current, patch) : structuredClone(patch);
       for (const [target,kind] of Object.entries((patch.requisites as Record<string,unknown>)??{})) if(kind===false)deletedRequisiteTargets.push({target,path:`${where}.requisites.${target}`});
-      record(name, patch, overlayStage);
+      record(name, patch, overlayStage, servicesPath, isolatedOverlay);
     }
-    layers.push({ stage: overlayStage, services: structuredClone(patches), origin: originFor(sourceFile, `${overlayStage}.services`, overlayStage) });
+    layers.push({ stage: overlayStage, services: structuredClone(patches), origin: originFor(sourceFile, servicesPath, overlayStage, isolatedOverlay) });
+  };
+  for (const [name, value] of Object.entries(services).sort(([a],[b]) => a.localeCompare(b))) record(name, value, "base", "services");
+  layers.push({ stage: "base", services: structuredClone(services), origin: originFor(sourceFile, "services", "base") });
+  for (const overlayStage of stageOverlayChain(stage)) applyOverlay((build[overlayStage]?.services ?? {}) as Record<string,Record<string,unknown>>, overlayStage, `${overlayStage}.services`, false);
+  if (options.isolated && (stage === "dev" || stage === "test")) {
+    const block = build[stage]?.[ISOLATED_OVERLAY_KEY];
+    if (block) applyOverlay((block.services ?? {}) as Record<string,Record<string,unknown>>, stage, `${stage}.${ISOLATED_OVERLAY_KEY}.services`, true);
   }
   for(const deleted of deletedRequisiteTargets)if(!(deleted.target in services))fail(sourceFile,stage,deleted.path,"Unknown requisite target",deleted.target);
   for (const [name, value] of Object.entries(services)) {

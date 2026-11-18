@@ -438,6 +438,188 @@
               },
               "required": [],
               "additionalProperties": false
+            },
+            "on-inframode-isolated": {
+              "type": "object",
+              "properties": {
+                "services": {
+                  "type": "object",
+                  "properties": {
+                    "main": {
+                      "type": "object",
+                      "properties": {
+                        "env": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "buildArgs": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "endpoints": {
+                          "type": "object",
+                          "propertyNames": {
+                            "pattern": "^[a-z][a-z0-9-]*$"
+                          },
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "port": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 65535
+                              },
+                              "publicPort": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 65535
+                                  },
+                                  {
+                                    "const": "AUTO"
+                                  }
+                                ]
+                              },
+                              "primary": {
+                                "type": "boolean"
+                              },
+                              "scheme": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                              }
+                            },
+                            "required": [],
+                            "additionalProperties": false
+                          }
+                        },
+                        "requisites": {
+                          "type": "object",
+                          "propertyNames": {
+                            "pattern": "^[a-z][a-z0-9-]*$"
+                          },
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "enum": [
+                                  "requirement",
+                                  "dependency",
+                                  "prerequisite"
+                                ]
+                              },
+                              {
+                                "const": false
+                              }
+                            ]
+                          }
+                        },
+                        "override-compose": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "patternProperties": {
+                    "^(?!(?:main|tester)$)[a-z][a-z0-9-]*$": {
+                      "type": "object",
+                      "properties": {
+                        "compose": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "service": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "env": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "endpoints": {
+                          "type": "object",
+                          "propertyNames": {
+                            "pattern": "^[a-z][a-z0-9-]*$"
+                          },
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "service": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "\\S"
+                              },
+                              "port": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 65535
+                              },
+                              "publicPort": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 65535
+                                  },
+                                  {
+                                    "const": "AUTO"
+                                  }
+                                ]
+                              },
+                              "primary": {
+                                "type": "boolean"
+                              },
+                              "scheme": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                              }
+                            },
+                            "required": [],
+                            "additionalProperties": false
+                          }
+                        },
+                        "requisites": {
+                          "type": "object",
+                          "propertyNames": {
+                            "pattern": "^[a-z][a-z0-9-]*$"
+                          },
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "enum": [
+                                  "requirement",
+                                  "dependency",
+                                  "prerequisite"
+                                ]
+                              },
+                              {
+                                "const": false
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "propertyNames": {
+                    "pattern": "^[a-z][a-z0-9-]*$"
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -847,6 +1029,188 @@
                 "pattern": "^[a-z][a-z0-9-]*$"
               },
               "required": [],
+              "additionalProperties": false
+            },
+            "on-inframode-isolated": {
+              "type": "object",
+              "properties": {
+                "services": {
+                  "type": "object",
+                  "properties": {
+                    "main": {
+                      "type": "object",
+                      "properties": {
+                        "env": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "buildArgs": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "endpoints": {
+                          "type": "object",
+                          "propertyNames": {
+                            "pattern": "^[a-z][a-z0-9-]*$"
+                          },
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "port": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 65535
+                              },
+                              "publicPort": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 65535
+                                  },
+                                  {
+                                    "const": "AUTO"
+                                  }
+                                ]
+                              },
+                              "primary": {
+                                "type": "boolean"
+                              },
+                              "scheme": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                              }
+                            },
+                            "required": [],
+                            "additionalProperties": false
+                          }
+                        },
+                        "requisites": {
+                          "type": "object",
+                          "propertyNames": {
+                            "pattern": "^[a-z][a-z0-9-]*$"
+                          },
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "enum": [
+                                  "requirement",
+                                  "dependency",
+                                  "prerequisite"
+                                ]
+                              },
+                              {
+                                "const": false
+                              }
+                            ]
+                          }
+                        },
+                        "override-compose": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "patternProperties": {
+                    "^(?!(?:main|tester)$)[a-z][a-z0-9-]*$": {
+                      "type": "object",
+                      "properties": {
+                        "compose": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "service": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "env": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "endpoints": {
+                          "type": "object",
+                          "propertyNames": {
+                            "pattern": "^[a-z][a-z0-9-]*$"
+                          },
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "service": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "\\S"
+                              },
+                              "port": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 65535
+                              },
+                              "publicPort": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 65535
+                                  },
+                                  {
+                                    "const": "AUTO"
+                                  }
+                                ]
+                              },
+                              "primary": {
+                                "type": "boolean"
+                              },
+                              "scheme": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z][A-Za-z0-9+.-]*$"
+                              }
+                            },
+                            "required": [],
+                            "additionalProperties": false
+                          }
+                        },
+                        "requisites": {
+                          "type": "object",
+                          "propertyNames": {
+                            "pattern": "^[a-z][a-z0-9-]*$"
+                          },
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "enum": [
+                                  "requirement",
+                                  "dependency",
+                                  "prerequisite"
+                                ]
+                              },
+                              {
+                                "const": false
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "propertyNames": {
+                    "pattern": "^[a-z][a-z0-9-]*$"
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                }
+              },
               "additionalProperties": false
             }
           },

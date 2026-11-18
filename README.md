@@ -1,14 +1,16 @@
 # Solid Stack Builder V3
 
-Builder 3.1.0 compiles a service's `build.json` or a system's `mesh.json` into Docker Compose. Services declare possible runtime modules; explicit **requisites** select which modules run and how they wait. Mesh sources stay independently runnable, with explicit `extends` rewrites when a real service replaces a local mock. Main services can declare stage-aware Docker `buildArgs`.
+Builder 3.2.0 compiles a service's `build.json` or a system's `mesh.json` into Docker Compose. Services declare possible runtime modules; explicit **requisites** select which modules run and how they wait. Mesh sources stay independently runnable, with explicit `extends` rewrites when a real service replaces a local mock. Main services can declare stage-aware Docker `buildArgs`, and isolated runs can start local helper modules through `on-inframode-isolated`.
 
-The source package declares version 3.1.0. This checkout does not imply that version has been published to a package registry. For a local checkout, run `pnpm install`, `pnpm build`, and `node dist/bin.js --version`. The package exposes both `builder` and `solid-builder` when installed. Node.js 20 or newer and Docker Engine with Compose are required for runtime commands.
+The source package declares version 3.2.0. This checkout does not imply that version has been published to a package registry. For a local checkout, run `pnpm install`, `pnpm build`, and `node dist/bin.js --version`. The package exposes both `builder` and `solid-builder` when installed. Node.js 20 or newer and Docker Engine with Compose are required for runtime commands.
 
 [Builder V3 documentation](docs/README.md)
 
 [Upgrade from Builder 2.2.0](docs/migration/v2.2-to-v3.0.md)
 
 [Upgrade from Builder 3.0.0](docs/migration/v3.0-to-v3.1.md)
+
+[Upgrade from Builder 3.1.0](docs/migration/v3.1-to-v3.2.md)
 
 ## Tests
 
@@ -41,7 +43,7 @@ services:
     command: ["sh", "-c", "exit 0"]
 ```
 
-The [service quickstart](docs/getting-started/service-quickstart.md) gives a runnable tree. Run `builder check`, then `builder service up dev`; `builder service up dev --full` includes the effective requisite closure. `builder service up prod` uses the `prod` target and integrated graph. `builder service up test` runs isolated unit tests, cleans up, then runs service E2E with a production main and full graph.
+The [service quickstart](docs/getting-started/service-quickstart.md) gives a runnable tree. Run `builder check`, then `builder service up dev`; `builder service up dev --full` includes the effective requisite closure; `dev.on-inframode-isolated` can add local helpers to plain isolated dev. `builder service up prod` uses the `prod` target and integrated graph. `builder service up test` runs isolated unit tests, cleans up, then runs service E2E with a production main and full graph.
 
 | Workflow | Main target | Main execution mode | Infrastructure mode |
 |---|---|---|---|

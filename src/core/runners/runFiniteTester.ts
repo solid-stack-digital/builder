@@ -10,7 +10,7 @@ export interface FiniteTesterAdapters {
   inspectImage?: InspectImage;
   checkPorts?: typeof checkHostPortCollisions;
 }
-function inspectRunnerExit(yaml:string,projectDir:string,runner:string):number|undefined {
+export function inspectRunnerExit(yaml:string,projectDir:string,runner:string):number|undefined {
   const ps=spawnSync("docker",["compose","--project-directory",projectDir,"-f","-","ps","-aq",runner],{cwd:projectDir,encoding:"utf8",input:yaml});
   const id=ps.stdout?.trim();
   if(ps.status!==0||!id)return undefined;

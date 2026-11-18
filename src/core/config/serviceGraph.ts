@@ -19,19 +19,21 @@ export function buildDeclaredGraph(input: EffectiveComposition): DeclaredGraph {
   edges.sort((a,b) => `${a.consumer}:${a.target}:${a.kind}`.localeCompare(`${b.consumer}:${b.target}:${b.kind}`));
   return { nodes: input.nodes, roots: [...input.roots].sort(), edges };
 }
-export function computeClosure(start: NodeId, adjacency: ReadonlyMap<NodeId, readonly Edge[]>): Set<NodeId> {
+export function computeClosure(start: NodeId, adjacency: ReadonlyMap<NodeId, readonly Edge[]>, follow: (edge: Edge) => boolean = () => true): Set<NodeId> {
   const visited = new Set<NodeId>(); const stack = [start];
-  while (stack.length) { const id = stack.pop()!; if (visited.has(id)) continue; visited.add(id); for (const edge of adjacency.get(id) ?? []) stack.push(edge.target); }
+  while (stack.length) { const id = stack.pop()!; if (visited.has(id)) continue; visited.add(id); for (const edge of adjacency.get(id) ?? []) if (follow(edge)) stack.push(edge.target); }
   return visited;
 }
 export function selectReachableGraph(declared: DeclaredGraph, profile: GraphProfile): EffectiveGraph {
   const adjacency = new Map<NodeId,Edge[]>();
   for (const edge of declared.edges) { const list = adjacency.get(edge.consumer) ?? []; list.push(edge); adjacency.set(edge.consumer,list); }
+  const rootSet = new Set(declared.roots), isolated = profile.infraMode === "isolated";
+  // Isolated runs follow root edges only when declared in on-inframode-isolated; activated modules keep their own edges.
+  const follow = (edge: Edge): boolean => !isolated || !rootSet.has(edge.consumer) || edge.origin.isolatedOverlay === true;
   const active = new Set<NodeId>();
-  if (profile.infraMode === "isolated") for (const root of declared.roots) active.add(root);
-  else for (const root of declared.roots) for (const id of computeClosure(root,adjacency)) active.add(id);
+  for (const root of declared.roots) for (const id of computeClosure(root,adjacency,follow)) active.add(id);
   const nodes = new Map([...declared.nodes].filter(([id]) => active.has(id)));
-  const edges = profile.infraMode === "isolated" ? [] : declared.edges.filter(edge => active.has(edge.consumer) && active.has(edge.target));
+  const edges = declared.edges.filter(edge => follow(edge) && active.has(edge.consumer) && active.has(edge.target));
   const activeAdjacency = new Map<NodeId,Edge[]>();
   for (const edge of edges) { const list = activeAdjacency.get(edge.consumer) ?? []; list.push(edge); activeAdjacency.set(edge.consumer,list); }
   const closures = new Map<NodeId,Set<NodeId>>();

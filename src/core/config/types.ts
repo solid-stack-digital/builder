@@ -2,7 +2,7 @@ import type { BuildJson, Environment, MainEndpoint, MainService, OrdinaryService
 import type { MeshConfig } from "../mesh/types.js";
 export type ConfigStage = Environment;
 export type NodeId = string;
-export type Origin = { sourceFile: string; configPath: string; projectDir: string; scope: "build" | "mesh"; meshRoot?: string; layer: "base" | ConfigStage };
+export type Origin = { sourceFile: string; configPath: string; projectDir: string; scope: "build" | "mesh"; meshRoot?: string; layer: "base" | ConfigStage; isolatedOverlay?: true };
 export type Located<T> = { value: T; origin: Origin };
 export type Edge = { consumer: NodeId; target: NodeId; kind: RequisiteKind; origin: Origin };
 export type EffectiveMain = MainService & { kind: "main"; env: Record<string,string>; buildArgs: Record<string,string>; endpoints: Record<string,MainEndpoint>; requisites: Requisites };

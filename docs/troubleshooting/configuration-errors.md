@@ -1,3 +1,5 @@
 # Configuration errors
 
 Unknown root `app`/`dependencies` or mesh `path`/provider maps indicate V2 syntax. Move application to `services.main`, ordinary modules to `services.<name>`, use mesh `source`, and add explicit requisites. Both build and mesh need `name` and a tester; ordinary endpoint-less modules need `service`. An overlay may change env/requisites but cannot replace an existing ordinary `compose` or mesh `source`. Build allows dev/prod/test/e2e overlays; mesh allows dev/prod/e2e. See the [field migration table](../migration/v2.2-to-v3.0.md#field-transformations) and [schemas](../reference/json-schemas.md).
+
+`on-inframode-isolated` is accepted only inside `dev` and `test`, may contain only `services`, and rejects `tester`. A module introduced by the block needs a complete `compose`. `outside effective requisite closure` for a block-only module means its reference sits outside the block, or the block lacks the requisite that activates it; move both into the same `<stage>.on-inframode-isolated.services.main`.

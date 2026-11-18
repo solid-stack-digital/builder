@@ -4,11 +4,11 @@ Later applicable values win. Builder resolves references only in the final survi
 
 | Recipient | Low → high precedence |
 |---|---|
-| Standalone main | selected main dotenv → source base env → source stage env → selected main override env → Builder-owned variables |
+| Standalone main | selected main dotenv → source base env → source stage env → source `on-inframode-isolated` env (isolated runs only) → selected main override env → Builder-owned variables |
 | Standalone E2E main | `.env.e2e` → base → prod → e2e env → selected override → Builder-owned variables |
 | Mesh main | source selected dotenv → source base/stage env → selected main override env → mesh base/stage `extends.main.env` → Builder-owned variables |
 | Global E2E main | source `.env.e2e` → source base/prod/e2e → selected override → mesh base/prod/e2e extends → Builder-owned variables |
-| Ordinary module | each container's native Compose defaults/env_file → source base/stage env → mesh base/stage extends env |
+| Ordinary module | each container's native Compose defaults/env_file → source base/stage env → source `on-inframode-isolated` env (isolated runs only) → mesh base/stage extends env |
 | Source tester | native runner defaults → source `.env.e2e-tester` → source base/prod/e2e tester env |
 | Global tester | native runner defaults → mesh `.env.e2e-tester` → mesh base/prod/e2e tester env |
 
