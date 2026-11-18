@@ -10,6 +10,7 @@ import {
   projectNamesForServiceStage,
   readRunState,
 } from "../../../../utils/runState.js";
+import { currentOutput } from "../../../../core/output/index.js";
 
 export async function handleServiceDown(
   rawStage: string = "dev",
@@ -25,7 +26,7 @@ export async function handleServiceDown(
     );
   }
 
-  console.log(
+  currentOutput().log(
     pc.cyan(`\n🧹 Stopping and tearing down service environment [${stage}]...`)
   );
 
@@ -37,7 +38,7 @@ export async function handleServiceDown(
       else if (stage === "test-e2e") env = "e2e";
 
       const finalYamlConfig = compileEnvironment(env, projectDir);
-      console.log(
+      currentOutput().log(
         pc.yellow("Final merged YAML configuration:\n"),
         redactYamlSecrets(finalYamlConfig)
       );
@@ -69,7 +70,7 @@ export async function handleServiceDown(
 
   clearRunState(projectDir);
 
-  console.log(
+  currentOutput().log(
     pc.green(`✅ Service environment [${stage}] stopped and removed.\n`)
   );
   return 0;

@@ -82,3 +82,7 @@ describe("V3.3 output modes core",()=>{
   expect(currentOutput().mode).toBe("normal");
  });
 });
+import { findConsoleWrites } from "../../scripts/check-no-console.js";
+describe("V3.3 output layer gate",()=>{
+ it("[OUT24] Builder sources write only through the output layer",()=>{expect(findConsoleWrites("src")).toEqual([]);});
+});

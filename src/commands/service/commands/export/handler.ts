@@ -6,6 +6,7 @@ import { compileApplicationEnv, serializeApplicationEnv } from "../../../../core
 import { ScriptError } from "../../../../errors/ScriptError.js";
 import type { Environment } from "../../../../types/index.js";
 import { canonicalPath, resolveProjectDir } from "../../../../utils/paths.js";
+import { currentOutput } from "../../../../core/output/index.js";
 
 const STAGES: Environment[] = ["dev", "prod", "test", "e2e"];
 
@@ -75,7 +76,7 @@ export async function handleExportEnv(rawStage?: string, options: ExportEnvOptio
           throw error;
         }
         files.push(filename);
-        console.log(pc.green(`Exported ${snapshot.stage} application environment to ${filename}`));
+        currentOutput().log(pc.green(`Exported ${snapshot.stage} application environment to ${filename}`));
         break;
       }
     }

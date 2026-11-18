@@ -15,6 +15,7 @@ import {
   projectNamesForMeshStage,
   readRunState,
 } from "../../../../utils/runState.js";
+import { currentOutput } from "../../../../core/output/index.js";
 
 function rootServiceDirsForCleanup(meshDir: string): string[] {
   try {
@@ -54,7 +55,7 @@ export async function handleMeshDown(
     );
   }
 
-  console.log(
+  currentOutput().log(
     pc.cyan(`\n🧹 Stopping and tearing down global mesh environment [${stage}]...`)
   );
 
@@ -62,7 +63,7 @@ export async function handleMeshDown(
     try {
       const mode = stage === "dev" ? "dev" : stage === "test" || stage === "test-e2e" ? "e2e" : "prod";
       const { yaml } = compileMeshEnvironment(mode, meshDir, { validateWithDocker: false });
-      console.log(
+      currentOutput().log(
         pc.yellow("\nFinal merged Mesh YAML configuration:\n"),
         redactYamlSecrets(yaml)
       );
@@ -106,7 +107,7 @@ export async function handleMeshDown(
 
   clearRunState(meshDir);
 
-  console.log(
+  currentOutput().log(
     pc.green(`✅ Global mesh environment [${stage}] stopped and removed.\n`)
   );
   return 0;

@@ -1,6 +1,7 @@
 import type { ChildProcess } from "node:child_process";
 import os from "node:os";
 import { teardownCompose } from "./teardownCompose.js";
+import { currentOutput } from "./output/index.js";
 
 interface ActiveComposeEntry {
   yamlConfig: string;
@@ -134,7 +135,7 @@ function ensureSignalHandlers(): void {
           });
           activeComposeSet.delete(item);
         } catch (error) {
-          console.error("Compose cleanup failed during signal shutdown:", error);
+          currentOutput().error("Compose cleanup failed during signal shutdown:", error);
         }
       }
     })().finally(() => process.exit(128 + signalNumber));

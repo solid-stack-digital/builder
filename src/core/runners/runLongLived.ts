@@ -12,10 +12,11 @@ import { writeRunState, clearRunState } from "../../utils/runState.js";
 import { runWithCleanup } from "../runWithCleanup.js";
 import { runCompose } from "../runCompose.js";
 import { teardownCompose } from "../teardownCompose.js";
+import { currentOutput } from "../output/index.js";
 export interface LongLivedAdapters { compose?:typeof runCompose; teardown?:typeof teardownCompose; checkPorts?:typeof checkHostPortCollisions; inspectImage?:InspectImage }
 export async function runLongLived(stage:"dev"|"prod",projectDir:string,options:RunOptions|MeshRunOptions,compile:(validationMode:boolean)=>CompiledComposition,composition:"service"|"mesh",adapters:LongLivedAdapters={}):Promise<number> {
   const compiled=compile(Boolean(options.dryRun)),yaml=stringify(compiled.compose);
-  if(options.debug)console.log(redactYamlSecrets(yaml));
+  if(options.debug)currentOutput().log(redactYamlSecrets(yaml));
   if(options.dryRun)return 0;
   await (adapters.checkPorts??checkHostPortCollisions)(extractHostPorts(yaml));
   persistHostPortAllocations(projectDir,compiled.allocations);

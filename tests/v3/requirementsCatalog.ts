@@ -69,6 +69,7 @@ export function buildV3Catalog():V3Case[]{
     ["OUT07","Normal mode delegates to console and has no result line"],["OUT08","Piped child output reaches the file in order; late writes ignored"],
     ["OUT09","runCompose takes stdio from the active output"],["OUT10","teardownCompose honors output mode and its silent flag"],
     ["OUT11","runStep sends captured output through Output"],["OUT12","prune and log followers follow the output mode"],
+    ["OUT24","Builder sources write only through the output layer"],
   ];
   for(const [id,setup] of outputModeCases)descriptions.set(id,{setup,action:"Run V3.3 output mode acceptance case",expected:"Output mode behavior matches the V3.3 feature specification"});
   const isolatedOverlayCases=[

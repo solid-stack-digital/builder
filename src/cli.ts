@@ -7,6 +7,7 @@ import { registerServiceCommand } from "./commands/service/command.js";
 import { ScriptError } from "./errors/ScriptError.js";
 import { errorMessage } from "./utils/errorMessage.js";
 import { version } from "./version.js";
+import { currentOutput } from "./core/output/index.js";
 
 export function createCli(): Command {
   const program = new Command();
@@ -41,12 +42,12 @@ export async function runCli(argv: string[] = process.argv): Promise<void> {
     (arg) => arg === "-h" || arg === "--help" || arg === "-V" || arg === "--version"
   );
   if (!isHelpOrVersion && argv.length > 2) {
-    console.log(pc.dim(`builder v${version}`));
+    currentOutput().log(pc.dim(`builder v${version}`));
   }
 
   // No arguments provided: print help and exit 0 (M17)
   if (argv.length <= 2) {
-    console.log(pc.dim(`builder v${version}\n`));
+    currentOutput().log(pc.dim(`builder v${version}\n`));
     cli.outputHelp();
     return;
   }
@@ -83,18 +84,18 @@ export async function runCli(argv: string[] = process.argv): Promise<void> {
       const formatted = err.message.startsWith("❌")
         ? err.message
         : `❌ ${err.message}`;
-      console.error(pc.red(`\n${formatted}\n`));
+      currentOutput().error(pc.red(`\n${formatted}\n`));
       if (isVerbose && err.stack) {
-        console.error(pc.dim(err.stack));
+        currentOutput().error(pc.dim(err.stack));
       }
     } else {
       const message = errorMessage(err);
       const formatted = message.startsWith("❌")
         ? message
         : `❌ Error: ${message}`;
-      console.error(pc.red(`\n${formatted}\n`));
+      currentOutput().error(pc.red(`\n${formatted}\n`));
       if (isVerbose && err instanceof Error && err.stack) {
-        console.error(pc.dim(err.stack));
+        currentOutput().error(pc.dim(err.stack));
       }
     }
 

@@ -4,6 +4,7 @@ import type { CompiledComposition } from "../composition/types.js";
 import { inspectRequiredHealth, type InspectImage } from "../composition/inspectRequiredHealth.js";
 import { runCompose } from "../runCompose.js";
 import { checkHostPortCollisions,extractHostPorts } from "../../utils/checkPortCollision.js";
+import { currentOutput } from "../output/index.js";
 export interface FiniteTesterAdapters {
   compose?: typeof runCompose;
   inspectRunnerExit?: (yaml:string,projectDir:string,runner:string)=>number|undefined;
@@ -36,10 +37,10 @@ export async function runFiniteTester(compiled:CompiledComposition,projectDir:st
   } catch (error) {
     throw new Error(`Tester startup failed while waiting for ${members.join(", ")}: ${error instanceof Error?error.message:String(error)}`,{cause:error});
   }
-  if(startStatus!==0){try{await compose(["logs","--no-color"],yaml,projectDir,{removeVolumes:true});}catch(error){console.warn("Could not collect startup logs",error);}return startStatus;}
+  if(startStatus!==0){try{await compose(["logs","--no-color"],yaml,projectDir,{removeVolumes:true});}catch(error){currentOutput().warn("Could not collect startup logs",error);}return startStatus;}
   const waited=await compose(["wait",compiled.testerServiceName],yaml,projectDir,{removeVolumes:true});
   const inspected=(adapters.inspectRunnerExit??inspectRunnerExit)(yaml,projectDir,compiled.testerServiceName);
   const status=inspected??(waited===0?1:waited);
-  try{await compose(["logs","--no-color"],yaml,projectDir,{removeVolumes:true});}catch(error){console.warn("Could not collect tester logs",error);}
+  try{await compose(["logs","--no-color"],yaml,projectDir,{removeVolumes:true});}catch(error){currentOutput().warn("Could not collect tester logs",error);}
   return status;
 }

@@ -11,21 +11,22 @@ import { runWithCleanup } from "../runWithCleanup.js";
 import { runCompose } from "../runCompose.js";
 import { teardownCompose } from "../teardownCompose.js";
 import { inspectRunnerExit } from "./runFiniteTester.js";
+import { currentOutput } from "../output/index.js";
 export type InspectServiceExit = (yaml:string,projectDir:string,service:string)=>number|undefined;
 export interface UnitRuntimeAdapters { compose?: typeof runCompose; teardown?: typeof teardownCompose; checkPorts?: typeof checkHostPortCollisions; inspectExit?: InspectServiceExit }
 /** Isolated unit graph with on-inframode-isolated modules: start detached, wait for main, report main's exit. */
 async function runUnitWithLocalModules(compiled:CompiledComposition,yaml:string,main:string,projectDir:string,compose:typeof runCompose,inspectExit:InspectServiceExit):Promise<number> {
   const started=await compose(["up","--build","--detach",...compiled.runtimeServiceNames],yaml,projectDir,{removeVolumes:true,timeoutMs:120_000});
-  if(started!==0){try{await compose(["logs","--no-color"],yaml,projectDir,{removeVolumes:true});}catch(error){console.warn("Could not collect startup logs",error);}return started;}
+  if(started!==0){try{await compose(["logs","--no-color"],yaml,projectDir,{removeVolumes:true});}catch(error){currentOutput().warn("Could not collect startup logs",error);}return started;}
   const waited=await compose(["wait",main],yaml,projectDir,{removeVolumes:true});
   const status=inspectExit(yaml,projectDir,main)??(waited===0?1:waited);
-  try{await compose(["logs","--no-color",main],yaml,projectDir,{removeVolumes:true});}catch(error){console.warn("Could not collect unit logs",error);}
+  try{await compose(["logs","--no-color",main],yaml,projectDir,{removeVolumes:true});}catch(error){currentOutput().warn("Could not collect unit logs",error);}
   return status;
 }
 export async function runTestUnit(options:RunOptions,adapters:UnitRuntimeAdapters={}):Promise<number> {
   const compiled=compileServiceComposition("test",options.projectDir,{validationMode:Boolean(options.dryRun)}),yaml=stringify(compiled.compose);
   const main=compiled.mainServiceNames.get(nodeId(undefined,"main"))!;
-  if(options.debug)console.log(redactYamlSecrets(yaml));
+  if(options.debug)currentOutput().log(redactYamlSecrets(yaml));
   if(options.dryRun)return 0;
   await (adapters.checkPorts??checkHostPortCollisions)(extractHostPorts(yaml));
   await (adapters.teardown??teardownCompose)(yaml,options.projectDir,{removeVolumes:true,silent:true});

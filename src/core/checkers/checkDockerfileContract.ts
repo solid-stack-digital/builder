@@ -7,6 +7,7 @@ import { CONFTEST_IMAGE } from "./constants.js";
 import { runStep } from "./runStep.js";
 import { readFileSync } from "node:fs";
 import { ConfigError } from "../../errors/ConfigError.js";
+import { currentOutput } from "../output/index.js";
 
 interface DockerStage { name:string; parent:string; command?:string; entrypoint?:string; health?:string }
 export function assertMainDockerfileContract(projectDir:string,activeStage:"dev"|"test"|"prod"):void {
@@ -41,6 +42,6 @@ export function checkDockerfileContract(build: BuildJson, projectDir: string): v
   const relative = "Dockerfile";
   resolveApplicationDockerfile(root, relative);
   const policyDir = getDockerfilePolicyDir();
-  console.log(pc.cyan(`\n🔍 Validating Builder Dockerfile contract (${relative})...`));
+  currentOutput().log(pc.cyan(`\n🔍 Validating Builder Dockerfile contract (${relative})...`));
   runStep("docker", ["run","--rm","--network","none","--mount",`type=bind,src=${root},dst=/project,readonly`,"--mount",`type=bind,src=${policyDir},dst=/builder-policy,readonly`,"-w","/project",CONFTEST_IMAGE,"test",relative,"-p","/builder-policy"],root,{stepName:"Dockerfile Contract",targetFile:relative});
 }
