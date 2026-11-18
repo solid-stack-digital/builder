@@ -73,6 +73,7 @@ export function buildV3Catalog():V3Case[]{
     ["OUT16","Silent dry-run prints only success"],["OUT17","Non-zero exit becomes a failure line"],["OUT18","Logfile captures the run and resolves relative to cwd"],
     ["OUT19","Output flags are accepted before and after the subcommand"],
     ["OUT20","Quiet attached run waits, reports running, follows logs; Ctrl-C is success"],["OUT21","Quiet attached startup failure tears down; normal and detached unchanged"],
+    ["OUT22","Finite tester streams runner logs live, then dumps other members"],["OUT23","Unit runs with local modules stream main live"],
     ["OUT24","Builder sources write only through the output layer"],
   ];
   for(const [id,setup] of outputModeCases)descriptions.set(id,{setup,action:"Run V3.3 output mode acceptance case",expected:"Output mode behavior matches the V3.3 feature specification"});

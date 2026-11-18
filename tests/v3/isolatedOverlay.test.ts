@@ -162,7 +162,7 @@ describe("V3.2 isolated infra-mode overlay",()=>{
     const devstore=rep(compile(path.join(root,"web"),"test"),"devstore"),unitCalls:string[][]=[];
     const runtime={unit:{checkPorts:async()=>{},teardown:async()=>{},compose:async(args:string[])=>{unitCalls.push(args);return 0;},inspectExit:()=>0},e2e:{checkPorts:async()=>{},teardown:async()=>{},finite:{checkPorts:async()=>{},compose:async()=>0,inspectRunnerExit:()=>0}}};
     expect(await runMeshServiceTests({projectDir:root},runtime)).toBe(0);
-    expect(unitCalls[0]!.slice(0,3)).toEqual(["up","--build","--detach"]);expect(unitCalls[0]).toContain(devstore);expect(unitCalls[1]).toEqual(["wait","main"]);
+    expect(unitCalls[0]!.slice(0,3)).toEqual(["up","--build","--detach"]);expect(unitCalls[0]).toContain(devstore);expect(unitCalls[1]).toEqual(["logs","--follow","--no-color","main"]);expect(unitCalls[2]).toEqual(["wait","main"]);
   },10_000);
   it("[ISO21] test-unit keeps the 3.1 command for main-only graphs and waits on main otherwise",async()=>{
     const fake=(calls:string[][],status:(args:string[])=>number,exit:number|undefined):UnitRuntimeAdapters=>({checkPorts:async()=>{},teardown:async()=>{},compose:async(args)=>{calls.push(args);return status(args);},inspectExit:()=>exit});
@@ -172,7 +172,7 @@ describe("V3.2 isolated infra-mode overlay",()=>{
     const b=isolatedBuild();b.test={[KEY]:{services:{main:{requisites:{devstore:"dependency"}}}}};const root=writeIsolated(b);const devstore=rep(compile(root,"test"),"devstore");
     const multi:string[][]=[];expect(await runTestUnit(options(root),fake(multi,()=>0,7))).toBe(7);
     expect(multi[0]!.slice(0,3)).toEqual(["up","--build","--detach"]);expect(multi[0]!.slice(3).sort()).toEqual(["main",devstore].sort());
-    expect(multi.slice(1)).toEqual([["wait","main"],["logs","--no-color","main"]]);
+    expect(multi.slice(1)).toEqual([["logs","--follow","--no-color","main"],["wait","main"]]);
     expect(await runTestUnit(options(root),fake([],()=>0,undefined))).toBe(1);
     expect(await runTestUnit(options(root),fake([],args=>args[0]==="wait"?5:0,undefined))).toBe(5);
     const failed:string[][]=[];expect(await runTestUnit(options(root),fake(failed,args=>args[0]==="up"?3:0,undefined))).toBe(3);

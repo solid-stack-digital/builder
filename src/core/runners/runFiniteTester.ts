@@ -4,12 +4,15 @@ import type { CompiledComposition } from "../composition/types.js";
 import { inspectRequiredHealth, type InspectImage } from "../composition/inspectRequiredHealth.js";
 import { runCompose } from "../runCompose.js";
 import { checkHostPortCollisions,extractHostPorts } from "../../utils/checkPortCollision.js";
+import { finishFollow, followerFor, type FollowCompose } from "./liveLogs.js";
 import { currentOutput } from "../output/index.js";
 export interface FiniteTesterAdapters {
   compose?: typeof runCompose;
   inspectRunnerExit?: (yaml:string,projectDir:string,runner:string)=>number|undefined;
   inspectImage?: InspectImage;
   checkPorts?: typeof checkHostPortCollisions;
+  /** Live log follower for the selected runner. */
+  follow?: FollowCompose;
 }
 export function inspectRunnerExit(yaml:string,projectDir:string,runner:string):number|undefined {
   const ps=spawnSync("docker",["compose","--project-directory",projectDir,"-f","-","ps","-aq",runner],{cwd:projectDir,encoding:"utf8",input:yaml});
@@ -38,9 +41,12 @@ export async function runFiniteTester(compiled:CompiledComposition,projectDir:st
     throw new Error(`Tester startup failed while waiting for ${members.join(", ")}: ${error instanceof Error?error.message:String(error)}`,{cause:error});
   }
   if(startStatus!==0){try{await compose(["logs","--no-color"],yaml,projectDir,{removeVolumes:true});}catch(error){currentOutput().warn("Could not collect startup logs",error);}return startStatus;}
-  const waited=await compose(["wait",compiled.testerServiceName],yaml,projectDir,{removeVolumes:true});
-  const inspected=(adapters.inspectRunnerExit??inspectRunnerExit)(yaml,projectDir,compiled.testerServiceName);
+  const runner=compiled.testerServiceName,follower=followerFor(adapters)(["logs","--follow","--no-color",runner],yaml,projectDir);
+  const waited=await compose(["wait",runner],yaml,projectDir,{removeVolumes:true});
+  const inspected=(adapters.inspectRunnerExit??inspectRunnerExit)(yaml,projectDir,runner);
   const status=inspected??(waited===0?1:waited);
-  try{await compose(["logs","--no-color"],yaml,projectDir,{removeVolumes:true});}catch(error){currentOutput().warn("Could not collect tester logs",error);}
+  await finishFollow(follower);
+  const others=members.filter(name=>name!==runner);
+  if(others.length){try{await compose(["logs","--no-color",...others],yaml,projectDir,{removeVolumes:true});}catch(error){currentOutput().warn("Could not collect tester logs",error);}}
   return status;
 }
