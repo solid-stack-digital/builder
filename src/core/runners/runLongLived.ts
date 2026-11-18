@@ -12,10 +12,11 @@ import { writeRunState, clearRunState } from "../../utils/runState.js";
 import { runWithCleanup } from "../runWithCleanup.js";
 import { runCompose } from "../runCompose.js";
 import { teardownCompose } from "../teardownCompose.js";
+import { currentOutput } from "../output/index.js";
 export interface LongLivedAdapters { compose?:typeof runCompose; teardown?:typeof teardownCompose; checkPorts?:typeof checkHostPortCollisions; inspectImage?:InspectImage }
 export async function runLongLived(stage:"dev"|"prod",projectDir:string,options:RunOptions|MeshRunOptions,compile:(validationMode:boolean)=>CompiledComposition,composition:"service"|"mesh",adapters:LongLivedAdapters={}):Promise<number> {
   const compiled=compile(Boolean(options.dryRun)),yaml=stringify(compiled.compose);
-  if(options.debug)console.log(redactYamlSecrets(yaml));
+  if(options.debug)currentOutput().log(redactYamlSecrets(yaml));
   if(options.dryRun)return 0;
   await (adapters.checkPorts??checkHostPortCollisions)(extractHostPorts(yaml));
   persistHostPortAllocations(projectDir,compiled.allocations);
@@ -33,7 +34,17 @@ export async function runLongLived(stage:"dev"|"prod",projectDir:string,options:
     if(images.length){const result=await (adapters.compose??runCompose)(["pull","--policy","missing",...images],yaml,projectDir,{removeVolumes:false});if(result!==0)return result;}
     inspectRequiredHealth(compiled.deferredHealthChecks,projectDir,adapters.inspectImage,stage,composition);
     await (adapters.checkPorts??checkHostPortCollisions)(extractHostPorts(yaml));
-    const status=await (adapters.compose??runCompose)(["up","--no-build",...(options.detach?["--detach"]:[]),...compiled.runtimeServiceNames],yaml,projectDir,{removeVolumes:false});
+    const compose=adapters.compose??runCompose,services=compiled.runtimeServiceNames,out=currentOutput();
+    if(!options.detach&&out.mode!=="normal"){
+      // Quiet attached run: start detached and wait for health so the "running" line is true,
+      // then follow logs until Ctrl-C (exit 130), which counts as a clean stop.
+      const started=await compose(["up","--no-build","--detach","--wait",...services],yaml,projectDir,{removeVolumes:false});
+      if(started!==0)return started;
+      out.result({kind:"running"});
+      const followed=await compose(["logs","--follow","--no-color",...services],yaml,projectDir,{removeVolumes:false});
+      return followed===130?0:followed;
+    }
+    const status=await compose(["up","--no-build",...(options.detach?["--detach"]:[]),...services],yaml,projectDir,{removeVolumes:false});
     succeeded=status===0;
     return status;
   },async()=>{

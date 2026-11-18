@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { handleCheck } from "./handler.js";
+import { CommandExitError } from "../../errors/CommandExitError.js";
 
 export const registerCheckCommand = (cmd: Command) => {
   cmd
@@ -20,7 +21,7 @@ export const registerCheckCommand = (cmd: Command) => {
         projectDir: options.projectDir,
       });
       if (exitCode !== 0) {
-        process.exit(exitCode);
+        throw new CommandExitError(exitCode);
       }
     });
 };

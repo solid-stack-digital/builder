@@ -4,6 +4,7 @@ import { getMeshJson } from "../getMeshJson.js";
 import { checkMeshServices } from "./checkMeshServices.js";
 import { checkMeshTester } from "./checkMeshTester.js";
 import { checkDockerfileContract } from "../../checkers/checkDockerfileContract.js";
+import { currentOutput } from "../../output/index.js";
 
 export interface CheckMeshOptions {
   requireTester?: boolean | undefined;
@@ -20,7 +21,7 @@ export function checkMesh(
   checkMeshServices(mesh, absMeshDir,options.dockerfileContract);
   checkMeshTester(mesh, absMeshDir);
 
-  console.log(
+  currentOutput().log(
     pc.bold(
       pc.green("\nAll V3 mesh infrastructure, services, and contract checks passed.\n")
     )

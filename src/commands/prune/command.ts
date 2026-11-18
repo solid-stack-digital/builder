@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { handlePrune } from "./handler.js";
+import { CommandExitError } from "../../errors/CommandExitError.js";
 
 export const registerPruneCommand = (cmd: Command): void => {
   cmd
@@ -13,7 +14,7 @@ export const registerPruneCommand = (cmd: Command): void => {
         dryRun: Boolean(options.dryRun),
       });
       if (exitCode !== 0) {
-        process.exit(exitCode);
+        throw new CommandExitError(exitCode);
       }
     });
 };

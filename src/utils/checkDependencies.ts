@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import pc from "picocolors";
 import { ScriptError } from "../errors/ScriptError.js";
+import { currentOutput } from "../core/output/index.js";
 
 export function checkComposeAvailability(): void {
   // 1. Check docker compose v2 plugin, PATH, and minimum version >= 2.24.0 (M2)
@@ -57,7 +58,7 @@ export function checkDependencies(): void {
       .split("\n")
       .filter(Boolean).length;
     if (count > 25) {
-      console.warn(
+      currentOutput().warn(
         pc.yellow(
           `\n⚠️ High Docker Network Count Warning: Detected ${count} networks. Docker's default address pool can become exhausted, resulting in "could not find an available, non-overlapping IPv4 address pool" errors.\n` +
             `To resolve, run "builder prune" or "docker network prune -f", or configure default-address-pools in /etc/docker/daemon.json.\n`

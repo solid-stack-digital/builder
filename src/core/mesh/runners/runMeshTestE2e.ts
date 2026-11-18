@@ -10,9 +10,10 @@ import { runWithCleanup } from "../../runWithCleanup.js";
 import { teardownCompose } from "../../teardownCompose.js";
 import { runFiniteTester } from "../../runners/runFiniteTester.js";
 import type { E2eRuntimeAdapters } from "../../runners/runTestE2e.js";
+import { currentOutput } from "../../output/index.js";
 export async function runMeshTestE2e(options:MeshRunOptions={},adapters:E2eRuntimeAdapters={}):Promise<number> {
   const root=resolveProjectDir(options.projectDir),compiled=compileMeshComposition("e2e",root,{validationMode:Boolean(options.dryRun)}),yaml=stringify(compiled.compose);
-  if(options.debug)console.log(redactYamlSecrets(yaml));
+  if(options.debug)currentOutput().log(redactYamlSecrets(yaml));
   if(options.dryRun)return 0;
   await (adapters.checkPorts??checkHostPortCollisions)(extractHostPorts(yaml));
   await (adapters.teardown??teardownCompose)(yaml,root,{removeVolumes:true,silent:true});

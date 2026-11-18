@@ -62,6 +62,22 @@ export function buildV3Catalog():V3Case[]{
     "Shadowed invalid reference","Surviving invalid reference","Reserved Builder key","Compose build args output","Docker build ingests args"
   ];
   buildArgCases.forEach((setup,index)=>{const id=`BAR${String(index+1).padStart(2,"0")}`;descriptions.set(id,{setup,action:"Run V3.1 build argument acceptance case",expected:"Build argument behavior matches the V3.1 feature specification"});});
+  const outputModeCases:Array<[string,string]>=[
+    ["OUT01","Log file name is <ms>-<pid>-<command>.log"],["OUT02","Logfile directory is created and a file path is rejected"],
+    ["OUT03","Log file is private and ANSI-free"],["OUT04","Silent mode prints only the result"],
+    ["OUT05","Silent failure is one line on stderr"],["OUT06","Logfile mode streams to file and reports the path"],
+    ["OUT07","Normal mode delegates to console and has no result line"],["OUT08","Piped child output reaches the file in order; late writes ignored"],
+    ["OUT09","runCompose takes stdio from the active output"],["OUT10","teardownCompose honors output mode and its silent flag"],
+    ["OUT11","runStep sends captured output through Output"],["OUT12","prune and log followers follow the output mode"],
+    ["OUT13","Export env rejects output flags"],["OUT14","Dry-run debug rejects output flags"],["OUT15","Help and version win over output flags"],
+    ["OUT16","Silent dry-run prints only success"],["OUT17","Non-zero exit becomes a failure line"],["OUT18","Logfile captures the run and resolves relative to cwd"],
+    ["OUT19","Output flags are accepted before and after the subcommand"],
+    ["OUT20","Quiet attached run waits, reports running, follows logs; Ctrl-C is success"],["OUT21","Quiet attached startup failure tears down; normal and detached unchanged"],
+    ["OUT22","Finite tester streams runner logs live, then dumps other members"],["OUT23","Unit runs with local modules stream main live"],
+    ["OUT24","Builder sources write only through the output layer"],
+    ["OUT25","Public API exposes scoped output"],["OUT26","Logfile captures real build and container output from a Docker run"],
+  ];
+  for(const [id,setup] of outputModeCases)descriptions.set(id,{setup,action:"Run V3.3 output mode acceptance case",expected:"Output mode behavior matches the V3.3 feature specification"});
   const isolatedOverlayCases=[
     "Dev and test accept isolated overlay","Prod and e2e reject isolated overlay","Isolated overlay rejects tester","Isolated overlay rejects nesting and unknown keys",
     "Integrated resolution ignores block","Isolated resolution merges block last","Isolated dev starts block module","Block reference resolves",
@@ -78,7 +94,7 @@ export function buildV3Catalog():V3Case[]{
     if(cols.length>=4&&cols[1]?.includes("§")){const section=cols[1]!;for(const id of expandIds(cols[2]??"")){const current=sections.get(id)??new Set<string>();current.add(section);sections.set(id,current);}}
     if(cols.length>=6&&/^\d+$/.test(cols[1]??"")){for(const [index,cases] of [[1,2],[3,4]] as const){const number=Number(cols[index]);if(!Number.isInteger(number)||number<1||number>61)continue;for(const id of expandIds(cols[cases]??"")){const current=invariants.get(id)??new Set<number>();current.add(number);invariants.set(id,current);}}}
   }
-  const dockerCases=new Set(["BAR25","ISO23","ISO24","ISO25"]),isDockerCase=(id:string)=>id.startsWith("DOC")||dockerCases.has(id);
+  const dockerCases=new Set(["BAR25","ISO23","ISO24","ISO25","OUT26"]),isDockerCase=(id:string)=>id.startsWith("DOC")||dockerCases.has(id);
   const tests=sourceIndex();
   return [...descriptions].sort(([a],[b])=>a.localeCompare(b)).map(([id,value])=>({id,title:value.setup,specSections:[...sections.get(id)??["verification"]],invariantIds:[...invariants.get(id)??[]].sort((a,b)=>a-b),layer:isDockerCase(id)?"D":/^(RUN|MSH|OPS|CLI)/.test(id)?"W":/^(CFG|MER|GRF|REF|ENV|PUB)/.test(id)?"U":"I",fixture:isDockerCase(id)?"tests/v3/docker":"tests/v3/support/fixtures.ts",setup:value.setup,action:value.action,expected:value.expected,testFile:tests.get(id)??""}));
 }

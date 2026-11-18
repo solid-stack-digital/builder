@@ -33,6 +33,7 @@ try {
   command("built CLI version","node",["dist/bin.js","--version"],durations);
   command("built API import","node",["--input-type=module","-e","await import('./dist/index.js')"],durations);
   command("legacy gate","pnpm",["check:v3-no-legacy"],durations);
+  command("console gate","pnpm",["check:no-console"],durations);
   prerequisite();
   command("Docker batches","pnpm",["test:v3:docker"],durations);
   command("all-case coverage","pnpm",["exec","tsx","scripts/check-v3-coverage.ts","all",".builder/v3-fast-report.json",".builder/v3-docker-report.json"],durations);

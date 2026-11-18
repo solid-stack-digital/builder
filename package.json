@@ -1,6 +1,6 @@
 {
   "name": "@solid-stack/builder",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "CLI build tool and orchestrator for Solid Stack services.",
   "type": "module",
   "main": "./dist/index.js",
@@ -36,6 +36,7 @@
     "test:docker": "pnpm test:v3:docker",
     "check:full": "pnpm test:v3",
     "check:v3-no-legacy": "tsx scripts/check-no-v2-config-code.ts",
+    "check:no-console": "tsx scripts/check-no-console.ts",
     "test:v3:fast": "vitest run --config vitest.v3.config.ts --reporter=default --reporter=json --outputFile.json=.builder/v3-fast-report.json && tsx scripts/check-v3-coverage.ts fast .builder/v3-fast-report.json",
     "test:v3:docker": "vitest run --config vitest.v3-docker.config.ts --reporter=default --reporter=json --outputFile.json=.builder/v3-docker-report.json",
     "test:v3": "tsx scripts/test-v3.ts",

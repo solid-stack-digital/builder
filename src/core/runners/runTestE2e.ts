@@ -8,10 +8,11 @@ import { clearRunState, writeRunState } from "../../utils/runState.js";
 import { runWithCleanup } from "../runWithCleanup.js";
 import { teardownCompose } from "../teardownCompose.js";
 import { runFiniteTester, type FiniteTesterAdapters } from "./runFiniteTester.js";
+import { currentOutput } from "../output/index.js";
 export interface E2eRuntimeAdapters { finite?: FiniteTesterAdapters; teardown?: typeof teardownCompose; checkPorts?: typeof checkHostPortCollisions }
 export async function runTestE2e(options:RunOptions,adapters:E2eRuntimeAdapters={}):Promise<number> {
   const compiled=compileServiceComposition("e2e",options.projectDir,{validationMode:Boolean(options.dryRun)}),yaml=stringify(compiled.compose);
-  if(options.debug)console.log(redactYamlSecrets(yaml));
+  if(options.debug)currentOutput().log(redactYamlSecrets(yaml));
   if(options.dryRun)return 0;
   await (adapters.checkPorts??checkHostPortCollisions)(extractHostPorts(yaml));
   await (adapters.teardown??teardownCompose)(yaml,options.projectDir,{removeVolumes:true,silent:true});

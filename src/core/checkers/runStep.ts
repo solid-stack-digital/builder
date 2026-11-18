@@ -1,6 +1,7 @@
 import { spawnSync, type SpawnSyncOptions } from "node:child_process";
 import pc from "picocolors";
 import { ScriptError } from "../../errors/ScriptError.js";
+import { currentOutput } from "../output/index.js";
 
 export interface StepContext {
   stepName: string;
@@ -27,24 +28,25 @@ export function runStep(
 
   const stdout = (result.stdout as string) ?? "";
   const stderr = (result.stderr as string) ?? "";
-  if (stdout) process.stdout.write(stdout);
-  if (stderr) process.stderr.write(stderr);
+  const out = currentOutput();
+  if (stdout) out.write("stdout", stdout);
+  if (stderr) out.write("stderr", stderr);
 
   if (result.error || result.status !== 0) {
-    console.error("\n" + "=".repeat(60));
-    console.error(pc.red(`🚨 INFRASTRUCTURE CHECK FAILED 🚨`));
-    console.error("=".repeat(60));
-    console.error(`Failed Step : ${ctx.stepName}`);
+    out.error("\n" + "=".repeat(60));
+    out.error(pc.red(`🚨 INFRASTRUCTURE CHECK FAILED 🚨`));
+    out.error("=".repeat(60));
+    out.error(`Failed Step : ${ctx.stepName}`);
     if (ctx.targetFile) {
-      console.error(`Target File : ${ctx.targetFile}  <-- FIX THIS FILE`);
+      out.error(`Target File : ${ctx.targetFile}  <-- FIX THIS FILE`);
     }
     if (result.error) {
-      console.error(`Cause       : ${result.error.message}`);
+      out.error(`Cause       : ${result.error.message}`);
     }
     if (ctx.detail) {
-      console.error(`\n${ctx.detail}`);
+      out.error(`\n${ctx.detail}`);
     }
-    console.error("=".repeat(60) + "\n");
+    out.error("=".repeat(60) + "\n");
 
     const causeMsg = result.error ? ` (${result.error.message})` : "";
     throw new ScriptError(

@@ -8,6 +8,15 @@ export { compileMeshEnvironment } from "./core/mesh/compileMeshEnvironment.js";
 export { compileApplicationEnv, serializeApplicationEnv } from "./core/compileApplicationEnv.js";
 export { teardownCompose } from "./core/teardownCompose.js";
 export { runCompose } from "./core/runCompose.js";
+export {
+  createOutput,
+  runWithOutput,
+  type Output,
+  type OutputMode,
+  type OutputOptions,
+  type OutputSinks,
+  type ResultLine,
+} from "./core/output/index.js";
 export { buildJsonSchema } from "./core/buildSchema.js";
 export { meshSchema } from "./core/mesh/meshSchema.js";
 export { ScriptError } from "./errors/ScriptError.js";
