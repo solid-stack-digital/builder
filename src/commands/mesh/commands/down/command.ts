@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { handleMeshDown } from "./handler.js";
+import { CommandExitError } from "../../../../errors/CommandExitError.js";
 
 export const registerMeshDownCommand = (cmd: Command): void => {
   cmd
@@ -32,7 +33,7 @@ export const registerMeshDownCommand = (cmd: Command): void => {
           debug: options.debug,
         });
         if (exitCode !== 0) {
-          process.exit(exitCode);
+          throw new CommandExitError(exitCode);
         }
       }
     );

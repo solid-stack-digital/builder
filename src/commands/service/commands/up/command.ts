@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { handleServiceUp } from "./handler.js";
+import { CommandExitError } from "../../../../errors/CommandExitError.js";
 
 export const registerUpCommand = (cmd: Command): void => {
   cmd
@@ -55,7 +56,7 @@ The test command runs unit tests before E2E.`
           full: Boolean(options.full),
         });
         if (exitCode !== 0) {
-          process.exit(exitCode);
+          throw new CommandExitError(exitCode);
         }
       }
     );

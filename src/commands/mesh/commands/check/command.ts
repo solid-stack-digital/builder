@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { handleMeshCheck } from "./handler.js";
+import { CommandExitError } from "../../../../errors/CommandExitError.js";
 
 export const registerMeshCheckCommand = (cmd: Command) => {
   cmd
@@ -27,7 +28,7 @@ export const registerMeshCheckCommand = (cmd: Command) => {
         requireTester: options.requireTester,
       });
       if (exitCode !== 0) {
-        process.exit(exitCode);
+        throw new CommandExitError(exitCode);
       }
     });
 };

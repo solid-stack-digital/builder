@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { handleMeshUp } from "./handler.js";
+import { CommandExitError } from "../../../../errors/CommandExitError.js";
 
 export const registerMeshUpCommand = (cmd: Command): void => {
   cmd
@@ -45,7 +46,7 @@ For a service’s isolated tests: builder service up test-unit -C <service>.`
           skipChecks: options.skipChecks,
         });
         if (exitCode !== 0) {
-          process.exit(exitCode);
+          throw new CommandExitError(exitCode);
         }
       }
     );
