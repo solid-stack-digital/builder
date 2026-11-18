@@ -18,10 +18,13 @@ export interface MainOverlay { env?: Env; buildArgs?: BuildArgs; endpoints?: Rec
 export interface TesterOverlay { compose?: string; service?: string; env?: Env }
 export interface OrdinaryOverlay { compose?: string; service?: string; env?: Env; endpoints?: Record<string, Partial<ServiceEndpoint>>; requisites?: RequisiteOverlay }
 export interface BuildStage { services?: Record<string, MainOverlay | TesterOverlay | OrdinaryOverlay> }
+/** Overlay applied after `dev` or `test` only when the run's INFRA_MODE is isolated. */
+export interface IsolatedInfraOverlay { services?: Record<string, MainOverlay | OrdinaryOverlay> }
+export interface IsolatableBuildStage extends BuildStage { "on-inframode-isolated"?: IsolatedInfraOverlay }
 export interface BuildJson {
   $schema?: string; name: string;
   services: Record<string, MainService | TesterService | OrdinaryService> & { main: MainService; tester: TesterService };
-  dev?: BuildStage; prod?: BuildStage; test?: BuildStage; e2e?: BuildStage;
+  dev?: IsolatableBuildStage; prod?: BuildStage; test?: IsolatableBuildStage; e2e?: BuildStage;
 }
 export interface ServiceUpOptions { projectDir?: string; debug?: boolean; detach?: boolean; dryRun?: boolean; skipChecks?: boolean; silenceWarnings?: boolean; full?: boolean }
 export interface ServiceDownOptions { projectDir?: string; volumes?: boolean; debug?: boolean }

@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.2.0 (source tree; publication not implied)
+
+### Added
+
+- Optional `on-inframode-isolated` overlay in `build.json` `dev` and `test` stages. Builder merges it last and only in isolated runs, so `service up dev`, `service up test-unit`, and the unit phase of `mesh up test` can start local helper modules while main keeps `INFRA_MODE=isolated`. Integrated runs ignore it.
+- `service up test-unit` waits on main's exit and returns its code when the isolated graph contains modules; main-only unit runs are unchanged.
+- [3.1.0 to 3.2.0 migration guide](docs/migration/v3.1-to-v3.2.md).
+
+### Compatibility
+
+- Configurations without the block compile to the same Compose output as 3.1.0.
+
 ## 3.0.0 (source tree; publication not implied)
 
 ### Breaking changes

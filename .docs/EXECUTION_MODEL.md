@@ -18,7 +18,7 @@ Allowed application values:
 
 Defines how application dependencies are provided.
 
-- `isolated` — no external dependency containers; application uses in-process stubs/mocks.
+- `isolated` — no external dependency containers; application uses in-process stubs/mocks. Only local helper modules declared through `dev`/`test` `on-inframode-isolated` (V3.2.0) may run beside main.
 - `integrated` — dependencies are consumed through their normal external/network interfaces.
 
 When integrated, the application must not know whether a dependency is production infrastructure, an emulator, a mock service, or another mesh service.

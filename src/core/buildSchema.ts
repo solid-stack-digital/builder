@@ -26,11 +26,15 @@ export const buildServicesSchema = z.record(identifier, z.unknown()).superRefine
     if (!parsed.success) for (const issue of parsed.error.issues) context.addIssue({ ...issue, path: [key, ...issue.path] });
   }
 });
-export const buildStageSchema = z.object({ services: z.record(identifier, z.unknown()).superRefine((value, context) => {
+const overlayServices = (allowTester: boolean) => z.record(identifier, z.unknown()).superRefine((value, context) => {
   for (const [key, entry] of Object.entries(value)) {
+    if (key === "tester" && !allowTester) { context.addIssue({ code: "custom", path: [key], message: "tester cannot be configured in on-inframode-isolated" }); continue; }
     const schema = key === "main" ? mainOverlaySchema : key === "tester" ? testerOverlaySchema : ordinaryOverlaySchema;
     const parsed = schema.safeParse(entry);
     if (!parsed.success) for (const issue of parsed.error.issues) context.addIssue({ ...issue, path: [key, ...issue.path] });
   }
-}).optional() }).strict();
-export const buildJsonSchema = z.object({ $schema: z.string().optional(), name: nonblank, services: buildServicesSchema, dev: buildStageSchema.optional(), prod: buildStageSchema.optional(), test: buildStageSchema.optional(), e2e: buildStageSchema.optional() }).strict();
+});
+export const buildStageSchema = z.object({ services: overlayServices(true).optional() }).strict();
+export const isolatedInfraOverlaySchema = z.object({ services: overlayServices(false).optional() }).strict();
+export const isolatableBuildStageSchema = z.object({ services: overlayServices(true).optional(), "on-inframode-isolated": isolatedInfraOverlaySchema.optional() }).strict();
+export const buildJsonSchema = z.object({ $schema: z.string().optional(), name: nonblank, services: buildServicesSchema, dev: isolatableBuildStageSchema.optional(), prod: buildStageSchema.optional(), test: isolatableBuildStageSchema.optional(), e2e: buildStageSchema.optional() }).strict();

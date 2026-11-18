@@ -62,6 +62,15 @@ export function buildV3Catalog():V3Case[]{
     "Shadowed invalid reference","Surviving invalid reference","Reserved Builder key","Compose build args output","Docker build ingests args"
   ];
   buildArgCases.forEach((setup,index)=>{const id=`BAR${String(index+1).padStart(2,"0")}`;descriptions.set(id,{setup,action:"Run V3.1 build argument acceptance case",expected:"Build argument behavior matches the V3.1 feature specification"});});
+  const isolatedOverlayCases=[
+    "Dev and test accept isolated overlay","Prod and e2e reject isolated overlay","Isolated overlay rejects tester","Isolated overlay rejects nesting and unknown keys",
+    "Integrated resolution ignores block","Isolated resolution merges block last","Isolated dev starts block module","Block reference resolves",
+    "Dev full ignores block","Prod and e2e ignore block","Base main edges stay dropped","Block-only module declaration",
+    "Activated module edges followed","Stage-specific blocks","No-block output unchanged","Block override-compose selection",
+    "Block reference diagnostic","Block unknown requisite removal","Mesh global runs ignore block","Mesh Phase 1 applies source block",
+    "Unit runner with local modules","Check compiles blocks","Docker isolated dev with local module","Docker unit with local module","Docker unit exit propagation"
+  ];
+  isolatedOverlayCases.forEach((setup,index)=>{const id=`ISO${String(index+1).padStart(2,"0")}`;descriptions.set(id,{setup,action:"Run V3.2 isolated infra-mode overlay acceptance case",expected:"Isolated overlay behavior matches the V3.2 feature specification"});});
   const sections=new Map<string,Set<string>>(),invariants=new Map<string,Set<number>>();
   const mapping=fs.readFileSync(path.join(planRoot,files[2]!),"utf8");
   for(const line of mapping.split("\n")){
@@ -69,8 +78,9 @@ export function buildV3Catalog():V3Case[]{
     if(cols.length>=4&&cols[1]?.includes("§")){const section=cols[1]!;for(const id of expandIds(cols[2]??"")){const current=sections.get(id)??new Set<string>();current.add(section);sections.set(id,current);}}
     if(cols.length>=6&&/^\d+$/.test(cols[1]??"")){for(const [index,cases] of [[1,2],[3,4]] as const){const number=Number(cols[index]);if(!Number.isInteger(number)||number<1||number>61)continue;for(const id of expandIds(cols[cases]??"")){const current=invariants.get(id)??new Set<number>();current.add(number);invariants.set(id,current);}}}
   }
+  const dockerCases=new Set(["BAR25","ISO23","ISO24","ISO25"]),isDockerCase=(id:string)=>id.startsWith("DOC")||dockerCases.has(id);
   const tests=sourceIndex();
-  return [...descriptions].sort(([a],[b])=>a.localeCompare(b)).map(([id,value])=>({id,title:value.setup,specSections:[...sections.get(id)??["verification"]],invariantIds:[...invariants.get(id)??[]].sort((a,b)=>a-b),layer:id.startsWith("DOC")||id==="BAR25"?"D":/^(RUN|MSH|OPS|CLI)/.test(id)?"W":/^(CFG|MER|GRF|REF|ENV|PUB)/.test(id)?"U":"I",fixture:id.startsWith("DOC")||id==="BAR25"?"tests/v3/docker":"tests/v3/support/fixtures.ts",setup:value.setup,action:value.action,expected:value.expected,testFile:tests.get(id)??""}));
+  return [...descriptions].sort(([a],[b])=>a.localeCompare(b)).map(([id,value])=>({id,title:value.setup,specSections:[...sections.get(id)??["verification"]],invariantIds:[...invariants.get(id)??[]].sort((a,b)=>a-b),layer:isDockerCase(id)?"D":/^(RUN|MSH|OPS|CLI)/.test(id)?"W":/^(CFG|MER|GRF|REF|ENV|PUB)/.test(id)?"U":"I",fixture:isDockerCase(id)?"tests/v3/docker":"tests/v3/support/fixtures.ts",setup:value.setup,action:value.action,expected:value.expected,testFile:tests.get(id)??""}));
 }
 
 /** Validate actual Vitest outcomes, not only test names or registry size. */
