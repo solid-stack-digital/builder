@@ -1,8 +1,8 @@
 # Solid Stack Builder V3
 
-Builder 3.2.0 compiles a service's `build.json` or a system's `mesh.json` into Docker Compose. Services declare possible runtime modules; explicit **requisites** select which modules run and how they wait. Mesh sources stay independently runnable, with explicit `extends` rewrites when a real service replaces a local mock. Main services can declare stage-aware Docker `buildArgs`, and isolated runs can start local helper modules through `on-inframode-isolated`.
+Builder 3.3.0 compiles a service's `build.json` or a system's `mesh.json` into Docker Compose. Services declare possible runtime modules; explicit **requisites** select which modules run and how they wait. Mesh sources stay independently runnable, with explicit `extends` rewrites when a real service replaces a local mock. Main services can declare stage-aware Docker `buildArgs`, and isolated runs can start local helper modules through `on-inframode-isolated`. The global `--silent` and `--logfile <dir>` flags reduce terminal output to a single result line (see [output modes](docs/reference/cli.md#output-modes)).
 
-The source package declares version 3.2.0. This checkout does not imply that version has been published to a package registry. For a local checkout, run `pnpm install`, `pnpm build`, and `node dist/bin.js --version`. The package exposes both `builder` and `solid-builder` when installed. Node.js 20 or newer and Docker Engine with Compose are required for runtime commands.
+The source package declares version 3.3.0. This checkout does not imply that version has been published to a package registry. For a local checkout, run `pnpm install`, `pnpm build`, and `node dist/bin.js --version`. The package exposes both `builder` and `solid-builder` when installed. Node.js 20 or newer and Docker Engine with Compose are required for runtime commands.
 
 [Builder V3 documentation](docs/README.md)
 

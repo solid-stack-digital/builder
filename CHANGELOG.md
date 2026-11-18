@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.3.0 (source tree; publication not implied)
+
+### Added
+
+- Global `--silent` flag: the terminal shows only `success` (stdout) or `failure: <reason>` (stderr). Exit codes are unchanged.
+- Global `--logfile <dir>` flag: everything Builder and its child processes print (Docker, Compose, BuildKit, containers) is written to a new `<epoch-ms>-<pid>-<command>.log` file in `<dir>`, and the terminal shows only the result. See [output modes](docs/reference/cli.md#output-modes).
+- In those modes, attached `up dev|prod` waits for healthy services, prints `running (press Ctrl-C to stop)` and follows container logs. Ctrl-C reports `success`.
+- `createOutput` and `runWithOutput` in the library API to scope output for embedded use.
+
+### Changed
+
+- Test workflows stream the selected tester's (or unit main's) logs live while waiting, instead of printing them after the run. Other members' logs are still printed once at the end.
+
+### Compatibility
+
+- Without the new flags, output and exit codes match 3.2.0 apart from the live test log ordering above. `service export env` and `--dry-run --debug` reject the new flags with exit code 2.
+
 ## 3.2.0 (source tree; publication not implied)
 
 ### Added

@@ -75,6 +75,7 @@ export function buildV3Catalog():V3Case[]{
     ["OUT20","Quiet attached run waits, reports running, follows logs; Ctrl-C is success"],["OUT21","Quiet attached startup failure tears down; normal and detached unchanged"],
     ["OUT22","Finite tester streams runner logs live, then dumps other members"],["OUT23","Unit runs with local modules stream main live"],
     ["OUT24","Builder sources write only through the output layer"],
+    ["OUT25","Public API exposes scoped output"],["OUT26","Logfile captures real build and container output from a Docker run"],
   ];
   for(const [id,setup] of outputModeCases)descriptions.set(id,{setup,action:"Run V3.3 output mode acceptance case",expected:"Output mode behavior matches the V3.3 feature specification"});
   const isolatedOverlayCases=[
@@ -93,7 +94,7 @@ export function buildV3Catalog():V3Case[]{
     if(cols.length>=4&&cols[1]?.includes("§")){const section=cols[1]!;for(const id of expandIds(cols[2]??"")){const current=sections.get(id)??new Set<string>();current.add(section);sections.set(id,current);}}
     if(cols.length>=6&&/^\d+$/.test(cols[1]??"")){for(const [index,cases] of [[1,2],[3,4]] as const){const number=Number(cols[index]);if(!Number.isInteger(number)||number<1||number>61)continue;for(const id of expandIds(cols[cases]??"")){const current=invariants.get(id)??new Set<number>();current.add(number);invariants.set(id,current);}}}
   }
-  const dockerCases=new Set(["BAR25","ISO23","ISO24","ISO25"]),isDockerCase=(id:string)=>id.startsWith("DOC")||dockerCases.has(id);
+  const dockerCases=new Set(["BAR25","ISO23","ISO24","ISO25","OUT26"]),isDockerCase=(id:string)=>id.startsWith("DOC")||dockerCases.has(id);
   const tests=sourceIndex();
   return [...descriptions].sort(([a],[b])=>a.localeCompare(b)).map(([id,value])=>({id,title:value.setup,specSections:[...sections.get(id)??["verification"]],invariantIds:[...invariants.get(id)??[]].sort((a,b)=>a-b),layer:isDockerCase(id)?"D":/^(RUN|MSH|OPS|CLI)/.test(id)?"W":/^(CFG|MER|GRF|REF|ENV|PUB)/.test(id)?"U":"I",fixture:isDockerCase(id)?"tests/v3/docker":"tests/v3/support/fixtures.ts",setup:value.setup,action:value.action,expected:value.expected,testFile:tests.get(id)??""}));
 }

@@ -1,3 +1,5 @@
 # Docker and Compose errors
 
 Builder resolves source, ordinary Compose, override, build context, bind, config and secret paths from the file that authored them. A missing asset or path escaping the allowed project boundary fails before startup. Builder generates namespaced service and resource names so two modules can use the same local identifiers; do not hardcode generated names. Raw public ports, container names or host networks in ordinary modules conflict with Builder ownership. `--dry-run` checks compilation but does not start Docker; live failures require Docker Compose logs and project-specific `down`. See [ordinary Compose](../reference/dependency-compose-contract.md) and [CLI](../reference/cli.md).
+
+To keep a complete record of a failing run, add `--logfile <dir>`. The terminal shows only the result and the log path, and the file holds every Builder, Compose, build and container line in order. See [output modes](../reference/cli.md#output-modes).

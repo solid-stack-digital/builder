@@ -1,6 +1,6 @@
 # Builder V3 documentation
 
-Builder 3.2.0 uses explicit service graphs, supports first-class main-service Docker build arguments, and lets isolated runs start local helper modules. A `build.json` names a standalone main, a tester, and optional ordinary Compose modules. Requisites make ordinary modules reachable; `requirement` includes, `dependency` waits for health, and `prerequisite` waits for successful completion. A `mesh.json` imports independently runnable sources and may explicitly rewrite their requisites and environment.
+Builder 3.3.0 uses explicit service graphs, supports first-class main-service Docker build arguments, lets isolated runs start local helper modules, and can reduce terminal output to a single result line with `--silent` or `--logfile`. A `build.json` names a standalone main, a tester, and optional ordinary Compose modules. Requisites make ordinary modules reachable; `requirement` includes, `dependency` waits for health, and `prerequisite` waits for successful completion. A `mesh.json` imports independently runnable sources and may explicitly rewrite their requisites and environment.
 
 Start with [installation](getting-started/installation.md), the [service quickstart](getting-started/service-quickstart.md), and the [mesh quickstart](getting-started/mesh-quickstart.md). Existing 2.2.0 users should follow the [V3 migration guide](migration/v2.2-to-v3.0.md).
 
