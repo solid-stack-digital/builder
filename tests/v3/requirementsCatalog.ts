@@ -67,6 +67,8 @@ export function buildV3Catalog():V3Case[]{
     ["OUT03","Log file is private and ANSI-free"],["OUT04","Silent mode prints only the result"],
     ["OUT05","Silent failure is one line on stderr"],["OUT06","Logfile mode streams to file and reports the path"],
     ["OUT07","Normal mode delegates to console and has no result line"],["OUT08","Piped child output reaches the file in order; late writes ignored"],
+    ["OUT09","runCompose takes stdio from the active output"],["OUT10","teardownCompose honors output mode and its silent flag"],
+    ["OUT11","runStep sends captured output through Output"],["OUT12","prune and log followers follow the output mode"],
   ];
   for(const [id,setup] of outputModeCases)descriptions.set(id,{setup,action:"Run V3.3 output mode acceptance case",expected:"Output mode behavior matches the V3.3 feature specification"});
   const isolatedOverlayCases=[

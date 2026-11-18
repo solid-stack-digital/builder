@@ -3,6 +3,7 @@ import os from "node:os";
 import { ScriptError } from "../errors/ScriptError.js";
 import { resolveProjectDir } from "../utils/paths.js";
 import { registerActiveCompose, setActiveChild } from "./composeCleanup.js";
+import { currentOutput } from "./output/index.js";
 
 export interface RunComposeOptions {
   removeVolumes?: boolean;
@@ -22,6 +23,7 @@ export async function runCompose(
     removeVolumes: options.removeVolumes ?? false,
   });
 
+  const out = currentOutput();
   return new Promise<number>((resolve, reject) => {
     let child;
     try {
@@ -30,9 +32,10 @@ export async function runCompose(
         ["compose", "--project-directory", absProjectDir, "-f", "-", ...args],
         {
           cwd: absProjectDir,
-          stdio: ["pipe", "inherit", "inherit"],
+          stdio: ["pipe", ...out.childStdio()],
         }
       );
+      out.pipeChild(child);
     } catch (err: any) {
       unregister();
       return reject(
@@ -85,4 +88,63 @@ export async function runCompose(
       }
     });
   });
+}
+
+export interface FollowHandle {
+  /** Resolves with the follower's exit status (128+signal when killed). */
+  done: Promise<number>;
+  /** SIGTERM the follower (no-op once it has exited) and resolve with its status. */
+  stop(): Promise<number>;
+}
+
+/**
+ * Run a secondary Compose command (e.g. `logs --follow`) alongside the primary one.
+ * It is not registered as the active child, so signal handling and cleanup stay
+ * bound to the primary command.
+ */
+export function followCompose(
+  args: string[],
+  yamlConfig: string,
+  projectDir: string,
+  options: { spawnProcess?: typeof spawn } = {}
+): FollowHandle {
+  const absProjectDir = resolveProjectDir(projectDir);
+  const out = currentOutput();
+  let exited = false;
+  let child: ReturnType<typeof spawn> | undefined;
+  const done = new Promise<number>((resolve) => {
+    try {
+      child = (options.spawnProcess ?? spawn)(
+        "docker",
+        ["compose", "--project-directory", absProjectDir, "-f", "-", ...args],
+        { cwd: absProjectDir, stdio: ["pipe", ...out.childStdio()] }
+      );
+    } catch (err: any) {
+      out.warn(`Could not follow Compose logs: ${err.message}`);
+      exited = true;
+      return resolve(1);
+    }
+    out.pipeChild(child);
+    child.stdin?.on("error", () => {});
+    child.stdin?.write(yamlConfig);
+    child.stdin?.end();
+    child.on("error", (err) => {
+      exited = true;
+      out.warn(`Could not follow Compose logs: ${err.message}`);
+      resolve(1);
+    });
+    child.on("close", (code, signal) => {
+      exited = true;
+      resolve(signal ? 128 + (os.constants.signals[signal] ?? 0) : code ?? 1);
+    });
+  });
+  return {
+    done,
+    stop: () => {
+      if (!exited && child) {
+        try { child.kill("SIGTERM"); } catch { /* already gone */ }
+      }
+      return done;
+    },
+  };
 }

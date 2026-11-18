@@ -4,12 +4,15 @@ import { spawn } from "node:child_process";
 import { ScriptError } from "../errors/ScriptError.js";
 import { resolveProjectDir } from "../utils/paths.js";
 import { setTearingDown } from "./composeCleanup.js";
+import { currentOutput } from "./output/index.js";
 
 export interface TeardownOptions {
   removeVolumes?: boolean;
   anonymousVolumeServices?: string[];
   projectName?: string;
   silent?: boolean;
+  /** Internal process boundary for deterministic tests. */
+  spawnProcess?: typeof spawn;
 }
 
 function runSpawn(
@@ -18,19 +21,18 @@ function runSpawn(
   cwd: string,
   input?: string,
   silent = false,
-  timeoutMs = 60_000
+  timeoutMs = 60_000,
+  spawnProcess: typeof spawn = spawn
 ): Promise<{ status: number | null; error?: Error }> {
+  const out = currentOutput();
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(executable, args, {
+      child = spawnProcess(executable, args, {
         cwd,
-        stdio: [
-          input ? "pipe" : "ignore",
-          silent ? "ignore" : "inherit",
-          silent ? "ignore" : "inherit",
-        ],
+        stdio: [input ? "pipe" : "ignore", ...(silent ? (["ignore", "ignore"] as const) : out.childStdio())],
       });
+      if (!silent) out.pipeChild(child);
     } catch (err: any) {
       return resolve({ status: null, error: err });
     }
@@ -91,7 +93,7 @@ export async function teardownCompose(
 
     if (!removeVolumes) {
       const services = yamlConfig.trim() ? anonymousVolumeServices(parse(yamlConfig)?.services ?? {}) : options.anonymousVolumeServices ?? [];
-      if (services.length) await runSpawn("docker", [...baseArgs, "rm", "-s", "-f", "-v", ...services], absProjectDir, inputData, true, 15_000);
+      if (services.length) await runSpawn("docker", [...baseArgs, "rm", "-s", "-f", "-v", ...services], absProjectDir, inputData, true, 15_000, options.spawnProcess);
     }
 
     const downArgs = [...baseArgs, "down"];
@@ -106,7 +108,8 @@ export async function teardownCompose(
       absProjectDir,
       inputData,
       silent,
-      60_000
+      60_000,
+      options.spawnProcess
     );
 
     // Retry once if down failed (e.g. active network endpoints race condition)
@@ -118,7 +121,8 @@ export async function teardownCompose(
         absProjectDir,
         inputData,
         silent,
-        60_000
+        60_000,
+        options.spawnProcess
       );
     }
 
